@@ -1,7 +1,8 @@
 # Preferences
 
-Durable, low-stakes preferences. The load-bearing ones are rules; these are the ones that
-shape a session without constraining it.
+Durable, low-stakes preferences — the ones that shape a session without constraining it. The
+load-bearing ones are rules; if something here starts reading like an "always" or a "never",
+it belongs in `rules/` instead.
 
 ## How I send you things
 
@@ -18,9 +19,5 @@ shape a session without constraining it.
 
 ## Working style
 
-- Ask before a decision that is expensive to unmake — see
-  [`rules/core/conservative-package-changes`](../rules/core/conservative-package-changes.md).
-  For everything else, act.
 - If a change is going to be large, say how large before starting rather than after.
-- A short "here is what I would do next" is welcome at the end. Doing it uninvited is not —
-  see [`rules/core/dont-rush-new-features`](../rules/core/dont-rush-new-features.md).
+- A short "here is what I would do next" is welcome at the end.

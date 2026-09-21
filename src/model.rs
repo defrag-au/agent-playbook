@@ -275,10 +275,20 @@ pub struct Target {
     pub name: String,
     pub model: String,
     pub harness: String,
+    /// The heading for the generated block. Defaults to `Agent rules`.
+    pub title: String,
     pub include: Vec<String>,
     pub exclude: Vec<String>,
+    /// Activation kinds to drop, e.g. `always`.
+    ///
+    /// For a target whose rules are delivered somewhere else. The personal instructions file
+    /// is the worked case: the universal rules ship in each repository's block, so repeating
+    /// them in a file that loads for every project is duplication with no reader.
+    pub exclude_activation: Vec<String>,
     pub emphasis: Vec<String>,
     pub addenda: Vec<String>,
+    /// Files under `memory/`, emitted after the rules.
+    pub memory: Vec<String>,
     pub default_file: String,
     /// The harness's instruction-file priority order, most significant first.
     ///
@@ -288,9 +298,13 @@ pub struct Target {
     pub instruction_files: Vec<String>,
 }
 
-/// A harness-specific addendum appended after the rules.
+/// A block of prose appended to the generated output — an addendum, or a memory file.
+///
+/// One shape for both, because they are the same thing mechanically: a markdown file from a
+/// directory, demoted one heading level and appended. They differ only in what they are for
+/// and where they sit in the output.
 #[derive(Debug, Clone)]
-pub struct Addendum {
+pub struct Section {
     pub name: String,
     pub body: String,
 }

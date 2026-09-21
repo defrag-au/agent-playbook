@@ -108,10 +108,14 @@ fn every_known_project_resolves_without_errors() {
             "{project} resolved with errors:\n{}",
             messages.join("\n")
         );
-        assert!(
-            !resolved.rules.is_empty(),
-            "{project} resolved to zero rules"
-        );
+        // `personal` is the one project that legitimately carries no rules — see
+        // `the_personal_target_carries_no_rules_and_the_memory_layer`.
+        if project != "personal" {
+            assert!(
+                !resolved.rules.is_empty(),
+                "{project} resolved to zero rules"
+            );
+        }
     }
 }
 
@@ -149,6 +153,46 @@ fn layer_order_is_core_then_language_then_org_then_project() {
             .all(|r| r.layer.rank() < Layer::Project.rank()),
         "a lower layer sorted after the project layer"
     );
+}
+
+#[test]
+fn the_personal_target_carries_no_rules_and_the_memory_layer() {
+    // Zed's personal instructions file loads for every project the user opens, and an agent
+    // reads it *alongside* the project's own file. So it must carry no rules at all: the
+    // universal rules ship in each repository's block, because a repo is bootstrapped with
+    // them and its `AGENTS.md` is committed and shared. Repeating them here would be
+    // duplication with no reader.
+    //
+    // What it carries is the `memory/` layer — facts about the person and the machine that
+    // are true regardless of repository, and that no repo's block should hold.
+    let resolved = resolve(&repo_root(), "personal", Some("zed-personal")).expect("resolve");
+    assert!(!resolved.has_errors(), "{:?}", resolved.diagnostics);
+    assert!(
+        resolved.rules.is_empty(),
+        "the personal file must carry no rules, but resolved: {:?}",
+        resolved
+            .rules
+            .iter()
+            .map(|rule| rule.rel.as_str())
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !resolved.memory.is_empty(),
+        "the personal instructions file would be empty"
+    );
+}
+
+#[test]
+fn repo_targets_do_not_carry_the_memory_layer() {
+    // The two files are complementary: memory is personal and loads everywhere, rules are
+    // per-repo. A repo block carrying memory would duplicate it in every project.
+    for project in ["shared-crates", "cnft-dev-workers", "archivist"] {
+        let resolved = resolve(&repo_root(), project, None).expect("resolve");
+        assert!(
+            resolved.memory.is_empty(),
+            "{project} carries the memory layer"
+        );
+    }
 }
 
 #[test]

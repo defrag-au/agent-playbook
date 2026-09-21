@@ -5,8 +5,8 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::load::{has_errors, load_addendum, load_project, load_rules, load_target};
-use crate::model::{Activation, Addendum, Diagnostic, Layer, Project, Rule, Target};
+use crate::load::{has_errors, load_addendum, load_memory, load_project, load_rules, load_target};
+use crate::model::{Activation, Diagnostic, Layer, Project, Rule, Section, Target};
 
 pub struct Resolved {
     /// The playbook root this was resolved from. Carried so the rendered block can name
@@ -21,7 +21,9 @@ pub struct Resolved {
     pub superseded: Vec<String>,
     /// In overlay order, looked up from the resolved set.
     pub emphasis: Vec<Rule>,
-    pub addenda: Vec<Addendum>,
+    /// Files from `memory/`, emitted after the rules.
+    pub memory: Vec<Section>,
+    pub addenda: Vec<Section>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -65,6 +67,16 @@ pub fn resolve(
             continue;
         }
         if excluded(&rule, &target) {
+            continue;
+        }
+        // A target may drop a whole activation kind — the personal instructions file drops
+        // `always`, because those rules ship in every repository's block and repeating them
+        // in a file that loads for every project is duplication with no reader.
+        if target
+            .exclude_activation
+            .iter()
+            .any(|kind| kind == &rule.activation.as_str())
+        {
             continue;
         }
         kept.push(rule);
@@ -129,6 +141,18 @@ pub fn resolve(
         }
     }
 
+    // --- memory -------------------------------------------------------------
+    let mut memory = Vec::new();
+    for name in &target.memory {
+        match load_memory(root, name) {
+            Ok(section) => memory.push(section),
+            Err(e) => diagnostics.push(Diagnostic::error(format!(
+                "target `{}`: memory file {name}: {e}",
+                target.name
+            ))),
+        }
+    }
+
     // --- addenda ------------------------------------------------------------
     let mut addenda = Vec::new();
     for name in &target.addenda {
@@ -141,9 +165,9 @@ pub fn resolve(
         }
     }
 
-    if kept.is_empty() {
+    if kept.is_empty() && memory.is_empty() && addenda.is_empty() {
         diagnostics.push(Diagnostic::warning(format!(
-            "project `{project_name}` + target `{target_name}` resolves to zero rules"
+            "project `{project_name}` + target `{target_name}` resolves to nothing at all"
         )));
     }
 
@@ -154,6 +178,7 @@ pub fn resolve(
         rules: kept,
         superseded,
         emphasis,
+        memory,
         addenda,
         diagnostics,
     })

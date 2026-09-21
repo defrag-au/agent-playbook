@@ -2,23 +2,26 @@
 
 Durable facts — about the environment and about how I want to be worked with.
 
-This layer is concatenated into the agent file alongside `rules/`, so it is always loaded. It
-is separate from `rules/` because a fact and a constraint have different lifetimes: a rule
-changes when a decision changes, a memory changes when the *world* changes.
+This layer is delivered by the **`zed-personal` target**, into Zed's personal instructions
+file (`~/.config/zed/AGENTS.md`), which loads for every project. It is not part of any
+repository's block: a fact about the machine is not a fact about a repo, and a repo's
+`AGENTS.md` is committed and shared.
 
 ## What belongs here
 
 | Kind | Example |
 | --- | --- |
-| Environment | "`cargo` is not on `PATH` outside the devshell" |
-| Tooling quirks | "Chromium headless floors the window near 620px" |
+| Environment | "Repositories are laid out as `~/code/<org>/<repo>`" |
+| Tooling available on the machine | "`nix` and `direnv` are installed" |
 | Durable preference | "Screenshots I send are the newest file in `~/Desktop`" |
-| Naming or path conventions | "Repos live under `~/code/<org>/<repo>`" |
 
 ## What does not
 
 - **Anything with an "always" or a "never" in it** → `rules/`. A constraint belongs where it
   can be layered, overridden and enforced; memory cannot.
+- **Anything that restates a rule.** The personal file and a repo's block are read *together*,
+  so a fact that is already a rule is duplication with no reader. "Use the devshell" is a
+  rule; "`direnv` is at `~/.nix-profile/bin/direnv`" is a fact.
 - **A procedure** → `skills/`.
 - **A crate's API** → `references/crates/`.
 
@@ -31,5 +34,5 @@ which one is current.
 
 The one exception is a fact whose *replacement* is unintuitive, where the stale version is
 worth naming so it is not rediscovered. `projects/archivist/rules/devshell-commands.md` does
-this for the profile-sourcing advice: it says what the old advice was and why it is wrong,
-because the symptom it was written for still occurs. That belongs in a rule, not here.
+this for the profile-sourcing advice — but note that it lives in a **rule**, not here, because
+it is a constraint rather than a fact.

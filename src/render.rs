@@ -15,7 +15,10 @@ pub fn render(resolved: &Resolved) -> String {
         "{BEGIN_PREFIX} (project: {}, target: {}) — generated, do not edit -->\n\n",
         resolved.project.name, resolved.target.name
     ));
-    out.push_str(&format!("# Agent rules — {}\n\n", resolved.project.name));
+    // The heading is the target's title alone. Naming the project here read as
+    // "# Personal instructions — personal", and for a repo block the project name is already
+    // in the file's path and in the provenance line below.
+    out.push_str(&format!("# {}\n\n", resolved.target.title));
     out.push_str(&format!(
         "Generated from agent-playbook (`projects/{}` + `models/{}`).\n\
          Rule sources live under `{}` — each heading's HTML comment names its file there.\n\
@@ -52,6 +55,12 @@ pub fn render(resolved: &Resolved) -> String {
         // Only the directive is compiled. The rationale stays in the rule file at source —
         // the block is for an agent's attention budget, not for the argument behind the rule.
         out.push_str(&rewrite_links(&demote_headings(&rule.directive)));
+        out.push('\n');
+    }
+
+    for section in &resolved.memory {
+        blank_line(&mut out);
+        out.push_str(&rewrite_links(&demote_headings(section.body.trim())));
         out.push('\n');
     }
 
@@ -128,17 +137,30 @@ fn rewrite_links(body: &str) -> String {
     out
 }
 
-/// Push every heading in an addendum down one level, so it sits under the rules rather
-/// than competing with them.
+/// Push every heading down one level, so a rule's own sub-headings sit under its title rather
+/// than competing with it.
+///
+/// Fenced code blocks are skipped: a `#` comment in a shell example is not a heading, and
+/// demoting it corrupts the example. It did — a `.env.example` block came out reading
+/// `## .env.example — committed`, which is not what anyone would write in a `.env` file.
 fn demote_headings(body: &str) -> String {
     let mut out = String::new();
+    let mut in_fence = false;
+
     for line in body.lines() {
-        if line.starts_with('#') && line.trim_start_matches('#').starts_with(' ') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+        } else if !in_fence
+            && line.starts_with('#')
+            && line.trim_start_matches('#').starts_with(' ')
+        {
             out.push('#');
         }
         out.push_str(line);
         out.push('\n');
     }
+
     while out.ends_with("\n\n") {
         out.pop();
     }
@@ -218,6 +240,37 @@ mod tests {
         let out = demote_headings("# Title\n\ntext\n\n## Sub\n");
         assert!(out.contains("## Title"));
         assert!(out.contains("### Sub"));
+    }
+
+    #[test]
+    fn a_hash_comment_inside_a_code_block_is_not_demoted() {
+        // The regression: a `.env.example` block came out reading `## .env.example —
+        // committed`, which is not what anyone would write in a `.env` file.
+        let body = "```\n# .env.example — committed\nKEY=value\n```\n";
+        assert_eq!(demote_headings(body), body);
+    }
+
+    #[test]
+    fn headings_outside_a_code_block_are_still_demoted() {
+        let body = "# Title\n\n```sh\n# a comment\n```\n\n## Sub\n";
+        let out = demote_headings(body);
+        assert!(out.contains("## Title"));
+        assert!(out.contains("# a comment"));
+        assert!(out.contains("### Sub"));
+    }
+
+    #[test]
+    fn a_fence_with_a_language_tag_toggles_too() {
+        let body = "```sh\n# comment\n```\n\n# Heading\n";
+        let out = demote_headings(body);
+        assert!(out.contains("# comment"));
+        assert!(out.contains("## Heading"));
+    }
+
+    #[test]
+    fn a_tilde_fence_is_recognised() {
+        let body = "~~~\n# comment\n~~~\n";
+        assert_eq!(demote_headings(body), body);
     }
 
     #[test]

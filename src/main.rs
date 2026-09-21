@@ -195,10 +195,16 @@ fn cmd_list(opts: &Opts) -> Result<ExitCode, String> {
         resolved.target.name, resolved.target.model, resolved.target.harness
     );
     println!(
-        "include: {}   exclude: {}   emphasis: {}",
+        "include: {}   exclude: {}   exclude_activation: {}   emphasis: {}",
         or_dash(&resolved.target.include),
         or_dash(&resolved.target.exclude),
+        or_dash(&resolved.target.exclude_activation),
         or_dash(&resolved.target.emphasis)
+    );
+    println!(
+        "memory: {}   addenda: {}",
+        or_dash(&resolved.target.memory),
+        or_dash(&resolved.target.addenda)
     );
 
     let width = resolved
@@ -225,6 +231,9 @@ fn cmd_list(opts: &Opts) -> Result<ExitCode, String> {
         );
     }
     println!("\n{} rules", resolved.rules.len());
+    if !resolved.memory.is_empty() {
+        println!("memory sections: {}", resolved.memory.len());
+    }
 
     if !resolved.superseded.is_empty() {
         println!("superseded by a higher layer:");
