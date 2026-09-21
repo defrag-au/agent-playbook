@@ -14,8 +14,9 @@ targets:
   or a heredoc — not for a big change, and not for "just one small change". This applies to
   every file: source, config, docs, rules, memory.
 - A change that touches ten places is ten edit calls, not one script.
-- The editor tools fail loudly on a stale or ambiguous match and show a reviewable diff. A
-  script's `str.replace` **silently does nothing** when the anchor text has moved.
+- The editor tools verify the file was read first, fail loudly on a stale or ambiguous
+  match, and show a reviewable diff. A script's `str.replace` **silently does nothing** when
+  the anchor text has moved.
 - Still fine: generating a file's *content* with a script when the content is genuinely
   computed (a catalogue from source headers, a table derived from data) — writing it to disk
   still goes through the write tool. And reads through the shell (`cat`, `grep`, `find`) to

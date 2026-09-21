@@ -10,7 +10,7 @@ targets:
 
 ## Directive
 
-D1 billing: reads are cheap, writes are expensive.
+D1 billing: reads are cheap, writes are expensive. Optimise Cloudflare D1 access for that.
 
 - Check existence before writing → a write that would be a no-op never happens, and CONFLICT
   handling is not paid for.

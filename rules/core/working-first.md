@@ -19,6 +19,8 @@ targets:
   - comment out code to silence a compilation error
   - fight type/lifetime/async issues before the plain logic is proven
   - rewrite a signature to make an error go away rather than understanding it
+  - say "we'll implement that later" about a core feature rather than an edge
+  - spend longer on the shape of the code than on whether the feature works
 - Deviate only when continuing would break something that works, introduce a security hole,
   or risk data corruption — and then fix it properly, do not disable it.
 
@@ -41,4 +43,5 @@ failure moves to whoever runs the code next.
 
 Green lights, for contrast: the user can exercise the feature right now · core functionality
 works even if the implementation is plain · each change leaves the working state working ·
-value is demonstrable this session rather than next.
+problems are being solved rather than hidden · value is demonstrable this session rather than
+next.

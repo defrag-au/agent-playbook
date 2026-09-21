@@ -10,15 +10,16 @@ targets:
 
 ## Directive
 
-- Never fabricate a value to make a function, fixture or screen look functional. Find where
-  the data actually comes from — a config file, a table, an API response, a sibling
-  implementation, an env var. A real search turning up nothing → ask, do not invent.
+- Never fabricate a value to make a function, fixture or screen look functional. Before
+  writing a placeholder, find where the data actually comes from — a config file, a table, an
+  API response, a sibling implementation, an env var. A real search turning up nothing → ask,
+  do not invent.
 - Same rule for: a plausible address, hash or timestamp invented for a fixture (it hides real
   parsing bugs, because invented data is already in the format the code expects) ·
   `unwrap_or(0)`, `Default::default()` or a hard-coded fallback on a value that should have
-  been sourced · a struct written from memory of what an API "should" return · a test
-  asserting what the code currently does · a confident explanation of a failure you have not
-  verified.
+  been sourced · a struct written from memory of what an API "should" return (cite the actual
+  response or the docs) · a test asserting what the code currently does · a confident
+  explanation of a failure you have not verified.
 - Choosing a sensible default and **stating it** is fine. Inventing a value and presenting it
   as data is not. Test: if someone asks "where does this number come from?", is there an
   answer? "Nowhere yet" → say so and ask.

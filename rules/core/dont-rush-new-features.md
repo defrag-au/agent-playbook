@@ -11,9 +11,12 @@ targets:
 ## Directive
 
 - Asked for X → build X and stop. Do not add Y and Z because they seem wanted: no config
-  option "for flexibility", no trait "for testability", no abstraction "for later".
-- Three exceptions only: the task cannot be completed without it · not doing it would break
-  something that currently works · I asked you to use your judgement.
+  option "for flexibility", no trait "for testability", no abstraction "for later" — unless
+  the task named it.
+- Plan each logical step of implementation together, one at a time.
+- Three exceptions only: the task cannot be completed without it (a caller that must be
+  updated to keep the workspace compiling, a type the requested feature needs to typecheck) ·
+  not doing it would break something that currently works · I asked you to use your judgement.
 - Everything else → mention it and let me decide. A one-line "this would also allow X if you
   want it next" is welcome. Building X uninvited is not.
 - Applies to cleanup too: renames, import reordering, tidying a neighbouring function, bumping

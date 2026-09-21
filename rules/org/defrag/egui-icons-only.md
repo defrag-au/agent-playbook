@@ -11,7 +11,8 @@ targets:
 ## Directive
 
 Never use raw Unicode symbols — `●` `○` `✓` `✕` `→` `★` and friends. Neither the default egui
-font nor the Phosphor font covers those blocks, so they render as broken boxes in the browser.
+font nor the Phosphor font covers the geometric and symbol Unicode blocks, so they render as
+broken boxes in the browser.
 
 Use `PhosphorIcon` from `icons.rs`:
 

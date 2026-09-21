@@ -11,7 +11,8 @@ targets:
 ## Directive
 
 Applies only when asked to prepare a commit or draft a PR — see
-[`core/git-is-the-users-domain`](../../core/git-is-the-users-domain.md).
+[`core/git-is-the-users-domain`](../../core/git-is-the-users-domain.md) for the standing rule
+that you do not commit uninvited.
 
 ### Commits
 

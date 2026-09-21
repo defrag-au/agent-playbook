@@ -11,7 +11,8 @@ targets:
 ## Directive
 
 `cargo`, `rustc`, `clippy`, `rustfmt`, `trunk`, `wrangler`, `node` and the wasm targets are
-**not on `PATH`**. Wrap every command:
+**not on `PATH`** — they come only from the devshell defined in `flake.nix`. Wrap every
+command:
 
 ```sh
 nix develop -c cargo build --workspace
@@ -22,9 +23,10 @@ nix develop -c cargo fmt
 
 `nix develop --command <cmd>` is equivalent.
 
-**In a sandboxed shell, `nix develop` cannot reach the daemon socket** —
-`cannot connect to socket … Operation not permitted`. Use direnv instead, which reads the
-already-realised devshell out of `.direnv/` and needs no daemon:
+**In a sandboxed shell, `nix develop` cannot reach the daemon socket**
+(`/nix/var/nix/daemon-socket/socket`) — `cannot connect to socket … Operation not
+permitted`. Use direnv instead, which reads the already-realised devshell out of `.direnv/`
+and needs no daemon:
 
 ```sh
 direnv exec . cargo build -p <crate>
