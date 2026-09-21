@@ -264,6 +264,17 @@ fn cmd_install(opts: &Opts, check: bool) -> Result<ExitCode, String> {
         .file
         .clone()
         .unwrap_or_else(|| resolved.target.default_file.clone());
+
+    // A harness that reads only the first matching instruction file will silently ignore the
+    // one we write if something outranks it. Say so before writing anything.
+    for shadow in install::shadowing_files(&repo, &file, &resolved.target.instruction_files) {
+        eprintln!(
+            "warning: {} outranks {} in {}'s instruction-file order — the managed block will \
+             NOT be read. Remove it, or install into it instead with `--file {shadow}`.",
+            shadow, file, resolved.target.name
+        );
+    }
+
     let block = render::render(&resolved);
 
     match install::write(&repo, &file, &block, check)? {

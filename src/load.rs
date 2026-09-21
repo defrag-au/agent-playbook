@@ -17,6 +17,7 @@ const TARGET_KEYS: &[&str] = &[
     "emphasis",
     "addenda",
     "default_file",
+    "instruction_files",
 ];
 const RULE_KEYS: &[&str] = &[
     "id",
@@ -145,6 +146,7 @@ pub fn load_target(root: &Path, name: &str) -> Result<Target, String> {
             .cloned()
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "AGENTS.md".to_string()),
+        instruction_files: list("instruction_files"),
     })
 }
 
@@ -300,17 +302,17 @@ fn parse_rule(rel: &str, path: &Path) -> (Option<Rule>, Vec<Diagnostic>) {
     };
 
     let sections = split_sections(split.body);
-    if !sections.has_directive {
-        diagnostics.push(Diagnostic::warning(format!(
-            "{rel}: no `## Directive` section — the whole body will be emitted. Split it so the \
-             terse direction is compiled and the rationale stays at source"
-        )));
-    }
     if sections.directive.is_empty() {
         diagnostics.push(Diagnostic::error(format!(
             "{rel}: rule has no directive — a heading with no text cannot constrain anything"
         )));
     }
+
+    // A missing `## Directive` is *not* reported here. Format conformance is a test-suite
+    // concern in this repository (see `every_rule_has_a_directive_section`), not a runtime
+    // one: emitting one warning per unmigrated rule on every invocation buries the warnings
+    // that are actually about this run, and a wall of warnings is how you teach someone to
+    // ignore them.
 
     match (id, title, layer, activation, priority) {
         (Some(id), Some(title), Some(layer), Some(activation), Some(priority))

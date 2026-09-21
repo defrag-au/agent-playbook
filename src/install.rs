@@ -37,6 +37,25 @@ impl Outcome {
     }
 }
 
+/// Files that outrank `file` in a harness's instruction-file order and exist in the repo.
+///
+/// A harness that reads only the **first** match — Zed does — will silently ignore the file
+/// we just wrote if anything above it is present. No error, no warning, and the rules simply
+/// do not apply. That is the worst failure mode available here, and it is cheap to detect.
+///
+/// `order` is most-significant-first, as declared by the target. A file that is not in the
+/// order is never reported: the harness is not known to rank it, so there is nothing to say.
+pub fn shadowing_files(repo: &Path, file: &str, order: &[String]) -> Vec<String> {
+    let Some(rank) = order.iter().position(|candidate| candidate == file) else {
+        return Vec::new();
+    };
+    order[..rank]
+        .iter()
+        .filter(|candidate| repo.join(candidate.as_str()).is_file())
+        .cloned()
+        .collect()
+}
+
 /// Replace the managed block in `existing` with `block`, or append it.
 pub fn splice(existing: &str, block: &str) -> String {
     let lines: Vec<&str> = existing.split_inclusive('\n').collect();
@@ -204,5 +223,89 @@ mod tests {
         assert!(diff.contains("line 2"));
         assert!(diff.contains("-b"));
         assert!(diff.contains("+B"));
+    }
+
+    fn order() -> Vec<String> {
+        [".rules", "AGENT.md", "AGENTS.md", "CLAUDE.md"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "agent-playbook-shadow-{}-{name}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("scratch dir");
+        dir
+    }
+
+    #[test]
+    fn nothing_shadows_an_empty_repo() {
+        let dir = scratch("empty");
+        assert!(shadowing_files(&dir, "AGENTS.md", &order()).is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_higher_ranked_file_shadows_the_one_we_write() {
+        let dir = scratch("higher");
+        fs::write(dir.join(".rules"), "legacy rules\n").expect("seed");
+        assert_eq!(
+            shadowing_files(&dir, "AGENTS.md", &order()),
+            vec![".rules".to_string()]
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_lower_ranked_file_does_not_shadow() {
+        // AGENTS.md outranks CLAUDE.md, so a repo holding both is read from AGENTS.md —
+        // and writing CLAUDE.md there would be pointless.
+        let dir = scratch("lower");
+        fs::write(dir.join("AGENTS.md"), "agents\n").expect("seed");
+        assert!(shadowing_files(&dir, "AGENTS.md", &order()).is_empty());
+        assert_eq!(
+            shadowing_files(&dir, "CLAUDE.md", &order()),
+            vec!["AGENTS.md".to_string()]
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_shadowing_file_in_a_subdirectory_is_found() {
+        // `.github/copilot-instructions.md` is a path, not a bare filename.
+        let dir = scratch("nested");
+        fs::create_dir_all(dir.join(".github")).expect("mkdir");
+        fs::write(dir.join(".github/copilot-instructions.md"), "copilot\n").expect("seed");
+        let order = vec![
+            ".github/copilot-instructions.md".to_string(),
+            "AGENTS.md".to_string(),
+        ];
+        assert_eq!(
+            shadowing_files(&dir, "AGENTS.md", &order),
+            vec![".github/copilot-instructions.md".to_string()]
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_file_outside_the_order_is_never_reported() {
+        // The harness is not known to rank it, so there is nothing to warn about.
+        let dir = scratch("unranked");
+        fs::write(dir.join(".cursorrules"), "cursor\n").expect("seed");
+        assert!(shadowing_files(&dir, "AGENTS.md", &order()).is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_empty_order_reports_nothing() {
+        // A harness that merges every file it finds cannot be shadowed by anything.
+        let dir = scratch("merging");
+        fs::write(dir.join(".rules"), "x\n").expect("seed");
+        assert!(shadowing_files(&dir, "AGENTS.md", &[]).is_empty());
+        let _ = fs::remove_dir_all(&dir);
     }
 }

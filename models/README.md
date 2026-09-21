@@ -39,6 +39,7 @@ default_file: CLAUDE.md
 | `emphasis` | Rule ids repeated verbatim in a `## Non-negotiable` preamble |
 | `addenda` | Files in `addenda/`, appended after all rules |
 | `default_file` | What `playbook install` writes into when `--file` is not given |
+| `instruction_files` | The harness's instruction-file priority order, most significant first. Used to warn when an existing file outranks the one being written |
 
 Full semantics in [`../docs/precedence.md`](../docs/precedence.md).
 

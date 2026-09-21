@@ -256,6 +256,12 @@ pub struct Target {
     pub emphasis: Vec<String>,
     pub addenda: Vec<String>,
     pub default_file: String,
+    /// The harness's instruction-file priority order, most significant first.
+    ///
+    /// Only meaningful for harnesses that read a single file — see
+    /// [`crate::install::shadowing_files`]. Empty means the harness merges every file it
+    /// finds, so nothing can shadow anything.
+    pub instruction_files: Vec<String>,
 }
 
 /// A harness-specific addendum appended after the rules.

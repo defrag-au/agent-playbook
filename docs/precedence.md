@@ -34,6 +34,7 @@ A target is a model+harness pair that consumes rules. `models/<target>/overlay.c
 | `emphasis` | Rule ids to repeat in a short preamble at the top of the output |
 | `addenda` | Filenames in `models/<target>/addenda/` appended after all rules |
 | `default_file` | Filename `playbook install` writes into when `--file` is not given |
+| `instruction_files` | The harness's instruction-file priority order, most significant first. Empty means the harness merges everything it finds, so nothing can shadow anything. `playbook install` and `check` warn when an existing file outranks the one being written — see `models/zed/overlay.conf` for the worked case |
 
 ### Why `emphasis` exists
 

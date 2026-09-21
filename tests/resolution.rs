@@ -24,6 +24,55 @@ fn ids(resolved: &playbook::resolve::Resolved) -> Vec<&str> {
 
 // --- against the real tree -------------------------------------------------
 
+/// Rules that do not yet declare an explicit `## Directive` section.
+///
+/// **A ratchet: this may only go down.** The migration from whole-body rules to
+/// directive-plus-rationale is in progress; the budget makes the remaining work visible
+/// without leaving the suite red, and it fails the moment someone adds a new rule without
+/// splitting it. Lower the number as rules are converted, and set it to `0` when the
+/// migration is done — at which point it becomes a plain hard gate.
+const RULES_WITHOUT_DIRECTIVE_BUDGET: usize = 34;
+
+/// The gate that keeps the compiled block terse.
+///
+/// The compiler is not a linter — it compiles whatever it is handed, and a rule with no
+/// `## Directive` is emitted whole. That is the right behaviour at compose time (never lose a
+/// rule's text) and the wrong thing to leave unnoticed, so the contract lives here, where a
+/// failure names every offender at once instead of printing a warning on every command.
+#[test]
+fn rules_without_a_directive_section_stay_within_budget() {
+    let (rules, _) = load_rules(&repo_root());
+    let offenders: Vec<&str> = rules
+        .iter()
+        .filter(|rule| {
+            let source = fs::read_to_string(repo_root().join(&rule.rel)).expect("read rule");
+            !playbook::model::split_sections(playbook::frontmatter::split_document(&source).body)
+                .has_directive
+        })
+        .map(|rule| rule.rel.as_str())
+        .collect();
+
+    assert!(
+        offenders.len() <= RULES_WITHOUT_DIRECTIVE_BUDGET,
+        "{} rules have no `## Directive` section but the budget is {}. A new rule must be \
+         split into `## Directive` (the terse direction, emitted) and `## Rationale` (the \
+         incident, kept at source) — see docs/rule-format.md.\n  {}",
+        offenders.len(),
+        RULES_WITHOUT_DIRECTIVE_BUDGET,
+        offenders.join("\n  ")
+    );
+
+    if offenders.len() < RULES_WITHOUT_DIRECTIVE_BUDGET {
+        panic!(
+            "{} rules are missing a `## Directive` section, below the budget of {}. \
+             Lower RULES_WITHOUT_DIRECTIVE_BUDGET to {} so the ratchet holds.",
+            offenders.len(),
+            RULES_WITHOUT_DIRECTIVE_BUDGET,
+            offenders.len()
+        );
+    }
+}
+
 #[test]
 fn every_rule_in_the_tree_parses_and_has_a_body() {
     let (rules, diagnostics) = load_rules(&repo_root());
