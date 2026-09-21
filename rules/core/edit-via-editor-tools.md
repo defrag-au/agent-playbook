@@ -8,32 +8,25 @@ overrides:
 targets:
 ---
 
-Edit files with the read/edit/write tools. Never shell out to `python`, `sed`, `awk`,
-`perl`, `truncate`, or a heredoc to modify a file — not for a big change, and not for "just
-one small change".
+## Directive
 
-This applies to every file: source, config, docs, rules, memory.
+- Edit files with the read/edit/write tools. Never `python`, `sed`, `awk`, `perl`, `truncate`
+  or a heredoc — not for a big change, and not for "just one small change". This applies to
+  every file: source, config, docs, rules, memory.
+- A change that touches ten places is ten edit calls, not one script.
+- The editor tools fail loudly on a stale or ambiguous match and show a reviewable diff. A
+  script's `str.replace` **silently does nothing** when the anchor text has moved.
+- Still fine: generating a file's *content* with a script when the content is genuinely
+  computed (a catalogue from source headers, a table derived from data) — writing it to disk
+  still goes through the write tool. And reads through the shell (`cat`, `grep`, `find`) to
+  gather information, before editing with the editor tools.
 
-Multi-edit convenience scripts are included. If a change touches ten places, that is ten edit
-calls, not one script.
+## Rationale
 
-## Why
+The "silently does nothing" case is not hypothetical. A write was reported as done after
+`cargo fmt` reflowed the anchor the script was matching against — the script found nothing,
+wrote nothing, exited zero, and the change was never made. The failure was invisible until
+much later.
 
-- The editor tools verify the file was read first and **fail loudly** on an ambiguous or
-  stale match.
-- They show a reviewable diff.
-- A script's `str.replace` **silently does nothing** when the anchor text has moved.
-
-That last one is not hypothetical. A write was reported as done after `cargo fmt` reflowed
-the anchor it was matching against — the script found nothing, wrote nothing, exited zero,
-and the change was never made. The failure was invisible until much later. Editor tools make
-that class of bug impossible.
-
-## What is still fine
-
-Generating a file's *content* with a script is fine when the content is genuinely computed —
-a catalogue built from source headers, a table derived from data. Writing it to disk still
-goes through the write tool.
-
-Reads through the shell are fine too: `cat`, `grep`, `find` to gather information, then edit
-with the editor tools.
+That is the whole argument: a tool that fails loudly costs a retry, and a tool that fails
+quietly costs the trustworthiness of every subsequent claim about the file.

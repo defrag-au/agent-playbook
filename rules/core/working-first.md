@@ -8,14 +8,25 @@ overrides:
 targets:
 ---
 
-Deliver working functionality before optimising architecture. Fix the cause of a problem;
-never comment it out, disable it, or route around it to get a build green.
+## Directive
 
-When facing a compilation error, a lifetime fight, or a design question, the first question
-is **"what is the simplest thing that makes this actually work?"** — not "what is the correct
-architecture for this?". Prove the concept end-to-end, then iterate.
+- Deliver working functionality before optimising architecture. Fix the cause; never comment
+  out, disable, or route around a problem to get a build green.
+- Facing a compile error, a lifetime fight or a design question → ask **"what is the simplest
+  thing that makes this actually work?"**, not "what is the correct architecture?".
+- Stop and reconsider if you are about to:
+  - add a `// TODO:` to disable functionality that was supposed to work
+  - comment out code to silence a compilation error
+  - fight type/lifetime/async issues before the plain logic is proven
+  - rewrite a signature to make an error go away rather than understanding it
+- Deviate only when continuing would break something that works, introduce a security hole,
+  or risk data corruption — and then fix it properly, do not disable it.
 
-## The two paths
+**Make it work, make it right, make it fast — in that order.**
+
+## Rationale
+
+There are two paths when something does not compile, and they diverge immediately.
 
 **Fix and prove.** Identify the root cause. Implement the minimal working solution. Verify it
 end-to-end. *Then* improve it.
@@ -24,29 +35,10 @@ end-to-end. *Then* improve it.
 problem before the basic logic is proven. Optimise something that has never run. Prioritise
 "it builds" over "it works".
 
-The second path is faster for about ten minutes and then costs a session.
+The second path is faster for about ten minutes and then costs a session. It is also
+self-concealing: a disabled feature looks like progress in a diff, and the discovery of the
+failure moves to whoever runs the code next.
 
-## Red flags — stop and reconsider
-
-- Adding a `// TODO:` to disable functionality that was supposed to work
-- Commenting out code to silence a compilation error
-- "We'll implement that later" applied to a core feature rather than an edge
-- Fighting type/lifetime/async issues before the plain logic is proven
-- Spending longer on the shape of the code than on whether the feature works
-- Rewriting a signature to make an error go away rather than understanding it
-
-## Green lights — keep going
-
-- The user can exercise the feature end-to-end right now
-- Core functionality works, even if the implementation is plain
-- Each change leaves the working state working
-- Problems are being solved rather than hidden
-- Value is demonstrable this session, not next session
-
-## Exceptions
-
-Deviate only when continuing would break something that currently works, would introduce a
-security hole, or would risk data corruption. Even then: fix it properly. Do not comment it
-out and do not disable it.
-
-**Make it work, make it right, make it fast — in that order.**
+Green lights, for contrast: the user can exercise the feature right now · core functionality
+works even if the implementation is plain · each change leaves the working state working ·
+value is demonstrable this session rather than next.

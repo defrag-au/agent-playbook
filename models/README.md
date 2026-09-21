@@ -61,6 +61,22 @@ Harness mechanics. Things that are true of the *tool*, not of how I want work do
   wrong.
 - **Org or project specifics.** `models/zed/` applies to every repo here.
 
+## Install both targets, not one
+
+A repo with only one instruction file is read through whichever target generated it. Zed
+reads the first match at the worktree root, so a `CLAUDE.md`-only repo gives **Zed** the
+`claude-code` target's addenda — which name Claude Code's tools — and a `AGENTS.md`-only repo
+leaves Claude Code with nothing at all.
+
+```sh
+playbook install --project shared-crates --target zed         --repo <repo>   # AGENTS.md
+playbook install --project shared-crates --target claude-code --repo <repo>   # CLAUDE.md
+```
+
+Two blocks is not duplication to be avoided: each is generated from the same rule set, and
+`playbook check` verifies both, so they cannot drift. The hand-maintained duplication this
+repository exists to remove was two files that nothing kept in sync.
+
 ## Model overlays make claims
 
 `emphasis` and any behavioural addendum are assertions about a specific model. They should

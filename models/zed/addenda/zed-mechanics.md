@@ -28,6 +28,16 @@ Two consequences that matter here:
   warning. `playbook install` and `playbook check` warn when they find one — see
   `instruction_files:` in `models/zed/overlay.conf`.
 
+**In a multi-root workspace the choice is per worktree, not global.** Each root is its own
+worktree and contributes its own first match, so one root can be read from `AGENTS.md` while
+another is read from `CLAUDE.md`. (Observed 2026-09-21: `archivist`, which has only
+`CLAUDE.md`, was read through it while three sibling roots were read through `AGENTS.md`.)
+
+The consequence for installation is that a repo with only a lower-ranked file is read
+through **whichever target generated that file** — so a `CLAUDE.md`-only repo gives Zed the
+`claude-code` target's harness addenda, which name Claude Code's tools. Install both targets.
+See `models/README.md`.
+
 ## Nested instruction files are not supported
 
 Zed loads **one file, at the worktree root**. A nested `AGENTS.md` in a subdirectory is
@@ -52,18 +62,24 @@ Do not build on nested files, and do not write a rule that assumes one will be r
 ## Personal instructions
 
 `~/.config/zed/AGENTS.md` (Windows: `%APPDATA%\Zed\AGENTS.md`) is loaded as personal
-instructions for **every** project. The docs say project instructions override personal
-`AGENTS.md` when they conflict.
+instructions for **every** project, alongside the project file. The docs say project
+instructions override personal `AGENTS.md` when they conflict.
 
-That makes it the place for rules that are true regardless of repository — but note the cost
-model: personal and project instructions both load, so this reduces *duplication across
-repos*, not the context a session pays for. Use it so a core rule is maintained in one place
+**Verified 2026-09-21.** Both load. A marker written into the personal file was visible to a
+fresh agent thread alongside the project blocks for all four workspace roots — and it also
+appeared in an *already-running* thread on its next turn, so Zed re-reads the personal file
+per prompt rather than only at thread start. A change there takes effect without restarting
+anything.
+
+**What "override when they conflict" actually means.** There is no structured merge. Both
+files arrive as text, and "project wins" is a reading instruction to the model rather than a
+mechanical per-rule resolution. So do not rely on precedence to settle a contradiction —
+**avoid the overlap**. Keep personal instructions to rules that are true of every repository
+and let project files carry the rest.
+
+That is still a *duplication* win rather than a token win: personal and project instructions
+both load, so a session pays for both. Use it so a core rule is maintained in one place
 rather than reinstalled in five.
-
-**Unverified:** the docs' "when they conflict" does not say whether both files are loaded
-with the project winning on a per-rule basis, or whether one displaces the other. Confirm
-before relying on the merge, by putting a distinctive line in the personal file and checking
-it survives alongside a project block.
 
 ## Rendering
 

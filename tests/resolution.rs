@@ -31,7 +31,7 @@ fn ids(resolved: &playbook::resolve::Resolved) -> Vec<&str> {
 /// without leaving the suite red, and it fails the moment someone adds a new rule without
 /// splitting it. Lower the number as rules are converted, and set it to `0` when the
 /// migration is done — at which point it becomes a plain hard gate.
-const RULES_WITHOUT_DIRECTIVE_BUDGET: usize = 34;
+const RULES_WITHOUT_DIRECTIVE_BUDGET: usize = 23;
 
 /// The gate that keeps the compiled block terse.
 ///
