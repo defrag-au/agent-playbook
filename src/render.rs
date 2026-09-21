@@ -86,9 +86,17 @@ fn rewrite_links(body: &str) -> String {
             if !target.ends_with(".md") || target.starts_with("http") {
                 return None;
             }
-            let label = &rest[1..label_end];
+            let label = rest[1..label_end].trim();
             let shown = if label.is_empty() { target } else { label };
-            Some((format!("`{shown}`"), target_end + 1))
+            // A rule cross-reference is usually written `[`id`](path)` — the label is
+            // already a code span, and wrapping it again would produce double backticks.
+            let replacement = if shown.len() >= 2 && shown.starts_with('`') && shown.ends_with('`')
+            {
+                shown.to_string()
+            } else {
+                format!("`{shown}`")
+            };
+            Some((replacement, target_end + 1))
         })();
 
         match rewritten {
@@ -177,5 +185,47 @@ mod tests {
         let out = demote_headings("# Title\n\ntext\n\n## Sub\n");
         assert!(out.contains("## Title"));
         assert!(out.contains("### Sub"));
+    }
+
+    #[test]
+    fn relative_md_links_become_code_spans() {
+        // The rendered block lives in another repo, where `../core/x.md` points nowhere.
+        let body = "see [`core/working-first`](../core/working-first.md) for why";
+        let out = rewrite_links(body);
+        assert_eq!(out, "see `core/working-first` for why");
+        assert!(!out.contains(".."));
+    }
+
+    #[test]
+    fn links_in_addenda_are_rewritten_too() {
+        let body = "See [`core/planning-stays-in-thinking`](../../../rules/core/planning-stays-in-thinking.md).";
+        let out = rewrite_links(body);
+        assert_eq!(out, "See `core/planning-stays-in-thinking`.");
+    }
+
+    #[test]
+    fn absolute_links_are_left_alone() {
+        let body = "[crates.io](https://crates.io/crates/x) and [docs](https://x.dev/a.md)";
+        assert_eq!(rewrite_links(body), body);
+    }
+
+    #[test]
+    fn non_markdown_links_are_left_alone() {
+        let body = "[notes](notes.txt)";
+        assert_eq!(rewrite_links(body), body);
+    }
+
+    #[test]
+    fn text_with_brackets_survives() {
+        // Rule bodies contain arrays and task lists. Neither is a link, and neither may
+        // be mangled by the rewriter.
+        let body = "an array `[u8; 4]` and a list:\n\n- [x] done\n- [ ] todo\n";
+        assert_eq!(rewrite_links(body), body);
+    }
+
+    #[test]
+    fn a_link_label_is_kept_when_it_differs_from_the_target() {
+        let body = "the [widget-screenshot skill](../../../skills/widget-screenshot/SKILL.md)";
+        assert_eq!(rewrite_links(body), "the `widget-screenshot skill`");
     }
 }

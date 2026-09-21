@@ -33,7 +33,7 @@ A target is a model+harness pair that consumes rules. `models/<target>/overlay.c
 | `exclude` | Rule ids or path prefixes to drop |
 | `emphasis` | Rule ids to repeat in a short preamble at the top of the output |
 | `addenda` | Filenames in `models/<target>/addenda/` appended after all rules |
-| `default_file` | Filename `install.sh` writes into when `--file` is not given |
+| `default_file` | Filename `playbook install` writes into when `--file` is not given |
 
 ### Why `emphasis` exists
 
@@ -58,25 +58,33 @@ the overlay with a comment saying when it was last checked.
 
 ## Worked example
 
-`shared-crates` + `claude-code`:
+`shared-crates` + `claude-code`. First the activation filter, which is mechanical:
 
 ```
-core/*        activation: always                 → 9 rules
-rust/*        activation: language:rust           → 4 rules  (project declares rust)
-org/defrag/*  activation: org:defrag              → 8 rules  (project declares defrag)
-projects/shared-crates/rules.md                   → 1 rule   (repo-specific)
-                                                ────────────
-                                                  22 rules
+core/*           activation: always          → 10 rules
+rules/rust/*     activation: language:rust    →  4 rules   (the project declares rust)
+rules/org/defrag activation: org:defrag       →  7 rules   (the project declares defrag)
+projects/shared-crates/rules/*                →  2 rules   (repo-specific)
+                                              ────────────
+                                                23 rules
 ```
+
+Nothing is excluded and nothing is overridden, so `playbook list --project shared-crates`
+shows 23 rows in layer order and no `superseded` section. That is the normal case: the
+precedence machinery is only visible when it has work to do.
 
 Then the `claude-code` overlay:
 
-```
-emphasis: working-first, never-make-things-up, test-preservation
-exclude:  rust-no-raw-unicode        (that is an egui rule; org layer owns it, so this is a
-                                      deliberate drop for non-frontend work)
+```conf
+emphasis: working-first, never-make-things-up, test-preservation, verify-before-claiming
 addenda:  no-privately-preamble.md, tool-names.md
 ```
 
-Output: a `## Non-negotiable` block with three rules repeated, the 22 rules in layer order,
-then the two Claude-harness addenda. `docs/inventory.md` records the source of every one.
+Output: a `## Non-negotiable` block with four rule leads repeated, the 23 rules in layer
+order each under its own heading with an HTML comment naming its source, then the two
+Claude-harness addenda demoted one heading level so they sit under the rules rather than
+competing with them.
+
+`archivist` resolves to 15 — the same 10 core and 4 rust rules, its own single project rule,
+and **no org rules**, because it declares `org: hodlcroft`. `cnft-dev-workers` resolves to 27:
+the same core, rust and org sets, plus six project rules of its own.

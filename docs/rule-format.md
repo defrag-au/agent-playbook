@@ -10,7 +10,7 @@ this, it needs to be a reference file instead.
 ---
 id: rust-devshell-first
 title: Rust tooling lives behind the Nix devshell
-layer: rust
+layer: language:rust
 activation: language:rust
 priority: 50
 overrides:
@@ -20,17 +20,31 @@ targets:
 Body. Markdown. Whatever length the rule needs.
 ```
 
+### Why `layer` is spelled out
+
+The layer name is `language:rust`, not `rust`. A bare name is ambiguous between a language
+and a typo — `layer: org` and `layer: organizaton` look the same to a parser that accepts any
+unknown name as a language layer, and the typo would silently sort into the wrong place.
+Spelling the namespace out means an unknown layer fails to parse, and the loader reports it.
+
 ## Fields
 
 | Field | Required | Values | Meaning |
 | --- | --- | --- | --- |
 | `id` | yes | kebab-case, unique across the whole repo | The contract. Referenced by `overrides:` and by an overlay's `exclude:` / `emphasis:` |
 | `title` | yes | plain text, one line | Becomes the `##` heading in the generated file |
-| `layer` | yes | `core`, `rust`, `org`, `project` | Sort order in the output. Unknown layers sort last |
+| `layer` | yes | `core`, `language:<name>`, `org`, `project` | Sort order in the output |
 | `activation` | yes | see below | When the rule is included |
 | `priority` | no | integer, default `50` | Higher sorts earlier within its layer |
 | `overrides` | no | comma-separated ids | Rule ids this rule supersedes. Those rules are dropped at compose time and the drop is reported |
 | `targets` | no | comma-separated target names | Restricts the rule to those targets. Empty means all |
+
+All four required keys must be **present and non-empty**. A missing one is a load error, not
+a default — a rule with no `activation` that quietly became `always` is a rule that applies
+somewhere nobody chose. `manual` exists for rules that are real but narrow: a migration that
+applies once, a constraint that is only correct while something else is in force. Manual
+rules live in `rules/` so they are versioned and reviewable, without being loaded into every
+session.
 
 ### `activation`
 
@@ -41,10 +55,6 @@ Body. Markdown. Whatever length the rule needs.
 | `org:defrag` | The project declares `org: defrag` |
 | `project:shared-crates` | The project is `shared-crates` |
 | `manual` | Never automatically. A target must name the rule's id in its `include:` |
-
-`manual` exists for rules that are real but narrow — a migration procedure that applies once,
-a rule that is only correct while a specific constraint is in force. Manual rules live in
-`rules/` so they are versioned and reviewable, without being loaded into every session.
 
 ## Writing the body
 
@@ -80,3 +90,7 @@ this repository was built to stop.
 
 When one does appear, treat it as a signal. If a rule is overridden by three projects, it is
 wrong at its current layer: move it up or delete it.
+
+The loader enforces the direction: a rule may only override one in a **strictly lower**
+layer. Same-layer and upward overrides are both errors, because neither has a defined answer
+and the shell implementation resolved them by accident of sort order.

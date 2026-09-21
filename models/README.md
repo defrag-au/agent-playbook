@@ -38,7 +38,7 @@ default_file: CLAUDE.md
 | `exclude` | Rule ids or path prefixes to drop |
 | `emphasis` | Rule ids repeated verbatim in a `## Non-negotiable` preamble |
 | `addenda` | Files in `addenda/`, appended after all rules |
-| `default_file` | What `install.sh` writes into when `--file` is not given |
+| `default_file` | What `playbook install` writes into when `--file` is not given |
 
 Full semantics in [`../docs/precedence.md`](../docs/precedence.md).
 
