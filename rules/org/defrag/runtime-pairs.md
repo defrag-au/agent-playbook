@@ -32,3 +32,14 @@ nix develop -c cargo tree --target wasm32-unknown-unknown -p <crate>
 
 `cardano-tx/tests/miniquad_linkable.rs` asserts the default-feature-free build reaches no
 wasm-bindgen, so a macroquad host can still link it.
+
+## For a WASM build, audit the feature flags
+
+Minimise the features enabled on a wasm32 target. Default features are chosen for a native
+build, so a wasm consumer inherits capabilities it cannot use — and a feature that pulls in a
+system library is a build failure at link time, not at the crate that introduced it. Check the
+transitive tree rather than the direct dependency:
+
+```sh
+nix develop -c cargo tree --target wasm32-unknown-unknown -p <crate>
+```

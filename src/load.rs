@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::frontmatter::{parse_conf, split_document, split_list, Split};
-use crate::model::{Addendum, Diagnostic, Layer, Project, Rule, Severity, Target};
+use crate::model::{split_sections, Addendum, Diagnostic, Layer, Project, Rule, Severity, Target};
 
 const PROJECT_KEYS: &[&str] = &["project", "path", "org", "languages", "default_target"];
 const TARGET_KEYS: &[&str] = &[
@@ -299,16 +299,22 @@ fn parse_rule(rel: &str, path: &Path) -> (Option<Rule>, Vec<Diagnostic>) {
         },
     };
 
-    let body = split.body.trim().to_string();
-    if body.is_empty() {
+    let sections = split_sections(split.body);
+    if !sections.has_directive {
+        diagnostics.push(Diagnostic::warning(format!(
+            "{rel}: no `## Directive` section — the whole body will be emitted. Split it so the \
+             terse direction is compiled and the rationale stays at source"
+        )));
+    }
+    if sections.directive.is_empty() {
         diagnostics.push(Diagnostic::error(format!(
-            "{rel}: rule has no body — a heading with no text cannot constrain anything"
+            "{rel}: rule has no directive — a heading with no text cannot constrain anything"
         )));
     }
 
     match (id, title, layer, activation, priority) {
         (Some(id), Some(title), Some(layer), Some(activation), Some(priority))
-            if !body.is_empty() =>
+            if !sections.directive.is_empty() =>
         {
             (
                 Some(Rule {
@@ -320,7 +326,8 @@ fn parse_rule(rel: &str, path: &Path) -> (Option<Rule>, Vec<Diagnostic>) {
                     overrides: split.list("overrides"),
                     targets: split.list("targets"),
                     rel: rel.to_string(),
-                    body,
+                    directive: sections.directive,
+                    rationale: sections.rationale,
                 }),
                 diagnostics,
             )

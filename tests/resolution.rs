@@ -426,7 +426,7 @@ fn an_unknown_activation_is_fatal() {
 }
 
 #[test]
-fn a_missing_body_is_fatal() {
+fn a_rule_with_no_directive_is_fatal() {
     let f = Fixture::new("empty-body");
     f.write(
         "rules/core/a.md",
@@ -439,8 +439,30 @@ fn a_missing_body_is_fatal() {
         resolved
             .diagnostics
             .iter()
-            .any(|d| d.message.contains("no body")),
-        "expected a body error, got {:?}",
+            .any(|d| d.message.contains("no directive")),
+        "expected a directive error, got {:?}",
+        resolved.diagnostics
+    );
+}
+
+#[test]
+fn a_rule_whose_directive_section_is_empty_is_fatal() {
+    // The heading is present but carries no text. That is the same failure as no body at all:
+    // a heading that constrains nothing.
+    let f = Fixture::new("empty-directive");
+    f.write(
+        "rules/core/a.md",
+        "---\nid: a\ntitle: a\nlayer: core\nactivation: always\n---\n\n## Directive\n\n## Rationale\n\nWhy it matters.\n",
+    );
+
+    let resolved = f.resolve();
+    assert!(resolved.has_errors());
+    assert!(
+        resolved
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("no directive")),
+        "expected a directive error, got {:?}",
         resolved.diagnostics
     );
 }

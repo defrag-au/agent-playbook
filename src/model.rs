@@ -128,6 +128,11 @@ impl fmt::Display for Layer {
 }
 
 /// One standing constraint.
+///
+/// The body is split into two sections, and the split is the point: `directive` is what the
+/// compiler emits, `rationale` is why the rule exists and stays at source. The compiled block
+/// is optimised for an agent's attention budget; the argument for the rule is optimised for
+/// the person deciding whether to keep it.
 #[derive(Debug, Clone)]
 pub struct Rule {
     pub id: String,
@@ -139,14 +144,17 @@ pub struct Rule {
     pub targets: Vec<String>,
     /// Path relative to the playbook root, e.g. `rules/core/working-first.md`.
     pub rel: String,
-    pub body: String,
+    /// The terse direction. Emitted.
+    pub directive: String,
+    /// The incident, the measurement, the history. Not emitted.
+    pub rationale: String,
 }
 
 impl Rule {
-    /// The actionable lead: the first paragraph, as one line.
+    /// The actionable lead: the first paragraph of the directive, as one line.
     pub fn lead(&self) -> String {
         let mut out = String::new();
-        for line in self.body.lines() {
+        for line in self.directive.lines() {
             if line.trim().is_empty() {
                 if !out.is_empty() {
                     break;
@@ -161,10 +169,70 @@ impl Rule {
         out
     }
 
-    /// The id without its layer prefix, for display.
     pub fn short_id(&self) -> &str {
         self.id.as_str()
     }
+}
+
+/// Split a rule body into its directive and rationale sections.
+///
+/// `## Directive` runs to `## Rationale` (or the end of the file); anything before
+/// `## Directive` is prepended to the directive rather than dropped, so a stray preamble
+/// costs verbosity instead of losing content. A body with no `## Directive` at all is
+/// returned whole, with `has_directive` false so the loader can warn — the test suite is
+/// what makes it a hard failure.
+pub struct Sections {
+    pub directive: String,
+    pub rationale: String,
+    pub has_directive: bool,
+}
+
+pub fn split_sections(body: &str) -> Sections {
+    let mut directive: Vec<&str> = Vec::new();
+    let mut rationale: Vec<&str> = Vec::new();
+    let mut has_directive = false;
+    let mut in_rationale = false;
+
+    for line in body.lines() {
+        if is_section(line, "directive") {
+            has_directive = true;
+            continue;
+        }
+        if is_section(line, "rationale") {
+            in_rationale = true;
+            continue;
+        }
+        if in_rationale {
+            rationale.push(line);
+        } else {
+            directive.push(line);
+        }
+    }
+
+    Sections {
+        directive: trim_blank(&directive),
+        rationale: trim_blank(&rationale),
+        has_directive,
+    }
+}
+
+fn is_section(line: &str, name: &str) -> bool {
+    let Some(rest) = line.trim().strip_prefix("## ") else {
+        return false;
+    };
+    rest.trim().eq_ignore_ascii_case(name)
+}
+
+fn trim_blank(lines: &[&str]) -> String {
+    let start = lines.iter().position(|l| !l.trim().is_empty());
+    let Some(start) = start else {
+        return String::new();
+    };
+    let end = lines
+        .iter()
+        .rposition(|l| !l.trim().is_empty())
+        .unwrap_or(start);
+    lines[start..=end].join("\n")
 }
 
 /// A repository the playbook knows about.
@@ -327,8 +395,55 @@ mod tests {
             overrides: vec![],
             targets: vec![],
             rel: "rules/core/x.md".into(),
-            body: "First line\nwraps.\n\nSecond paragraph.\n".into(),
+            directive: "First line\nwraps.\n\nSecond paragraph.\n".into(),
+            rationale: String::new(),
         };
         assert_eq!(rule.lead(), "First line wraps.");
+    }
+
+    #[test]
+    fn sections_split_at_the_rationale_heading() {
+        let body = "## Directive\n\nDo the thing.\n\n## Rationale\n\nBecause it broke.\n";
+        let s = split_sections(body);
+        assert!(s.has_directive);
+        assert_eq!(s.directive, "Do the thing.");
+        assert_eq!(s.rationale, "Because it broke.");
+    }
+
+    #[test]
+    fn rationale_is_optional() {
+        let s = split_sections("## Directive\n\nDo the thing.\n");
+        assert!(s.has_directive);
+        assert_eq!(s.directive, "Do the thing.");
+        assert!(s.rationale.is_empty());
+    }
+
+    #[test]
+    fn a_body_with_no_directive_is_returned_whole_and_flagged() {
+        // The compiler warns on this; the test suite is what makes it fail. Nothing is
+        // dropped either way — a rule that loses its text silently is worse than a long one.
+        let s = split_sections("Just prose, no headings.\n\nMore prose.\n");
+        assert!(!s.has_directive);
+        assert!(s.directive.contains("Just prose"));
+        assert!(s.directive.contains("More prose"));
+    }
+
+    #[test]
+    fn content_before_the_directive_heading_is_kept_not_dropped() {
+        let s = split_sections("A stray preamble.\n\n## Directive\n\nDo the thing.\n");
+        assert!(s.has_directive);
+        assert!(s.directive.contains("A stray preamble."));
+        assert!(s.directive.contains("Do the thing."));
+    }
+
+    #[test]
+    fn sub_headings_inside_a_directive_stay_in_the_directive() {
+        // A directive may carry its own structure — the traps list does. Only `## Rationale`
+        // ends it, so `###` and even `##` sub-headings do not silently truncate the rule.
+        let body = "## Directive\n\nLead.\n\n### A trap\n\nDetails.\n\n## Rationale\n\nWhy.\n";
+        let s = split_sections(body);
+        assert!(s.directive.contains("### A trap"));
+        assert!(s.directive.contains("Details."));
+        assert_eq!(s.rationale, "Why.");
     }
 }

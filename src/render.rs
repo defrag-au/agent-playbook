@@ -49,12 +49,14 @@ pub fn render(resolved: &Resolved) -> String {
             "<!-- rule: {} -->\n\n",
             rule.rel.trim_end_matches(".md")
         ));
-        out.push_str(&rewrite_links(&rule.body));
+        // Only the directive is compiled. The rationale stays in the rule file at source —
+        // the block is for an agent's attention budget, not for the argument behind the rule.
+        out.push_str(&rewrite_links(&demote_headings(&rule.directive)));
         out.push('\n');
     }
 
     for addendum in &resolved.addenda {
-        out.push('\n');
+        blank_line(&mut out);
         out.push_str(&rewrite_links(&demote_headings(addendum.body.trim())));
         out.push('\n');
     }
@@ -62,6 +64,18 @@ pub fn render(resolved: &Resolved) -> String {
     out.push_str(END_MARKER);
     out.push('\n');
     out
+}
+
+/// Ensure the buffer ends with exactly one blank line, so consecutive blocks are
+/// separated by one line rather than accumulating one per block.
+fn blank_line(out: &mut String) {
+    if out.is_empty() || out.ends_with("\n\n") {
+        return;
+    }
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    out.push('\n');
 }
 
 /// Rewrite a relative markdown link to a `.md` file into a code span.
@@ -178,6 +192,25 @@ mod tests {
             extract_block("<!-- BEGIN agent-playbook (project: x, target: y) -->\nbody\n")
                 .is_none()
         );
+    }
+
+    #[test]
+    fn addenda_are_separated_by_exactly_one_blank_line() {
+        let mut out = String::from("rule body\n");
+        blank_line(&mut out);
+        out.push_str("first addendum\n");
+        blank_line(&mut out);
+        out.push_str("second addendum\n");
+        assert!(!out.contains("\n\n\n"), "got: {out:?}");
+        assert!(out.contains("rule body\n\nfirst addendum\n\nsecond addendum\n"));
+    }
+
+    #[test]
+    fn blank_line_is_idempotent() {
+        let mut out = String::from("a\n");
+        blank_line(&mut out);
+        blank_line(&mut out);
+        assert_eq!(out, "a\n\n");
     }
 
     #[test]

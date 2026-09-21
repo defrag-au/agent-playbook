@@ -17,8 +17,55 @@ overrides:
 targets:
 ---
 
-Body. Markdown. Whatever length the rule needs.
+## Directive
+
+`cargo` is not on `PATH`. Wrap every command:
+
+```sh
+nix develop -c cargo build --workspace
 ```
+
+In a sandboxed shell, use `direnv exec . <cmd>` — see below.
+
+## Rationale
+
+The failure reads as a permissions problem rather than a missing toolchain, which is why it is
+worth stating before it is worth debugging.
+```
+
+### The two sections are the format
+
+**`## Directive` is required and is the only part that is compiled.** It is the terse,
+concrete direction an agent needs. `## Rationale` is optional and is **never emitted** — it is
+the argument for keeping the rule, read by a person deciding whether to.
+
+The split exists because the two have opposite optima. The compiled block competes for an
+agent's attention on every turn; the rationale is a maintenance document that only has to be
+convincing once. Compiling the source verbatim spends the agent's budget on the second job.
+
+A rule with no `## Directive` is returned whole, with a compiler warning — the test suite
+(`every_rule_has_a_directive_section`) is what makes it a hard failure. Nothing is dropped
+either way, because a rule that loses its text silently is worse than a long one.
+
+### Writing the directive
+
+- **Lead with the rule.** The first paragraph is repeated verbatim by a target's `emphasis:`,
+  so it must be actionable on its own.
+- **Name the tool, not the vibe.** A concrete command survives paraphrasing; an adjective does
+  not.
+- **Keep it under about twenty lines.** That is a bar, not a law — the traps list is longer
+  because seven traps do not compress into one. The ratchet test is the real bound.
+- **Do not restate a lower layer.** If `rules/core/` says it, a `rules/rust/` rule must not
+  repeat it.
+- **Do not edit a lower-layer rule to suit one repo.** Add a higher-layer rule with
+  `overrides:` — and only if the layers genuinely conflict.
+
+### Writing the rationale
+
+Write it for the person who is about to delete the rule. Include the incident, the measurement,
+the alternatives considered, and anything that would otherwise be rediscovered. The incidents
+that predate this repository are in `docs/inventory.md`; new ones belong here, next to the rule
+they justify.
 
 ### Why `layer` is spelled out
 
