@@ -8,8 +8,10 @@ overrides:
 targets:
 ---
 
-**If a type is consumed by more than one domain — frontend, workers, data layer — it belongs
-in `types/shared`.**
+## Directive
+
+**A type consumed by more than one domain — frontend, workers, data layer — belongs in
+`types/shared`.**
 
 | Location | Contents | May depend on |
 | --- | --- | --- |
@@ -26,20 +28,19 @@ types/shared (foundation — no local dependencies)
     └── data
 ```
 
+Which crates import it? One → keep it local. More than one → `types/shared`. A cycle on the
+way is the compiler telling you the type is at the wrong layer.
+
+## Rationale
+
 The forbidden edges exist to break cycles. `orchestrator → api-types` and `data → api-types`
 both create circular dependencies, which is why a type that both need must be pushed down to
 `types/shared` rather than shared by reference.
 
-## Worked examples
+Worked examples:
 
 - `shared_types::CollectionTag` — used by api-types, orchestrator and data → `types/shared`
 - `shared_types::CatchupStyle` — used by api-types and orchestrator → `types/shared`
 - `orchestrator::AssetRefresh` — only used in worker queues → stays in `orchestrator`
 - `api_types::admin::CatchupEvent` — SSE events, only the frontend needs them → stays in
   `api-types`
-
-## The test
-
-Ask which crates import it. One → keep it local. More than one → it belongs in
-`types/shared`, and any cycle that appears on the way is the compiler telling you the type is
-at the wrong layer.

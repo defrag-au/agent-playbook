@@ -8,32 +8,35 @@ overrides:
 targets:
 ---
 
-Formatting and mechanical lint fixes are tool work. Do not spend a turn hand-aligning code or
-typing out the fix for a lint the tool will apply itself.
+## Directive
+
+Formatting and mechanical lint fixes are tool work. Do not hand-align code or type out a fix
+the tool will apply itself.
 
 ```sh
 nix develop -c cargo fmt
 nix develop -c cargo clippy --fix --allow-dirty --all-targets --all-features -- -D warnings
 ```
 
-Run them, then **read what changed** and check the remaining diagnostics manually. The
-ordering matters: `--fix` first, then review, because the automated pass changes the lines
-you were about to read.
+- Run them, then read what changed and check the remaining diagnostics manually. `--fix` first,
+  then review — the pass changes the lines you were about to read.
+- A warning is a failure, not a note. This codebase does not accumulate "known warnings".
+- `--fix` applies only mechanically safe suggestions — it will not choose between two valid
+  shapes · know a `disallowed_methods` match is a false positive on a blessed call · fix
+  anything needing a semantic decision.
+- A rule clippy cannot enforce → add a source scan in `cargo test`, in the same spirit as
+  `cargo fmt --check`. Add the test with the rule.
 
-## `-D warnings` is not optional
+## Rationale
 
-The lint command treats warnings as errors. A warning is a failure, not a note. That is
-deliberate — this codebase does not accumulate "known warnings", because a suite with a
-hundred warnings cannot show you the one that matters.
+`-D warnings` is deliberate rather than incidental. A suite that accumulates "known warnings"
+cannot show you the one that matters, so a warning is treated as a failure from the first one
+rather than after the hundredth.
 
-## Where the tooling stops
+The review pass is not optional because `--fix` only applies suggestions that are mechanically
+safe: it will not make a choice that needs a semantic decision, and it cannot tell a genuine
+lint from a false positive on a blessed call.
 
-`--fix` only applies suggestions that are mechanically safe. It will not:
-
-- Choose between two valid shapes
-- Know that a `disallowed_methods` match is a false positive on a blessed call
-- Fix anything requiring a semantic decision
-
-Some rules in this playbook cannot be enforced by clippy at all — a source scan in
-`cargo test` is the tool for those, in the same spirit as `cargo fmt --check`. When you add a
-rule of that kind, add the test with it.
+Some rules cannot be enforced by clippy at all. Those get a source scan in `cargo test`, in the
+same spirit as `cargo fmt --check` — the scan is what makes the rule a failure rather than a
+note.

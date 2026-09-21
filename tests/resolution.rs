@@ -24,23 +24,19 @@ fn ids(resolved: &playbook::resolve::Resolved) -> Vec<&str> {
 
 // --- against the real tree -------------------------------------------------
 
-/// Rules that do not yet declare an explicit `## Directive` section.
-///
-/// **A ratchet: this may only go down.** The migration from whole-body rules to
-/// directive-plus-rationale is in progress; the budget makes the remaining work visible
-/// without leaving the suite red, and it fails the moment someone adds a new rule without
-/// splitting it. Lower the number as rules are converted, and set it to `0` when the
-/// migration is done — at which point it becomes a plain hard gate.
-const RULES_WITHOUT_DIRECTIVE_BUDGET: usize = 23;
-
-/// The gate that keeps the compiled block terse.
+/// Every rule must declare its directive explicitly.
 ///
 /// The compiler is not a linter — it compiles whatever it is handed, and a rule with no
 /// `## Directive` is emitted whole. That is the right behaviour at compose time (never lose a
 /// rule's text) and the wrong thing to leave unnoticed, so the contract lives here, where a
 /// failure names every offender at once instead of printing a warning on every command.
+///
+/// This counted down from 34 as a ratchet while the migration was in progress. The migration
+/// is complete, so it is a plain gate. A future change that needs a migration budget again
+/// should reintroduce the ratchet shape — with a non-zero budget, or the comparisons that make
+/// a ratchet a ratchet become degenerate and clippy says so.
 #[test]
-fn rules_without_a_directive_section_stay_within_budget() {
+fn every_rule_declares_a_directive() {
     let (rules, _) = load_rules(&repo_root());
     let offenders: Vec<&str> = rules
         .iter()
@@ -53,24 +49,13 @@ fn rules_without_a_directive_section_stay_within_budget() {
         .collect();
 
     assert!(
-        offenders.len() <= RULES_WITHOUT_DIRECTIVE_BUDGET,
-        "{} rules have no `## Directive` section but the budget is {}. A new rule must be \
-         split into `## Directive` (the terse direction, emitted) and `## Rationale` (the \
+        offenders.is_empty(),
+        "{} rule(s) have no `## Directive` section, so their whole body is compiled. Split \
+         each into `## Directive` (the terse direction, emitted) and `## Rationale` (the \
          incident, kept at source) — see docs/rule-format.md.\n  {}",
         offenders.len(),
-        RULES_WITHOUT_DIRECTIVE_BUDGET,
         offenders.join("\n  ")
     );
-
-    if offenders.len() < RULES_WITHOUT_DIRECTIVE_BUDGET {
-        panic!(
-            "{} rules are missing a `## Directive` section, below the budget of {}. \
-             Lower RULES_WITHOUT_DIRECTIVE_BUDGET to {} so the ratchet holds.",
-            offenders.len(),
-            RULES_WITHOUT_DIRECTIVE_BUDGET,
-            offenders.len()
-        );
-    }
 }
 
 #[test]

@@ -8,9 +8,9 @@ overrides:
 targets:
 ---
 
-egui has no real text shaping and poor typographic hierarchy, so **blocks of text are the
-wrong tool.** If a widget is explaining itself in paragraphs, the design is wrong, not the
-copy. Reach for an encoding instead:
+## Directive
+
+Blocks of text are the wrong tool in egui — reach for an encoding instead:
 
 | Instead of | Use |
 | --- | --- |
@@ -19,15 +19,19 @@ copy. Reach for an encoding instead:
 | a number the reader must compare by eye | bar height or width |
 | long-form detail | behind an expand, on hover, or in a side panel |
 
-## The test
+- A list of twenty should be **scannable** — if reading twenty means reading twenty paragraphs,
+  redesign.
+- Keep at most one line of irreducible text (a title, a statement); put the rest on demand.
+- Storybook captions to the same standard: one or two short lines, not an essay.
 
-A list of twenty of these should be **scannable**. If reading twenty means reading twenty
-paragraphs, redesign.
+## Rationale
 
-Keep at most one line of irreducible text — a title, a statement — and put the rest on demand.
+egui has no real text shaping and poor typographic hierarchy, so a paragraph is not a design
+element — it is a wall. A widget explaining itself in paragraphs is a design problem, not a copy
+problem.
 
-## Applies to story captions too
+The failure is not that the text is unreadable; it is that a list of twenty becomes twenty
+paragraphs to read rather than a shape to scan.
 
-Storybook captions are held to the same standard: one or two short lines, not an essay. A
-caption that needs a paragraph to explain the widget is a caption describing a widget that
-needs redesigning.
+A caption that needs a paragraph to explain the widget is a caption describing a widget that needs
+redesigning.

@@ -151,20 +151,44 @@ pub struct Rule {
 }
 
 impl Rule {
-    /// The actionable lead: the first paragraph of the directive, as one line.
+    /// The actionable lead, repeated verbatim by a target's `emphasis:`.
+    ///
+    /// Directives are written two ways — as a prose lead paragraph, or as a bullet list — and
+    /// the lead has to be the same thing in both cases: the first complete instruction. For a
+    /// bullet list that is the first bullet plus its continuation lines, not the whole list
+    /// run together into a paragraph. (It was the whole list, briefly: a directive opening on
+    /// a bullet produced a 400-word single line in the preamble.)
     pub fn lead(&self) -> String {
-        let mut out = String::new();
-        for line in self.directive.lines() {
-            if line.trim().is_empty() {
-                if !out.is_empty() {
-                    break;
-                }
-                continue;
+        let lines: Vec<&str> = self.directive.lines().collect();
+        let Some(start) = lines.iter().position(|line| !line.trim().is_empty()) else {
+            return String::new();
+        };
+
+        let first = lines[start].trim();
+        let bullet = first.starts_with("- ") || first.starts_with("* ");
+        let first = first
+            .strip_prefix("- ")
+            .or_else(|| first.strip_prefix("* "))
+            .unwrap_or(first);
+
+        let mut out = String::from(first);
+        for line in &lines[start + 1..] {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                break;
             }
-            if !out.is_empty() {
-                out.push(' ');
+            let continues = if bullet {
+                // Inside a bullet: continuations are indented, including nested bullets.
+                line.starts_with("  ") || line.starts_with('\t')
+            } else {
+                // Inside a prose paragraph: stop at the first bullet.
+                !(trimmed.starts_with("- ") || trimmed.starts_with("* "))
+            };
+            if !continues {
+                break;
             }
-            out.push_str(line.trim());
+            out.push(' ');
+            out.push_str(trimmed);
         }
         out
     }
@@ -392,7 +416,12 @@ mod tests {
 
     #[test]
     fn lead_takes_only_the_first_paragraph() {
-        let rule = Rule {
+        let rule = rule_with_directive("First line\nwraps.\n\nSecond paragraph.\n");
+        assert_eq!(rule.lead(), "First line wraps.");
+    }
+
+    fn rule_with_directive(directive: &str) -> Rule {
+        Rule {
             id: "x".into(),
             title: "T".into(),
             layer: Layer::Core,
@@ -401,10 +430,46 @@ mod tests {
             overrides: vec![],
             targets: vec![],
             rel: "rules/core/x.md".into(),
-            directive: "First line\nwraps.\n\nSecond paragraph.\n".into(),
+            directive: directive.into(),
             rationale: String::new(),
-        };
-        assert_eq!(rule.lead(), "First line wraps.");
+        }
+    }
+
+    #[test]
+    fn lead_takes_the_first_bullet_and_its_continuations() {
+        // The regression: a directive opening on a bullet used to collapse the entire list
+        // into one line, because "first paragraph" found no blank line to stop at.
+        let rule = rule_with_directive(
+            "- First instruction,\n  which wraps.\n  - a nested detail\n- Second instruction.\n- Third.\n",
+        );
+        assert_eq!(
+            rule.lead(),
+            "First instruction, which wraps. - a nested detail"
+        );
+    }
+
+    #[test]
+    fn lead_stops_at_the_second_bullet() {
+        let rule = rule_with_directive("- One.\n- Two.\n- Three.\n");
+        assert_eq!(rule.lead(), "One.");
+    }
+
+    #[test]
+    fn lead_stops_at_a_bullet_after_a_prose_lead() {
+        // A rule may open with a sentence and then list — the lead is the sentence.
+        let rule = rule_with_directive("Do the thing.\n\n- detail one\n- detail two\n");
+        assert_eq!(rule.lead(), "Do the thing.");
+    }
+
+    #[test]
+    fn lead_tolerates_a_leading_blank_line_and_a_star_bullet() {
+        let rule = rule_with_directive("\n\n* Starred instruction.\n* Another.\n");
+        assert_eq!(rule.lead(), "Starred instruction.");
+    }
+
+    #[test]
+    fn lead_of_an_empty_directive_is_empty() {
+        assert_eq!(rule_with_directive("\n\n").lead(), "");
     }
 
     #[test]

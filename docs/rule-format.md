@@ -49,12 +49,22 @@ either way, because a rule that loses its text silently is worse than a long one
 
 ### Writing the directive
 
-- **Lead with the rule.** The first paragraph is repeated verbatim by a target's `emphasis:`,
-  so it must be actionable on its own.
+- **Lead with the rule.** The first **bullet or paragraph** is repeated verbatim by a
+  target's `emphasis:`, so it must be actionable on its own — and for a bullet list that means
+  the *first bullet*, so make it the rule's core rather than a narrow case. `Rule::lead()`
+  takes the first bullet plus its indented continuation lines, or the first paragraph if the
+  directive opens with prose.
 - **Name the tool, not the vibe.** A concrete command survives paraphrasing; an adjective does
   not.
 - **Keep it under about twenty lines.** That is a bar, not a law — the traps list is longer
-  because seven traps do not compress into one. The ratchet test is the real bound.
+  because seven traps do not compress into one. The measured result across the tree is −40%
+  against the old whole-body output; rules that were already pure lists compress least.
+- **Use the notation.** `situation → action` on one line · `·` between prohibitions in a list ·
+  a table where the content is a mapping · a code block where it is a command. Imperative
+  fragments, not sentences.
+- **Emit only the delta from model defaults.** A frontier model already knows serde derives,
+  `snake_case`, and what `cargo fmt` does. What it does not know is this project's specifics —
+  spend the budget there.
 - **Do not restate a lower layer.** If `rules/core/` says it, a `rules/rust/` rule must not
   repeat it.
 - **Do not edit a lower-layer rule to suit one repo.** Add a higher-layer rule with
