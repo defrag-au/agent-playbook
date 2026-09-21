@@ -1,0 +1,23 @@
+[package]
+name = "agent-playbook"
+version = "0.1.0"
+edition = "2021"
+description = "Resolve and render agent rules for a project + target"
+license = "MIT"
+
+[[bin]]
+name = "playbook"
+path = "src/main.rs"
+
+[lib]
+name = "playbook"
+path = "src/lib.rs"
+
+# No dependencies, deliberately. The composer has to build with no network and no
+# registry cache, because it is the tool you reach for when a repo's toolchain is the
+# thing that is broken. std is enough for a flat `key: value` format.
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
