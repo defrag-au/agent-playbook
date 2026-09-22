@@ -31,6 +31,10 @@ at-recall diff crates/x/src/lib.rs --patch    # the hunks, for one file
 at-recall diff HEAD~1..HEAD                   # a range of history: reads no working-tree file
 at-recall log --limit 5                       # the last five commits, with the true total
 at-recall log crates/x/src/lib.rs             # that file's history
+
+# the recipe — one read for "write me a PR description"
+at-recall pr                                  # base, commits, diffstat by kind, areas
+at-recall pr --with areas                     # just the shape of the change set
 ```
 
 `--limit N` caps the output (default 200 lines); `--root <path>` points the tool at another tree;
@@ -97,7 +101,38 @@ than composing a pipeline to go looking.
 
 `at-recall state` exits 0 even on a clean tree, because the branch and HEAD *are* the answer to
 "what am I looking at" — read the count from the bound: `# 0 paths`. `at-recall diff` exits 1 when
-nothing differs, and 4 when it refused.
+nothing differs, and 4 when it refused. `at-recall pr` exits 1 when the branch has nothing on top of
+its base, which is the one answer you can branch on the code alone.
+
+## Recipes
+
+A recipe is one verb that composes the reads its sibling verbs use, so its count cannot disagree with
+the listing beside it. That is why it is a verb and not a sequence of the ones above: the sequence
+costs an approval per step and a re-read of each step's text.
+
+```sh
+at-recall pr                          # "write me a PR description": the facts for it, in one read
+at-recall pr --base main              # when the branch tracks nothing and there is no origin/HEAD
+at-recall pr --with commits,diffstat  # sections: commits, diffstat, areas
+at-recall pr --with areas             # one line: the shape of the change set
+```
+
+`pr` prints the base it resolved, the branch's own commits, every changed file with its counts and
+its **kind** — `manifest`, `lockfile`, `schema`, `generated`, `docs`, `tests`, `assets` or `code`, by
+path name only, first rule wins — and then the change set by kind:
+`# areas      17 files · 2 manifest · 2 lockfile · 3 docs · 10 code`. It reports unasked when part of
+a diff is nothing but whitespace: `# whitespace only: 1 file, +1 -1 of the lines`.
+
+Two things it will not do, and both matter when you write the description:
+
+- **It never fetches.** The base is whatever this repository has locally, and every answer says so:
+  `# caveat: origin/main is a local ref and this tool never fetches — the remote may be ahead`.
+- **It does not write the description.** Why a change exists is the one fact not in the repository,
+  so the recipe hands you the facts and leaves the prose to you.
+
+Its exits name the primitives rather than the recipe — `at-recall log <range> --limit N` for a cut
+commit list, `at-recall diff <range> --patch` for the hunks — so following one leaves the recipe
+without leaving the question.
 
 ## Traps
 

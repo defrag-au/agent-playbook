@@ -86,6 +86,15 @@ fn dispatch(args: &[String]) -> Result<Exit, Fail> {
         }
         "diff" => verbs::diff::run(&parsed.positionals, &opts)?,
         "log" => verbs::log::run(&parsed.positionals, &opts)?,
+        "pr" => {
+            if !parsed.positionals.is_empty() {
+                return Err(Fail::usage(format!(
+                    "`pr` answers for the whole branch and takes no path · {}",
+                    verb.usage
+                )));
+            }
+            verbs::pr::run(&opts)?
+        }
         other => {
             return Err(Fail::usage(format!(
                 "`{other}` is catalogued but not implemented"
@@ -244,6 +253,17 @@ fn context(parsed: &Parsed) -> Result<Opts, Fail> {
         None => (DEFAULT_LIMIT, None),
     };
 
+    // `--with` is a comma-separated list of section names. The set is the verb's — it validates,
+    // because it owns the list — and a blank entry is kept rather than filtered out, so `--with ""`
+    // is a usage error naming the sections instead of silently meaning "all of them".
+    let with = match parsed.value("--with") {
+        Some(list) => list
+            .split(',')
+            .map(|name| name.trim().to_string())
+            .collect(),
+        None => Vec::new(),
+    };
+
     Ok(Opts {
         root,
         root_was_explicit: named_root.is_some(),
@@ -254,5 +274,7 @@ fn context(parsed: &Parsed) -> Result<Opts, Fail> {
         patch: parsed.has("--patch"),
         summary: parsed.has("--summary"),
         ignore_space: parsed.has("--ignore-space"),
+        base: parsed.value("--base").map(str::to_string),
+        with,
     })
 }

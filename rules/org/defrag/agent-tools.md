@@ -22,6 +22,7 @@ targets:
 | `git status`, `git status --porcelain` | `at-recall state` |
 | `git diff`, `git diff --stat` | `at-recall diff [<rev>] [<path>…]` — add `--patch` for the hunks |
 | `git log`, `git log --oneline` | `at-recall log [<rev>] [<path>…]` |
+| the archaeology before a PR description: branch, base, `merge-base`, `log --oneline base..HEAD`, `diff --stat` | `at-recall pr [--base <rev>]` — the branch, its commits and its diffstat in one read |
 | anything not listed | `at-describe` — the catalogue, one screen |
 
 - The exact lines · every mention · how many · which files → `at-peek slice <file>:40-60` ·
@@ -40,9 +41,15 @@ targets:
   before editing it.
 - `at-peek` runs nothing at all; `at-recall` runs `git` and nothing else. That difference is why
   they are separate binaries, and why they are separate approvals if I have tiered them.
-- `at-recall` answers `state`, `log` and `diff`. `blame`, `show`, `churn` and the report recipes are
-  designed and not written — ask for the one you want rather than reaching for `git`, and name the
-  question, because that is what turns it into a verb.
+- A **recipe** is one verb that composes the reads its sibling verbs use, so a count cannot disagree
+  with the listing beside it: `at-recall pr` answers "write me a PR description" with the base, the
+  branch's commits and the diffstat by kind. Ask for the recipe rather than composing the sequence —
+  `pr --with commits,diffstat,areas` selects sections, and its `# next:` lines name the primitives
+  (`log`, `diff`) when you want the detail behind it. It prints the facts a description is written
+  from and does not write the description: why a change exists is not in the repository.
+- `at-recall` answers `state`, `log`, `diff` and the `pr` recipe. `blame`, `show` and `churn`, and the
+  `review` and `release` recipes, are designed and not written — ask for the one you want rather than
+  reaching for `git`, and name the question, because that is what turns it into a verb.
 
 ## Rationale
 

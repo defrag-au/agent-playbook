@@ -515,6 +515,10 @@ fn every_printed_exit_is_a_command_that_runs() {
         vec!["diff", "src/a.rs", "--patch", "--limit", "2"],
         vec!["log", "--limit", "1"],
         vec!["log", "src/a.rs", "--limit", "1"],
+        // The recipe's exits are primitives — a widened list, a table, the hunks — so following one
+        // has to leave the recipe behind without leaving the question.
+        vec!["pr", "--base", "HEAD~1", "--limit", "1"],
+        vec!["pr", "--base", "HEAD~1", "--with", "areas"],
     ] {
         let printed = exits(&at_recall(repo.path(), &args));
         assert!(
@@ -780,6 +784,276 @@ fn log_refuses_a_reflog_reference_too() {
     assert!(stderr(&out).contains("reflog"), "{}", stderr(&out));
 }
 
+// ---------------------------------------------------------------------------------------------
+// The recipe
+// ---------------------------------------------------------------------------------------------
+
+/// A `main` and a `feature` off it, which is the shape every `pr` test needs: the recipe is about
+/// what one branch adds on top of another. The base commit is named `base`, so a row that leaked
+/// into the listing is visible by its subject.
+fn branched(name: &str) -> Repo {
+    let repo = Repo::new(name);
+    repo.write("src/a.rs", "one\n");
+    repo.write("Cargo.toml", "[package]\nname = \"fixture\"\n");
+    repo.write("docs/notes.md", "# notes\n");
+    repo.commit("base");
+    repo.git(&["checkout", "-q", "-b", "feature"]);
+    repo.write("src/a.rs", "one\ntwo\n");
+    repo.commit("second");
+    repo.write("docs/notes.md", "# notes\n\nmore\n");
+    repo.commit("third");
+    repo
+}
+
+/// One content row that names `path`, for asserting on a column without pinning the padding.
+fn row_naming(text: &str, needle: &str) -> String {
+    text.lines()
+        .filter(|line| !line.starts_with('#'))
+        .find(|line| line.contains(needle))
+        .unwrap_or_else(|| panic!("no row names {needle} in:\n{text}"))
+        .to_string()
+}
+
+#[test]
+fn pr_answers_for_the_whole_branch_in_one_read() {
+    let repo = branched("pr-basic");
+    let out = at_recall(repo.path(), &["pr", "--base", "main"]);
+    let text = stdout(&out);
+
+    assert_eq!(code(&out), 0, "{} {}", text, stderr(&out));
+    assert!(
+        text.starts_with("# at-recall pr · repo · base main\n"),
+        "the header names the base the answer is about: {text}"
+    );
+    assert!(
+        text.contains("# caveat: main is a local ref and this tool never fetches"),
+        "the base is whatever this repository has locally, and the answer says so: {text}"
+    );
+
+    assert!(text.contains("commits    2 commits"), "{text}");
+    assert!(text.contains("third"), "{text}");
+    assert!(text.contains("second"), "{text}");
+    assert!(
+        !text.lines().any(|line| line.ends_with("  base")),
+        "the base commit is not on the branch: {text}"
+    );
+
+    assert!(text.contains("diffstat   2 files, +3 -0"), "{text}");
+    let code_row = row_naming(&text, "src/a.rs");
+    assert!(code_row.starts_with("  +1 -0"), "{text}");
+    assert!(
+        code_row.trim_end().ends_with("code"),
+        "each row states what the path is: {text}"
+    );
+    assert!(
+        row_naming(&text, "docs/notes.md")
+            .trim_end()
+            .ends_with("docs"),
+        "{text}"
+    );
+
+    assert!(
+        text.contains("areas      2 files · 1 docs · 1 code"),
+        "{text}"
+    );
+    // Nothing was cut, so no total line and no widen: the answer is complete and says nothing about
+    // limits, which is what "no bound" has to look like.
+    assert!(!text.contains("reached"), "{text}");
+    assert!(
+        !text.contains("of 2 files") && !text.contains("of 2 commits"),
+        "{text}"
+    );
+}
+
+#[test]
+fn pr_resolves_the_base_from_the_branch_upstream() {
+    let repo = branched("pr-upstream");
+    repo.git(&["branch", "--set-upstream-to=main", "feature"]);
+
+    let out = at_recall(repo.path(), &["pr"]);
+    let text = stdout(&out);
+
+    assert_eq!(code(&out), 0, "{} {}", text, stderr(&out));
+    assert!(
+        text.starts_with("# at-recall pr · repo · base main\n"),
+        "an upstream is the base without being asked: {text}"
+    );
+}
+
+#[test]
+fn pr_falls_back_to_the_remote_head_when_nothing_is_tracked() {
+    // The last step before the refusal, and the one a clone relies on: a branch that tracks nothing
+    // in a repository that has an `origin/HEAD`. Set with update-ref rather than a fetch, because
+    // the fixture's history is the whole of what the remote could have.
+    let repo = branched("pr-origin-head");
+    repo.git(&["update-ref", "refs/remotes/origin/main", "main"]);
+    repo.git(&[
+        "symbolic-ref",
+        "refs/remotes/origin/HEAD",
+        "refs/remotes/origin/main",
+    ]);
+
+    let out = at_recall(repo.path(), &["pr"]);
+    let text = stdout(&out);
+
+    assert_eq!(code(&out), 0, "{} {}", text, stderr(&out));
+    assert!(
+        text.starts_with("# at-recall pr · repo · base origin/main\n"),
+        "the answer names the ref it resolved: {text}"
+    );
+    assert!(text.contains("commits    2 commits"), "{text}");
+}
+
+#[test]
+fn pr_refuses_when_no_base_can_be_resolved() {
+    // The one case where a guess would be invisible: a branch that tracks nothing in a repository
+    // with no `origin/HEAD`. The refusal names the flag that fixes it.
+    let repo = dirty("pr-no-base");
+    let out = at_recall(repo.path(), &["pr"]);
+
+    assert_eq!(code(&out), 2, "{}", stdout(&out));
+    assert!(stderr(&out).contains("--base"), "{}", stderr(&out));
+    assert!(
+        stdout(&out).is_empty(),
+        "a refusal prints no answer: {}",
+        stdout(&out)
+    );
+}
+
+#[test]
+fn pr_refuses_a_base_that_is_not_one_revision() {
+    let repo = branched("pr-bad-base");
+
+    let range = at_recall(repo.path(), &["pr", "--base", "main...feature"]);
+    assert_eq!(code(&range), 2);
+    assert!(
+        stderr(&range).contains("a base is one revision"),
+        "{}",
+        stderr(&range)
+    );
+
+    let missing = at_recall(repo.path(), &["pr", "--base", "nope"]);
+    assert_eq!(code(&missing), 3);
+    assert!(
+        stderr(&missing).contains("not a revision"),
+        "{}",
+        stderr(&missing)
+    );
+}
+
+#[test]
+fn pr_sections_select_and_an_unknown_one_says_which_exist() {
+    let repo = branched("pr-sections");
+
+    let areas = at_recall(repo.path(), &["pr", "--base", "main", "--with", "areas"]);
+    let text = stdout(&areas);
+    assert_eq!(code(&areas), 0, "{} {}", text, stderr(&areas));
+    assert_eq!(content_lines(&text), 1, "one section is one line: {text}");
+    assert!(
+        text.contains("areas      2 files · 1 docs · 1 code"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("third"),
+        "the commits were not asked for, so they are not read: {text}"
+    );
+
+    let two = stdout(&at_recall(
+        repo.path(),
+        &["pr", "--base", "main", "--with", "commits,diffstat"],
+    ));
+    assert!(two.contains("third"), "{two}");
+    assert!(two.contains("diffstat   2 files"), "{two}");
+    assert!(
+        !two.contains("areas      "),
+        "a section left out is not printed: {two}"
+    );
+
+    let unknown = at_recall(
+        repo.path(),
+        &["pr", "--base", "main", "--with", "everything"],
+    );
+    assert_eq!(code(&unknown), 2);
+    assert!(
+        stderr(&unknown).contains("commits, diffstat, areas"),
+        "a reader who mistypes should not silently get fewer sections: {}",
+        stderr(&unknown)
+    );
+}
+
+#[test]
+fn pr_says_when_the_branch_is_empty() {
+    // The one answer a caller branches on the exit code alone: there is no description to write.
+    let repo = branched("pr-empty");
+    repo.git(&["checkout", "-q", "main"]);
+
+    let out = at_recall(repo.path(), &["pr", "--base", "main"]);
+    let text = stdout(&out);
+
+    assert_eq!(code(&out), 1, "nothing to describe: {text}");
+    assert!(text.contains("# nothing between main and HEAD"), "{text}");
+    assert!(text.contains("commits    0 commits"), "{text}");
+    assert!(text.contains("areas      0 files\n"), "{text}");
+    assert!(
+        exits(&out).is_empty(),
+        "there is nothing behind an empty change set to offer: {text}"
+    );
+}
+
+#[test]
+fn pr_states_the_whitespace_delta_without_being_asked() {
+    let repo = Repo::new("pr-whitespace");
+    repo.write("a.rs", "fn main() {\n    let a = 1;\n}\n");
+    repo.write("b.rs", "let x = 1;\n");
+    repo.commit("base");
+    repo.git(&["checkout", "-q", "-b", "feature"]);
+    repo.write("a.rs", "fn main() {\n        let a = 1;\n}\n");
+    repo.write("b.rs", "let x = 2;\n");
+    repo.commit("reindent and change");
+
+    let text = stdout(&at_recall(repo.path(), &["pr", "--base", "main"]));
+
+    // Git reports the reindented line as one addition and one deletion, and `-w` drops the file
+    // entirely, so the delta is the whole of what `-w` would have taken away.
+    assert!(text.contains("diffstat   2 files, +2 -2"), "{text}");
+    assert!(
+        text.contains("# whitespace only: 1 file, +1 -1 of the lines"),
+        "half of this diff is reindentation, which a reviewer should not have to ask about: {text}"
+    );
+}
+
+#[test]
+fn a_repository_filter_does_not_stop_the_pr_recipe() {
+    // `diff` refuses a repository that configures a clean filter because reading the working tree
+    // would run a program the repository names. This recipe reads commits and the diff between two
+    // of them, so nothing is converted and there is nothing to refuse.
+    let repo = Repo::new("pr-filter");
+    let script = repo.script("filter");
+    repo.write("a.foo", "one\n");
+    repo.write("src/a.rs", "one\n");
+    repo.commit("base");
+    repo.configure("filter.hostile.clean", &script);
+    repo.configure("filter.hostile.required", "false");
+    fs::write(repo.path().join(".gitattributes"), "*.foo filter=hostile\n").expect("attributes");
+    repo.git(&["add", "-A"]);
+    repo.git(&["commit", "-q", "-m", "attributes"]);
+    repo.git(&["checkout", "-q", "-b", "feature"]);
+    repo.write("src/a.rs", "one\ntwo\n");
+    repo.commit("change");
+    // Every fixture command above runs the clean filter on `a.foo` — that is what a clean filter is
+    // for — so the evidence is cleared immediately before the tool is asked anything. Clearing it
+    // earlier would leave `git add -A` to put it back, and the test would pass on its own setup.
+    repo.forget("filter");
+
+    let out = at_recall(repo.path(), &["pr", "--base", "main"]);
+    assert_eq!(code(&out), 0, "{} {}", stdout(&out), stderr(&out));
+    assert!(stdout(&out).contains("src/a.rs"), "{}", stdout(&out));
+    assert!(
+        !repo.ran("filter"),
+        "the recipe ran a program the repository named"
+    );
+}
+
 #[test]
 fn ignoring_whitespace_states_what_it_hid() {
     let repo = Repo::new("ignore-space");
@@ -878,6 +1152,8 @@ fn no_command_writes() {
     repo.write(".env", "TOKEN=placeholder-not-a-secret\n");
     repo.commit("first");
     repo.write("src/a.rs", "one\ntwo\n");
+    repo.commit("second");
+    repo.write("src/a.rs", "one\ntwo\nthree\n");
 
     let before = snapshot(repo.path());
     for args in [
@@ -888,6 +1164,9 @@ fn no_command_writes() {
         vec!["diff", "src/a.rs"],
         vec!["diff", "HEAD..HEAD"],
         vec!["diff", "--limit", "1"],
+        vec!["log", "--limit", "1"],
+        vec!["pr", "--base", "HEAD~1"],
+        vec!["pr", "--base", "HEAD~1", "--with", "areas"],
     ] {
         let _ = at_recall(repo.path(), &args);
     }
@@ -973,9 +1252,17 @@ fn output_is_byte_stable() {
     // `check` in the playbook diffs rendered output, and a reader diffs two transcripts. Either way
     // nondeterminism reads as a change that did not happen.
     let repo = dirty("stable");
+    repo.write("src/a.rs", "one\ntwo\nthree\nfour\nfive\n");
+    repo.commit("second");
+    repo.write("src/a.rs", "one\ntwo\nthree\nfour\nfive\nsix\n");
     repo.write("notes.md", "scratch\n");
 
-    for args in [vec!["state"], vec!["diff"], vec!["diff", "--patch"]] {
+    for args in [
+        vec!["state"],
+        vec!["diff"],
+        vec!["diff", "--patch"],
+        vec!["pr", "--base", "HEAD~1"],
+    ] {
         let first = at_recall(repo.path(), &args);
         let second = at_recall(repo.path(), &args);
         assert_eq!(

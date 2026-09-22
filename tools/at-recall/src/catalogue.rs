@@ -43,6 +43,39 @@ const HOW: Flag = Flag {
     value: "",
     one_line: "This verb's flags (`-h` is the same flag)",
 };
+const BASE: Flag = Flag {
+    name: "--base",
+    takes_value: true,
+    value: "<rev>",
+    one_line: "What the branch diverged from; default is its upstream, else origin/HEAD",
+};
+const WITH: Flag = Flag {
+    name: "--with",
+    takes_value: true,
+    value: "<sections>",
+    one_line: "Comma-separated sections to print; default is all of them",
+};
+
+/// What `at-recall pr` prints, in the order it prints it. The names live here because the verb's
+/// help, `at-describe`'s catalogue and `--with`'s validation all read them from one place.
+pub const PR_SECTIONS: &[&str] = &["commits", "diffstat", "areas"];
+
+/// A recipe: a verb whose answer is several sections rather than one, so a reader can ask for a
+/// subset and a reviewer can read the set.
+///
+/// The sections are a reference to the slice `--with` validates against rather than a second copy
+/// of it, so a section can neither be offered here and refused by the parser nor the reverse.
+pub struct Recipe {
+    pub verb: &'static str,
+    pub one_line: &'static str,
+    pub sections: &'static [&'static str],
+}
+
+pub const RECIPES: &[Recipe] = &[Recipe {
+    verb: "pr",
+    one_line: "the facts a PR description is written from",
+    sections: PR_SECTIONS,
+}];
 
 pub static VERBS: &[Verb] = &[
     Verb {
@@ -78,6 +111,22 @@ pub static VERBS: &[Verb] = &[
                 named rather than passed over, because no difference looks like no change.",
         flags: &[PATCH, IGNORE_SPACE, SUMMARY, LIMIT, ROOT, SECRETS, HOW],
     },
+    Verb {
+        name: "pr",
+        question: "The facts a PR description is written from",
+        usage: "at-recall pr [--base <rev>] [--with <sections>] [--limit N] [--root <path>]",
+        notes: "One recipe with three sections, the whole branch in one read: `commits` (its own \
+                history), `diffstat` (every changed path with its counts and its kind) and `areas` \
+                (the change set by kind, which is what the first paragraph of a description is \
+                written from). The base is `--base`, else the branch's upstream, else `origin/HEAD`; \
+                nothing is fetched, so it is the ref this repository has locally and the output says \
+                so on every run. It prints facts and never conclusions — a path's kind comes from \
+                its name, not its contents — and it does not write the description, because why the \
+                change exists is the one fact not in the repository. Every section carries its \
+                count, so a cut section says what it was cut from, and a branch with nothing on top \
+                of its base exits 1 rather than 0: there is no description to write.",
+        flags: &[BASE, WITH, LIMIT, ROOT, HOW],
+    },
 ];
 
 static SPEC: Tool = Tool {
@@ -99,6 +148,23 @@ pub fn names() -> String {
 
 pub fn verb_lines() -> Vec<String> {
     at_core::catalogue::verb_lines(VERBS)
+}
+
+/// The recipes, one line each, in the shape [`verb_lines`] renders the verbs — and naming the
+/// binary, because the toolkit view lists the recipes of every binary under one heading.
+pub fn recipe_lines() -> Vec<String> {
+    RECIPES
+        .iter()
+        .map(|recipe| {
+            format!(
+                "  {} {} · {} · sections: {}",
+                crate::TOOL,
+                recipe.verb,
+                recipe.one_line,
+                recipe.sections.join(", ")
+            )
+        })
+        .collect()
 }
 
 pub fn help_all() -> String {

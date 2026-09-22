@@ -12,6 +12,7 @@
 
 pub mod catalogue;
 pub mod cli;
+pub mod facts;
 pub mod git;
 pub mod status;
 pub mod verbs;

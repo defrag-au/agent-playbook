@@ -100,9 +100,11 @@ fn toolkit() -> String {
     }
 
     out.push_str("\nRecipes\n");
-    out.push_str(
-        "  none in this build · `pr`, `review` and `release` are designed and not written;\n",
-    );
+    for line in recall::recipe_lines() {
+        out.push_str(&line);
+        out.push('\n');
+    }
+    out.push_str("  `review` and `release` are designed and not written;\n");
     out.push_str("  the shapes are in docs/inspection-tools.md in the playbook\n");
 
     out.push_str("\nExit codes\n");

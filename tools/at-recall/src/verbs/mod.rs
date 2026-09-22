@@ -11,6 +11,7 @@
 
 pub mod diff;
 pub mod log;
+pub mod pr;
 pub mod state;
 
 use at_core::contract::{truncate, Fail, Report, MAX_LINE_WIDTH};
@@ -45,6 +46,11 @@ pub struct Opts {
     pub summary: bool,
     /// Whether a diff should ignore whitespace when comparing lines, and say what that hid.
     pub ignore_space: bool,
+    /// The revision a recipe should compare against, when the caller named one. `None` means the
+    /// verb resolves a default and says which one it used.
+    pub base: Option<String>,
+    /// The sections a recipe was asked to print. Empty means all of them.
+    pub with: Vec<String>,
 }
 
 /// What one verb may still print, and what it gave up to stay inside `--limit`.

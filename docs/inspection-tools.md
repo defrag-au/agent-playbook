@@ -2,11 +2,11 @@
 
 **Status:** proposal, 2026-09-22; part built. Built and tested: `tools/at-core` (the shared output
 contract and path containment), `tools/at-peek` (`stat`, `slice`, `search`), `tools/at-recall`
-(`state`, `log`, `diff`), and `tools/at-describe` (the catalogue). The toolkit is packaged by this
-repository's `flake.nix` and wired into the org's shells by `defrag-nix`. Everything else here is
-still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in `peek`; `show`, `blame`,
-`why`, `churn` in `recall`), the recipes, and the rule and skill drafts at the end — which stay
-drafts until the verbs they name exist.
+(`state`, `log`, `diff`, and the `pr` recipe), and `tools/at-describe` (the catalogue). The toolkit
+is packaged by this repository's `flake.nix` and wired into the org's shells by `defrag-nix`.
+Everything else here is still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in
+`peek`; `show`, `blame`, `why`, `churn` in `recall`), the other two recipes (`review`, `release`),
+and the rule and skill drafts at the end — which stay drafts until the verbs they name exist.
 
 Three things the implementation settled that this document did not anticipate, each of them a test
 rather than a paragraph (`tools/at-recall/tests/contract.rs`):
@@ -261,28 +261,47 @@ derivable from the repository in front of it · it reads within one trust tier.
 | --- | --- | --- |
 | `at-peek overview` | What is this repository | Layout, languages by file count, manifests, docs, test layout, declared commands |
 | `at-peek commands` | How do I build and test here | What the manifests declare — `flake.nix`, `Cargo.toml`, `package.json`, `Makefile` — never a claim about which is right |
-| `at-recall pr` | Write the PR description | Base and its caveat, commits, diffstat by area, category flags |
+| **`at-recall pr`** *(built)* | Write the PR description | `commits`, `diffstat` (per file, with its kind), `areas`; `--with` selects, `--base` names the base |
 | `at-recall review` | What should I scrutinise | The same facts, risk-ordered, with churn per file |
 | `at-recall release [--since <tag>]` | What goes in the changelog | Commits since the last tag, grouped by the prefix convention their messages already use |
 
 `at-describe` lists the recipes under the binary that owns them, so the rule does not have to.
-`at-recall pr` in full — the shape the other two follow:
+`at-recall pr` in full. This is a real transcript from the repository the toolkit was first used in,
+with the diffstat trimmed — the numbers are the run's, not a sketch:
 
 ```
 $ at-recall pr
-# at-recall pr · archivist · base origin/main (merge-base 9c1f2ab)
-# caveat: origin/main is the local ref and was not fetched — the remote may be ahead
-commits     4
-  3f2a1c9 2026-07-14 damo  Close the redb handle before the writer thread exits
-  b41d7e0 2026-08-02 ana   Tidy cache module imports
+# at-recall pr · cnft.dev-workers · base origin/main
+# caveat: origin/main is a local ref and this tool never fetches — the remote may be ahead
+commits    3 commits
+  2ea6ec8e  2026-09-22  Damon Oehlman  .
+  d08b3219  2026-09-22  Damon Oehlman  include view art in asset card
+  7b4b5543  2026-09-22  Damon Oehlman  experiments with at tooling
+diffstat   17 files, +1463 -539
+  +891 -0    AGENTS.md                                                  docs
+  +169 -229  Cargo.lock                                                 lockfile
+  +55 -55    Cargo.toml                                                 manifest
   ...
-diffstat    9 files, +412 −118 (1 binary skipped)
-  crates/archivist/src/cache.rs  +180 −40
-  Cargo.toml                     +2 −1    manifest
-  crates/archivist/Cargo.lock    +31 −12  lockfile
-areas       1 manifest · 1 lockfile · 0 schema · 0 generated
-# 9 of 9 files · at-recall diff origin/main --patch for the hunks
+areas      17 files · 2 manifest · 2 lockfile · 3 docs · 10 code
+# next: at-recall diff origin/main...HEAD --patch · the hunks
 ```
+
+Four ways the built verb settled differently from the sketch above, each for the same reason — a
+number a reader cannot check is not a fact:
+
+- **The header names the base and not the merge base.** The base is what the reader must judge; the
+  merge-base sha is an input to the range, and printing it invites the reading that the range is
+  against it. A diverged branch is visible in the commit count instead.
+- **`--with` selects sections**, so "how big is this branch" is `--with areas` and costs one line.
+- **A second `diff` read reports the whitespace delta unasked** — `# whitespace only: 1 file, +1 -1
+  of the lines` — because "half of this is reindentation" changes how the rest is read and is not a
+  fact a reviewer knows to ask for.
+- **`areas` prints only the kinds that are present.** `0 schema · 0 generated` is a sketch of a
+  schema that has no content; the count of kinds absent from a change set is not a fact about it.
+
+Two that hold as designed: the base resolution order (`--base`, then the branch's upstream, then
+`origin/HEAD`, then a refusal naming `--base`) and the exit naming primitives rather than the recipe
+(`at-recall log <range> --limit N`, `at-recall diff <range> --patch`).
 
 ### Candidates it rejects
 

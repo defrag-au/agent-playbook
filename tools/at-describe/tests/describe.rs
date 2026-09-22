@@ -89,6 +89,32 @@ fn one_verb_can_be_asked_for_on_its_own() {
 }
 
 #[test]
+fn the_catalogue_lists_the_recipes_with_their_sections() {
+    // A recipe that is built but not described is the silent case this suite exists for: the agent
+    // looking for it asks `at-describe` first and would conclude it does not exist.
+    let text = stdout(&describe(&[]));
+
+    assert!(!text.contains("none in this build"), "{text}");
+    for recipe in at_recall::catalogue::RECIPES {
+        assert!(
+            text.contains(recipe.verb),
+            "{} is not described: {text}",
+            recipe.verb
+        );
+        assert!(
+            at_recall::catalogue::VERBS
+                .iter()
+                .any(|verb| verb.name == recipe.verb),
+            "{} is a recipe for a verb that does not exist",
+            recipe.verb
+        );
+        for section in recipe.sections {
+            assert!(text.contains(section), "{section} is not described: {text}");
+        }
+    }
+}
+
+#[test]
 fn an_unknown_name_is_a_usage_error_that_names_what_is_known() {
     let out = describe(&["statx"]);
 

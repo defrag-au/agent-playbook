@@ -18,18 +18,11 @@ use std::collections::BTreeSet;
 
 use at_core::contract::{secret_shaped, Fail, Report, MAX_LIMIT};
 
+use crate::facts::{self, borrowed, totals, FileStat};
 use crate::git::{with_paths, Noun};
 use crate::status::Status;
 use crate::verbs::{again, plural, split_rev_and_paths, Budget, Opts, Outcome};
 use crate::TOOL;
-
-/// What every diff run carries, whatever the caller asked for. `--no-color` because a repository
-/// can configure colour on and this output is read by a machine; `--no-ext-diff` and `--no-textconv`
-/// because both names a program for git to run, and this tool runs one program only.
-const NEUTRAL: &[&str] = &["--no-color", "--no-ext-diff", "--no-textconv"];
-
-/// `--ignore-space`: compare lines ignoring whitespace, which is `git diff -w`.
-const IGNORE_SPACE: &str = "--ignore-all-space";
 
 pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
     let mut report = Report::new();
@@ -42,7 +35,7 @@ pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
     refuse_filtered(opts, &rev, &paths)?;
     report.header(TOOL, "diff", opts.root.name(), &comparison(&rev));
 
-    let files = numstat(opts, &rev, &paths, opts.ignore_space)?;
+    let files = facts::numstat(&opts.git, &rev, &paths, opts.ignore_space)?;
     if files.is_empty() {
         report.bound("no differences".to_string());
         explain_empty(&mut report, opts, &paths)?;
@@ -51,7 +44,7 @@ pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
     // What the flag hid, when there is something to hide: the same comparison without it, so the
     // reader can see how much of the change is reindentation rather than reach for a second read.
     let hidden = if opts.ignore_space {
-        Some(numstat(opts, &rev, &paths, false)?)
+        Some(facts::numstat(&opts.git, &rev, &paths, false)?)
     } else {
         None
     };
@@ -346,7 +339,7 @@ fn index_paths(opts: &Opts, rev: &Option<String>, paths: &[String]) -> Result<Ve
     let raw = opts.git.run(Noun::Diff, &borrowed(&args))?;
     Ok(raw
         .lines()
-        .filter_map(parse_numstat)
+        .filter_map(facts::parse_numstat)
         .flat_map(|file| file.names)
         .collect())
 }
@@ -369,7 +362,7 @@ fn patch(
         pathspecs.push(format!(":(exclude,literal){name}"));
     }
 
-    let args = diff_args(rev, &pathspecs, &["--patch"], opts.ignore_space);
+    let args = facts::diff_args(rev, &pathspecs, &["--patch"], opts.ignore_space);
     let hunks = opts.git.run(Noun::Diff, &borrowed(&args))?;
     for line in hunks.lines() {
         budget.push(report, line);
@@ -444,107 +437,6 @@ fn explain_empty(report: &mut Report, opts: &Opts, paths: &[String]) -> Result<(
     Ok(())
 }
 
-fn diff_args(
-    rev: &Option<String>,
-    paths: &[String],
-    mode: &[&str],
-    ignore_space: bool,
-) -> Vec<String> {
-    let mut args: Vec<String> = NEUTRAL
-        .iter()
-        .chain(mode.iter())
-        .map(|flag| (*flag).to_string())
-        .collect();
-    if ignore_space {
-        args.push(IGNORE_SPACE.to_string());
-    }
-    if let Some(rev) = rev {
-        args.push(rev.clone());
-    }
-    with_paths(&mut args, paths);
-    args
-}
-
-fn borrowed(args: &[String]) -> Vec<&str> {
-    args.iter().map(String::as_str).collect()
-}
-
-/// One line of `--numstat`.
-struct FileStat {
-    /// `None` for a binary file: git prints `-` where a count would be, and a line count for a
-    /// binary file is a number that means nothing.
-    added: Option<u64>,
-    deleted: Option<u64>,
-    /// The path as git wrote it, which for a rename is the factored `old => new` form.
-    label: String,
-    /// The one or two real names behind `label`, because a rename is one line with two paths and
-    /// the deny-list has to see both.
-    names: Vec<String>,
-}
-
-impl FileStat {
-    /// The first column: the counts, or the word for a file that has none.
-    fn counts(&self) -> String {
-        match (self.added, self.deleted) {
-            (Some(added), Some(deleted)) => format!("+{added} -{deleted}"),
-            _ => "binary".to_string(),
-        }
-    }
-}
-
-fn numstat(
-    opts: &Opts,
-    rev: &Option<String>,
-    paths: &[String],
-    ignore_space: bool,
-) -> Result<Vec<FileStat>, Fail> {
-    let args = diff_args(rev, paths, &["--numstat"], ignore_space);
-    let raw = opts.git.run(Noun::Diff, &borrowed(&args))?;
-    Ok(raw
-        .lines()
-        .filter(|line| !line.is_empty())
-        .filter_map(parse_numstat)
-        .collect())
-}
-
-fn parse_numstat(line: &str) -> Option<FileStat> {
-    let mut parts = line.splitn(3, '\t');
-    let added = parts.next()?;
-    let deleted = parts.next()?;
-    let label = parts.next()?;
-    Some(FileStat {
-        added: added.parse().ok(),
-        deleted: deleted.parse().ok(),
-        label: label.to_string(),
-        names: names_of(label),
-    })
-}
-
-/// `src/{old.rs => new.rs}` and `old.rs => new.rs` are git's two factored rename forms, and the
-/// brace form factors out a common prefix or suffix — `{old => new}/mod.rs` for a directory that
-/// moved. Neither name is on a line of its own, so both are rebuilt here.
-///
-/// A path containing the literal text ` => ` would be read as a rename. That is accepted: the
-/// misreading costs a broader refusal, never a file printed that the deny-list meant to withhold.
-fn names_of(label: &str) -> Vec<String> {
-    if let (Some(open), Some(close)) = (label.find('{'), label.find('}')) {
-        if open < close {
-            if let Some((old, new)) = label[open + 1..close].split_once(" => ") {
-                let prefix = &label[..open];
-                let suffix = &label[close + 1..];
-                return vec![
-                    format!("{prefix}{old}{suffix}"),
-                    format!("{prefix}{new}{suffix}"),
-                ];
-            }
-        }
-    }
-    match label.split_once(" => ") {
-        Some((old, new)) => vec![old.to_string(), new.to_string()],
-        None => vec![label.to_string()],
-    }
-}
-
 /// Whether a path is one the deny-list refuses. Both the name and the whole path are checked: the
 /// name catches `.env` in any directory, and the path catches a file inside a directory that is
 /// itself named for secrets.
@@ -553,57 +445,9 @@ fn secret_shaped_path(path: &str) -> bool {
     secret_shaped(name).is_some() || secret_shaped(path).is_some()
 }
 
-/// `+12 -35`, and the binary count when there is one to state.
-fn totals(files: &[FileStat]) -> String {
-    let added: u64 = files.iter().filter_map(|file| file.added).sum();
-    let deleted: u64 = files.iter().filter_map(|file| file.deleted).sum();
-    let binary = files.iter().filter(|file| file.added.is_none()).count();
-    if binary == 0 {
-        format!("+{added} -{deleted}")
-    } else {
-        format!("+{added} -{deleted} ({binary} binary)")
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_plain_path_is_its_own_name() {
-        assert_eq!(names_of("src/main.rs"), vec!["src/main.rs"]);
-    }
-
-    #[test]
-    fn a_factored_rename_yields_both_names() {
-        assert_eq!(
-            names_of("src/{old.rs => new.rs}"),
-            vec!["src/old.rs", "src/new.rs"]
-        );
-        assert_eq!(
-            names_of("src/{old => new}/mod.rs"),
-            vec!["src/old/mod.rs", "src/new/mod.rs"]
-        );
-    }
-
-    #[test]
-    fn an_unfactored_rename_yields_both_names() {
-        assert_eq!(names_of("a.rs => b/c.rs"), vec!["a.rs", "b/c.rs"]);
-    }
-
-    #[test]
-    fn a_binary_file_has_no_counts() {
-        let file = parse_numstat("-\t-\tassets/logo.png").expect("a numstat line");
-        assert_eq!(file.counts(), "binary");
-        assert_eq!(file.added, None);
-    }
-
-    #[test]
-    fn counts_and_path_survive_a_path_with_a_tab_after_it() {
-        let file = parse_numstat("12\t3\tsrc/a weird name.rs").expect("a numstat line");
-        assert_eq!(file.counts(), "+12 -3");
-        assert_eq!(file.label, "src/a weird name.rs");
-    }
 
     #[test]
     fn the_deny_list_sees_a_secret_name_in_any_directory() {
@@ -612,24 +456,5 @@ mod tests {
         assert!(secret_shaped_path("secrets/notes.md"));
         assert!(!secret_shaped_path("src/cache.rs"));
         assert!(!secret_shaped_path(".env.example"));
-    }
-
-    #[test]
-    fn totals_state_the_binary_count() {
-        let files = vec![
-            FileStat {
-                added: Some(12),
-                deleted: Some(3),
-                label: "a.rs".to_string(),
-                names: vec!["a.rs".to_string()],
-            },
-            FileStat {
-                added: None,
-                deleted: None,
-                label: "b.png".to_string(),
-                names: vec!["b.png".to_string()],
-            },
-        ];
-        assert_eq!(totals(&files), "+12 -3 (1 binary)");
     }
 }
