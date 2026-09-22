@@ -81,7 +81,16 @@ impl Repo {
     /// and the output can be asserted exactly.
     fn git_output(&self, args: &[&str]) -> Output {
         let mut command = Command::new("git");
-        command.arg("-C").arg(&self.dir).args(args);
+        command.arg("-C").arg(&self.dir);
+        // `git commit` spawns `git maintenance run --auto --quiet --detach` — visible in a
+        // `GIT_TRACE` — and that detached process holds `.git/objects/maintenance.lock` for as long
+        // as it runs. A fixture that leaves a background writer inside the window
+        // `no_command_writes` measures makes that test fail for a reason that is not the tool: the
+        // lock is in the snapshot taken *before* the tool ran, which is a file the tool cannot have
+        // created. Nothing in these fixtures wants auto-maintenance, so it is switched off here
+        // rather than waited for.
+        command.arg("-c").arg("maintenance.auto=false");
+        command.args(args);
         neutral(&mut command);
         command.output().expect("run git")
     }
