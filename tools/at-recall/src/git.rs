@@ -155,6 +155,11 @@ impl Git {
             "core.hooksPath=/dev/null",
             "diff.external=",
             "core.quotePath=false",
+            // Commits carry the encoding they were written in, and this is the encoding they come
+            // back out in. Pinned to UTF-8 so a repository cannot hand this tool bytes it will
+            // then have to lossily convert — the mangled-author failure is silent and looks like
+            // data.
+            "i18n.logOutputEncoding=UTF-8",
         ]
         .iter()
         .flat_map(|setting| ["-c".to_string(), setting.to_string()])

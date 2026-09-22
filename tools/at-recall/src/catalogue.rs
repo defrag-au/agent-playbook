@@ -13,6 +13,12 @@ const LIMIT: Flag = Flag {
     value: "N",
     one_line: "Cap the output; default 200, ceiling 2000. Clamping is announced",
 };
+const IGNORE_SPACE: Flag = Flag {
+    name: "--ignore-space",
+    takes_value: false,
+    value: "",
+    one_line: "Compare lines ignoring whitespace (`git diff -w`), and state what that hid",
+};
 const ROOT: Flag = Flag {
     name: "--root",
     takes_value: true,
@@ -50,6 +56,17 @@ pub static VERBS: &[Verb] = &[
         flags: &[SUMMARY, LIMIT, ROOT, HOW],
     },
     Verb {
+        name: "log",
+        question: "What changed lately",
+        usage: "at-recall log [<rev>] [<path>…] [--limit N] [--root <path>]",
+        notes: "One line per commit, newest first: short hash, date, author, subject. Paths are a \
+                filter, so `log <path>` is that file's history and not the repository's, and the \
+                count under the listing comes from walking the same revision and paths — so the \
+                total is the number the listing was drawn from. Author and date filters are flags \
+                on this question and are not here yet.",
+        flags: &[LIMIT, ROOT, HOW],
+    },
+    Verb {
         name: "diff",
         question: "What is the difference",
         usage: "at-recall diff [<rev>] [<path>…] [--patch] [--summary] [--limit N] [--root <path>]",
@@ -59,7 +76,7 @@ pub static VERBS: &[Verb] = &[
                 paths are one invocation. The table names every changed path; `--patch` withholds \
                 the hunks of a secret-shaped one and says which. A path git does not track is \
                 named rather than passed over, because no difference looks like no change.",
-        flags: &[PATCH, SUMMARY, LIMIT, ROOT, SECRETS, HOW],
+        flags: &[PATCH, IGNORE_SPACE, SUMMARY, LIMIT, ROOT, SECRETS, HOW],
     },
 ];
 

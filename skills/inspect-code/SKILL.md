@@ -29,6 +29,8 @@ at-recall state                               # branch, HEAD, merge or rebase in
 at-recall diff                                # what changed, one line per file, with the totals
 at-recall diff crates/x/src/lib.rs --patch    # the hunks, for one file
 at-recall diff HEAD~1..HEAD                   # a range of history: reads no working-tree file
+at-recall log --limit 5                       # the last five commits, with the true total
+at-recall log crates/x/src/lib.rs             # that file's history
 ```
 
 `--limit N` caps the output (default 200 lines); `--root <path>` points the tool at another tree;
@@ -118,6 +120,14 @@ nothing differs, and 4 when it refused.
   in `.gitattributes` is a program the repository names, and `at-recall` runs git only. The refusal
   lists the paths (`a.foo (filter=lfs)`); if you need the filtered form, that is a `git diff` to ask
   about.
+- **A big diff may be formatting.** `at-recall diff --ignore-space` compares lines ignoring
+  whitespace (`git diff -w`) and states what that hid: `# with whitespace: 9 files, +412 -118
+  (3 whitespace-only)`. One read answers "is this change real"; the two-read version with an `echo`
+  between them is the habit it replaces.
+- **A file in another repository needs `--root`.** Each invocation resolves one root — the worktree
+  you are in, or the path you name — so reading a file in a sibling repo is
+  `at-peek slice --root ~/code/github/pallas src/hashes.rs:95-166`. An absolute path is not a
+  reason to reach for `sed`; it is a reason to name the root.
 - **`search` does not honour `.gitignore`.** It refuses a fixed list of directory names
   (`target`, `node_modules`, `.direnv`, `dist`, `result`, `.tmp`, `.git`) and names what it
   skipped. If a search looks incomplete, read the trailer before concluding the code is absent.

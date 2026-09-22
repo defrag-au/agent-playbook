@@ -85,6 +85,7 @@ fn dispatch(args: &[String]) -> Result<Exit, Fail> {
             verbs::state::run(&opts)?
         }
         "diff" => verbs::diff::run(&parsed.positionals, &opts)?,
+        "log" => verbs::log::run(&parsed.positionals, &opts)?,
         other => {
             return Err(Fail::usage(format!(
                 "`{other}` is catalogued but not implemented"
@@ -252,5 +253,6 @@ fn context(parsed: &Parsed) -> Result<Opts, Fail> {
         include_secret_paths: parsed.has("--include-secret-paths"),
         patch: parsed.has("--patch"),
         summary: parsed.has("--summary"),
+        ignore_space: parsed.has("--ignore-space"),
     })
 }

@@ -488,6 +488,10 @@ fn every_printed_exit_is_a_command_that_runs() {
     repo.write("src/b.rs", "alpha\n");
     repo.write(".env", "TOKEN=placeholder-not-a-secret\n");
     repo.commit("first");
+    // Two commits, so `log --limit 1` has something to cut — and the changes below stay uncommitted,
+    // so every other invocation has something to show.
+    repo.write("src/a.rs", "one\ntwo\n");
+    repo.commit("second");
     repo.write("src/a.rs", "one\ntwo\nthree\n");
     repo.write("src/b.rs", "alpha\nBETA\n");
     repo.write(
@@ -505,9 +509,12 @@ fn every_printed_exit_is_a_command_that_runs() {
         vec!["diff", "--limit", "1"],
         vec!["diff", "--summary"],
         vec!["diff", "--summary", "--patch"],
+        vec!["diff", "--ignore-space"],
         vec!["diff", "--patch"],
         vec!["diff", "--patch", "--limit", "4"],
         vec!["diff", "src/a.rs", "--patch", "--limit", "2"],
+        vec!["log", "--limit", "1"],
+        vec!["log", "src/a.rs", "--limit", "1"],
     ] {
         let printed = exits(&at_recall(repo.path(), &args));
         assert!(
@@ -665,6 +672,153 @@ fn a_clean_tree_summarises_to_nothing_to_widen() {
     );
     assert!(!text.contains("not shown"), "{text}");
     assert!(exits(&out).is_empty(), "{text}");
+}
+
+#[test]
+fn log_lists_commits_newest_first_with_the_true_total() {
+    let repo = Repo::new("log-basic");
+    repo.write("src/a.rs", "one\n");
+    repo.commit("first");
+    repo.write("src/a.rs", "one\ntwo\n");
+    repo.commit("second");
+    repo.write("src/a.rs", "one\ntwo\nthree\n");
+    repo.commit("third");
+
+    let out = at_recall(repo.path(), &["log", "--limit", "2"]);
+    let text = stdout(&out);
+    assert_eq!(code(&out), 0, "{text}");
+    assert!(text.contains("· HEAD\n"), "{text}");
+    let rows: Vec<&str> = text.lines().filter(|line| !line.starts_with('#')).collect();
+    assert_eq!(rows.len(), 2, "{text}");
+    // Newest first: the subject column is the assertion, because a hash tells a reader nothing.
+    assert!(rows[0].ends_with("third"), "{text}");
+    assert!(rows[1].ends_with("second"), "{text}");
+    assert!(text.contains("# 2 of 3 commits · --limit 2"), "{text}");
+    assert!(
+        exits(&out)[0].0.contains("--limit 3"),
+        "the exit widens to the total: {text}"
+    );
+}
+
+#[test]
+fn the_count_matches_the_listing() {
+    // The total comes from `rev-list --count` and the rows from `log`; they are different git
+    // commands, so the claim that they agree is held by this test — including across a merge, which
+    // is where history simplification could quietly make them disagree.
+    let repo = Repo::new("log-merge");
+    repo.write("f.txt", "base\n");
+    repo.commit("base");
+    repo.git(&["checkout", "-q", "-b", "side"]);
+    repo.write("f.txt", "base\nside\n");
+    repo.commit("side");
+    repo.git(&["checkout", "-q", "main"]);
+    repo.write("other.txt", "main\n");
+    repo.commit("main");
+    repo.git(&["merge", "-q", "--no-edit", "side"]);
+    repo.write("f.txt", "base\nside\nafter\n");
+    repo.commit("after");
+
+    let out = at_recall(repo.path(), &["log", "--limit", "100"]);
+    let text = stdout(&out);
+    let rows = text.lines().filter(|line| !line.starts_with('#')).count();
+    assert!(rows > 1, "the fixture has a merge to walk: {text}");
+    assert!(
+        text.contains(&format!("# {rows} commits")),
+        "the total and the rows disagree: {text}"
+    );
+
+    // And the same claim, path-filtered, which is the other traversal git simplifies.
+    let filtered = at_recall(repo.path(), &["log", "f.txt", "--limit", "100"]);
+    let text = stdout(&filtered);
+    let rows = text.lines().filter(|line| !line.starts_with('#')).count();
+    assert!(text.contains(&format!("# {rows} commits")), "{text}");
+    assert!(!text.contains("other.txt"), "{text}");
+}
+
+#[test]
+fn log_takes_a_path_and_a_range() {
+    let repo = Repo::new("log-paths");
+    repo.write("a.rs", "one\n");
+    repo.write("b.rs", "one\n");
+    repo.commit("both");
+    repo.write("a.rs", "one\ntwo\n");
+    repo.commit("only a");
+
+    let out = at_recall(repo.path(), &["log", "a.rs"]);
+    let text = stdout(&out);
+    assert_eq!(code(&out), 0, "{text}");
+    assert!(
+        text.contains("· HEAD · a.rs"),
+        "the header names it: {text}"
+    );
+    assert!(text.contains("# 2 commits"), "{text}");
+
+    let range = stdout(&at_recall(repo.path(), &["log", "HEAD~1..HEAD"]));
+    assert!(range.contains("# 1 commit\n"), "{range}");
+}
+
+#[test]
+fn log_on_a_branch_with_no_commits_says_so_and_exits_one() {
+    let repo = Repo::new("log-unborn");
+
+    let out = at_recall(repo.path(), &["log"]);
+    let text = stdout(&out);
+
+    assert_eq!(code(&out), 1, "nothing to walk is not a failure: {text}");
+    assert!(text.contains("HEAD · no commits yet"), "{text}");
+    assert!(exits(&out).is_empty(), "nothing to widen: {text}");
+}
+
+#[test]
+fn log_refuses_a_reflog_reference_too() {
+    // The rule and its refusals are shared with `diff`; this is the test that they reached the
+    // second verb.
+    let repo = dirty("log-reflog");
+    let out = at_recall(repo.path(), &["log", "HEAD@{1}"]);
+
+    assert_eq!(code(&out), 2);
+    assert!(stderr(&out).contains("reflog"), "{}", stderr(&out));
+}
+
+#[test]
+fn ignoring_whitespace_states_what_it_hid() {
+    let repo = Repo::new("ignore-space");
+    repo.write("a.rs", "fn main() {\n    let a = 1;\n}\n");
+    repo.write("b.rs", "let x = 1;\n");
+    repo.commit("base");
+    // A reindent in one file, a real change in the other.
+    repo.write("a.rs", "fn main() {\n        let a = 1;\n}\n");
+    repo.write("b.rs", "let x = 2;\n");
+
+    let plain = stdout(&at_recall(repo.path(), &["diff"]));
+    assert!(plain.contains("# 2 files, +2 -2"), "{plain}");
+
+    let out = at_recall(repo.path(), &["diff", "--ignore-space"]);
+    let text = stdout(&out);
+    assert_eq!(code(&out), 0, "{text}");
+    assert!(text.contains("+1 -1"), "only the real change: {text}");
+    assert!(!text.contains("a.rs"), "the reindent is gone: {text}");
+    assert!(
+        text.contains("# with whitespace: 2 files, +2 -2 (1 whitespace-only)"),
+        "what the flag hid is stated: {text}"
+    );
+    // Every exit carries the flag, or following one would answer a different question.
+    for (command, _) in exits(&out) {
+        assert!(command.contains("--ignore-space"), "{command}");
+    }
+}
+
+#[test]
+fn ignoring_whitespace_says_when_there_was_nothing_to_hide() {
+    let repo = Repo::new("ignore-space-none");
+    repo.write("a.rs", "let a = 1;\n");
+    repo.commit("base");
+    repo.write("a.rs", "let a = 2;\n");
+
+    let text = stdout(&at_recall(repo.path(), &["diff", "--ignore-space"]));
+
+    assert!(text.contains("# no whitespace-only changes"), "{text}");
+    assert!(!text.contains("with whitespace:"), "{text}");
 }
 
 #[test]
@@ -863,9 +1017,12 @@ fn state_takes_no_path_and_says_so() {
 #[test]
 fn unknown_verbs_and_flags_say_what_is_available() {
     let repo = dirty("unknown");
-    let verb = at_recall(repo.path(), &["log"]);
-    assert_eq!(code(&verb), 2);
+    // `blame` is designed and not built, so it is the honest example of a verb that does not
+    // exist: the answer names the ones that do.
+    let verb = at_recall(repo.path(), &["blame"]);
+    assert_eq!(code(&verb), 2, "{}", stdout(&verb));
     assert!(stderr(&verb).contains("unknown verb"), "{}", stderr(&verb));
+    assert!(stderr(&verb).contains("log"), "{}", stderr(&verb));
 
     let flag = at_recall(repo.path(), &["diff", "--nope"]);
     assert_eq!(code(&flag), 2);

@@ -2,11 +2,11 @@
 
 **Status:** proposal, 2026-09-22; part built. Built and tested: `tools/at-core` (the shared output
 contract and path containment), `tools/at-peek` (`stat`, `slice`, `search`), `tools/at-recall`
-(`state`, `diff`), and `tools/at-describe` (the catalogue). The toolkit is packaged by this
+(`state`, `log`, `diff`), and `tools/at-describe` (the catalogue). The toolkit is packaged by this
 repository's `flake.nix` and wired into the org's shells by `defrag-nix`. Everything else here is
-still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in `peek`; `log`, `show`,
-`blame`, `why`, `churn`, `search` in `recall`), the recipes, and the rule and skill drafts at the
-end — which stay drafts until the verbs they name exist.
+still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in `peek`; `show`, `blame`,
+`why`, `churn` in `recall`), the recipes, and the rule and skill drafts at the end — which stay
+drafts until the verbs they name exist.
 
 Three things the implementation settled that this document did not anticipate, each of them a test
 rather than a paragraph (`tools/at-recall/tests/contract.rs`):
@@ -174,8 +174,9 @@ line numbers on every line, and a trailer stating what was *not* shown and how t
 
 ## `at-recall` — history
 
-Two of the verbs below are built — `state` and `diff` — and the rest are the design. Built means
-their shapes are asserted from outside the binary; the table is the specification for what is not.
+Three of the verbs below are built — `state`, `log` and `diff` — and the rest are the design. Built
+means their shapes are asserted from outside the binary; the table is the specification for what is
+not.
 
 Revisions accept `@` (HEAD), `@~N`, `@^`, a short hash, a branch or tag name, and `A..B`.
 Anything beginning with `-` is rejected as a rev, so a revision can never be read as a flag, and
@@ -184,7 +185,7 @@ Anything beginning with `-` is rejected as a rev, so a revision can never be rea
 | Verb | Answers | Default shape |
 | --- | --- | --- |
 | `at-recall state [path] [--wide]` | What am I looking at | Branch + upstream divergence, HEAD, in-progress op, modified/untracked counts and names; `--wide` adds what the branch is ahead of its base |
-| `at-recall log [path]` | What changed lately | One line per commit; `--since`, `--author`, `--message`, `--follow` |
+| `at-recall log [<rev>] [<path>…] [--limit N]` | What changed lately | One line per commit, newest first, with the count from walking the same revision and paths |
 | `at-recall show <rev>` | What did that commit do | Message, stat; `--patch` adds the diff |
 | `at-recall diff <revA>[..<revB>] [path]` | What is the difference | **Stat by default**; `--patch` adds hunks. `@` means HEAD, so `at-recall diff @ f.rs` is "what have I changed" |
 | `at-recall blame <path>:<range>` | Who last touched these lines | Grouped into ranges, each with rev, author, date, subject |

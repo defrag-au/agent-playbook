@@ -18,9 +18,9 @@ use std::collections::BTreeSet;
 
 use at_core::contract::{secret_shaped, Fail, Report, MAX_LIMIT};
 
-use crate::git::{rev, with_paths, Noun};
+use crate::git::{with_paths, Noun};
 use crate::status::Status;
-use crate::verbs::{again, plural, Budget, Opts, Outcome};
+use crate::verbs::{again, plural, split_rev_and_paths, Budget, Opts, Outcome};
 use crate::TOOL;
 
 /// What every diff run carries, whatever the caller asked for. `--no-color` because a repository
@@ -28,23 +28,33 @@ use crate::TOOL;
 /// because both names a program for git to run, and this tool runs one program only.
 const NEUTRAL: &[&str] = &["--no-color", "--no-ext-diff", "--no-textconv"];
 
+/// `--ignore-space`: compare lines ignoring whitespace, which is `git diff -w`.
+const IGNORE_SPACE: &str = "--ignore-all-space";
+
 pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
     let mut report = Report::new();
     if let Some(asked) = opts.limit_clamped_from {
         report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
     }
 
-    let (rev, paths) = split(args, opts)?;
+    let (rev, paths) = split_rev_and_paths(args, opts)?;
     let rev = default_revision(rev, opts);
     refuse_filtered(opts, &rev, &paths)?;
     report.header(TOOL, "diff", opts.root.name(), &comparison(&rev));
 
-    let files = numstat(opts, &rev, &paths)?;
+    let files = numstat(opts, &rev, &paths, opts.ignore_space)?;
     if files.is_empty() {
         report.bound("no differences".to_string());
         explain_empty(&mut report, opts, &paths)?;
         return Ok(Outcome::from_report(report));
     }
+    // What the flag hid, when there is something to hide: the same comparison without it, so the
+    // reader can see how much of the change is reindentation rather than reach for a second read.
+    let hidden = if opts.ignore_space {
+        Some(numstat(opts, &rev, &paths, false)?)
+    } else {
+        None
+    };
 
     let mut budget = Budget::new(opts.limit);
     let width = files
@@ -75,6 +85,9 @@ pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
             opts.limit
         )
     });
+    if let Some(raw) = &hidden {
+        space_bound(&mut report, &files, raw);
+    }
 
     // `--summary` does not fetch the hunks it would only discard: the patch is the most expensive
     // thing this verb reads, and a survey of several questions is exactly where that would be paid
@@ -172,12 +185,12 @@ fn exits(
         // The body, with a limit that fits what the frame counted. For a patch the frame did not
         // count the hunks — they were never fetched — so the limit is left to the default, and that
         // answer states its own cut.
-        let mut flags: Vec<String> = Vec::new();
-        if opts.patch {
-            flags.push("--patch".to_string());
+        let flags = if opts.patch {
+            flags(opts, &[])
         } else {
-            flags.push(format!("--limit {}", counts.rows.min(MAX_LIMIT)));
-        }
+            let limit = format!("--limit {}", counts.rows.min(MAX_LIMIT));
+            flags(opts, &[&limit])
+        };
         report.next(
             again(opts, "diff", rev.as_deref(), paths, &flags),
             // `--limit` fits the rows the frame counted; `--patch` carries no limit, because the
@@ -189,16 +202,12 @@ fn exits(
             },
         );
     } else if counts.dropped > 0 {
-        // `--patch` is carried, not assumed away: the exit has to ask the same question wider, and
-        // a widen that returned the table where the caller had asked for hunks would answer
-        // something else.
-        let mut flags: Vec<String> = Vec::new();
-        if opts.patch {
-            flags.push("--patch".to_string());
-        }
-        flags.push(format!("--limit {}", total.min(MAX_LIMIT)));
+        // The exit has to ask the same question wider, and a widen that returned the table where
+        // the caller had asked for hunks — or for whitespace to be ignored — would answer something
+        // else, which is what `flags` is for.
+        let limit = format!("--limit {}", total.min(MAX_LIMIT));
         report.next(
-            again(opts, "diff", rev.as_deref(), paths, &flags),
+            again(opts, "diff", rev.as_deref(), paths, &flags(opts, &[&limit])),
             format!("all {total} lines"),
         );
     }
@@ -210,7 +219,7 @@ fn exits(
                 "diff",
                 rev.as_deref(),
                 paths,
-                &["--include-secret-paths".to_string()],
+                &flags(opts, &["--include-secret-paths"]),
             ),
             "the hunks of those files",
         );
@@ -221,10 +230,46 @@ fn exits(
                 "diff",
                 rev.as_deref(),
                 paths,
-                &["--patch".to_string()],
+                &flags(opts, &["--patch"]),
             ),
             "the hunks",
         );
+    }
+}
+
+/// The flags that define *which question* was asked, as opposed to how much of it to print. Every
+/// exit carries them, because an exit that quietly dropped one would answer a different question:
+/// hunks where the caller had asked for a whitespace-ignoring table is not the same read.
+fn flags(opts: &Opts, extra: &[&str]) -> Vec<String> {
+    let mut flags: Vec<String> = Vec::new();
+    if opts.patch {
+        flags.push("--patch".to_string());
+    }
+    if opts.ignore_space {
+        flags.push("--ignore-space".to_string());
+    }
+    flags.extend(extra.iter().map(|flag| (*flag).to_string()));
+    flags
+}
+
+/// What `--ignore-space` hid: the same comparison without it. Stated whenever it differs, and
+/// stated as nothing when it does not — silence would leave the reader unable to tell whether the
+/// flag did anything.
+fn space_bound(report: &mut Report, ignored: &[FileStat], raw: &[FileStat]) {
+    let raw_totals = totals(raw);
+    let only = raw.len().saturating_sub(ignored.len());
+    if raw_totals == totals(ignored) && only == 0 {
+        report.bound("no whitespace-only changes".to_string());
+    } else if only > 0 {
+        report.bound(format!(
+            "with whitespace: {}, {raw_totals} ({only} whitespace-only)",
+            plural(raw.len(), "file")
+        ));
+    } else {
+        report.bound(format!(
+            "with whitespace: {}, {raw_totals}",
+            plural(raw.len(), "file")
+        ));
     }
 }
 
@@ -324,7 +369,7 @@ fn patch(
         pathspecs.push(format!(":(exclude,literal){name}"));
     }
 
-    let args = diff_args(rev, &pathspecs, &["--patch"]);
+    let args = diff_args(rev, &pathspecs, &["--patch"], opts.ignore_space);
     let hunks = opts.git.run(Noun::Diff, &borrowed(&args))?;
     for line in hunks.lines() {
         budget.push(report, line);
@@ -399,43 +444,20 @@ fn explain_empty(report: &mut Report, opts: &Opts, paths: &[String]) -> Result<(
     Ok(())
 }
 
-/// The first argument is a revision when it names one and a path otherwise — the rule git itself
-/// uses, so `at-recall diff main` and `at-recall diff src/main.rs` both mean what they look like.
-///
-/// A name that git can resolve but this tool will not pass — the reflog above all — is refused
-/// here rather than quietly demoted to a path, because "that is a reflog reference and this tool
-/// does not read the reflog" is the answer the caller needs.
-fn split(args: &[String], opts: &Opts) -> Result<(Option<String>, Vec<String>), Fail> {
-    match args.split_first() {
-        Some((first, rest)) => {
-            // Refused before git is asked anything: whether the reference resolves has nothing to do
-            // with the fact that this tool does not read the reflog, and a `HEAD@{1}` that happens
-            // not to exist must not be quietly read as a path.
-            crate::git::refuse_reflog(first)?;
-            if opts.git.names_a_revision(first) {
-                return Ok((Some(rev(first)?), rest.to_vec()));
-            }
-            // A token with a range in it is meant as one, whatever it resolves to. Reading it as a
-            // path instead would answer "nothing changed" about a range that does not exist.
-            if first.contains("..") {
-                return Err(Fail::environment(format!(
-                    "`{first}` is not a revision range in {} · a range needs both of its ends to \
-                     resolve",
-                    opts.root.name()
-                )));
-            }
-            Ok((None, args.to_vec()))
-        }
-        None => Ok((None, Vec::new())),
-    }
-}
-
-fn diff_args(rev: &Option<String>, paths: &[String], mode: &[&str]) -> Vec<String> {
+fn diff_args(
+    rev: &Option<String>,
+    paths: &[String],
+    mode: &[&str],
+    ignore_space: bool,
+) -> Vec<String> {
     let mut args: Vec<String> = NEUTRAL
         .iter()
         .chain(mode.iter())
         .map(|flag| (*flag).to_string())
         .collect();
+    if ignore_space {
+        args.push(IGNORE_SPACE.to_string());
+    }
     if let Some(rev) = rev {
         args.push(rev.clone());
     }
@@ -470,8 +492,13 @@ impl FileStat {
     }
 }
 
-fn numstat(opts: &Opts, rev: &Option<String>, paths: &[String]) -> Result<Vec<FileStat>, Fail> {
-    let args = diff_args(rev, paths, &["--numstat"]);
+fn numstat(
+    opts: &Opts,
+    rev: &Option<String>,
+    paths: &[String],
+    ignore_space: bool,
+) -> Result<Vec<FileStat>, Fail> {
+    let args = diff_args(rev, paths, &["--numstat"], ignore_space);
     let raw = opts.git.run(Noun::Diff, &borrowed(&args))?;
     Ok(raw
         .lines()

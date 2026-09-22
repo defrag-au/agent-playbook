@@ -10,9 +10,10 @@
 //! building the answer rather than trimming it afterwards, and every cut is a `#` line.
 
 pub mod diff;
+pub mod log;
 pub mod state;
 
-use at_core::contract::{truncate, Report, MAX_LINE_WIDTH};
+use at_core::contract::{truncate, Fail, Report, MAX_LINE_WIDTH};
 use at_core::paths::Root;
 
 use crate::git::Git;
@@ -42,6 +43,8 @@ pub struct Opts {
     /// Whether the caller asked for the frame and not the rows: the verb computes what it needs to
     /// state the shape, and prints none of the body.
     pub summary: bool,
+    /// Whether a diff should ignore whitespace when comparing lines, and say what that hid.
+    pub ignore_space: bool,
 }
 
 /// What one verb may still print, and what it gave up to stay inside `--limit`.
@@ -114,4 +117,39 @@ pub fn again(
         .root_was_explicit
         .then(|| opts.root.dir().display().to_string());
     at_core::contract::again(crate::TOOL, verb, &positionals, flags, root.as_deref())
+}
+
+/// Split positionals into a revision and paths: the first argument is a revision when it names one
+/// and a path otherwise — the rule git uses, so `log main` and `log src/main.rs` both mean what they
+/// look like. Shared by `diff` and `log`, because a rule stated twice drifts once.
+///
+/// A name git can resolve but this tool will not pass — the reflog above all — is refused here
+/// rather than quietly demoted to a path, because "that is reflog syntax and this tool does not read
+/// the reflog" is the answer the caller needs.
+pub fn split_rev_and_paths(
+    args: &[String],
+    opts: &Opts,
+) -> Result<(Option<String>, Vec<String>), Fail> {
+    match args.split_first() {
+        Some((first, rest)) => {
+            // Refused before git is asked anything: whether the reference resolves has nothing to do
+            // with the fact that this tool does not read the reflog, and a `HEAD@{1}` that happens
+            // not to exist must not be quietly read as a path.
+            crate::git::refuse_reflog(first)?;
+            if opts.git.names_a_revision(first) {
+                return Ok((Some(crate::git::rev(first)?), rest.to_vec()));
+            }
+            // A token with a range in it is meant as one, whatever it resolves to. Reading it as a
+            // path instead would answer "nothing changed" about a range that does not exist.
+            if first.contains("..") {
+                return Err(Fail::environment(format!(
+                    "`{first}` is not a revision range in {} · a range needs both of its ends to \
+                     resolve",
+                    opts.root.name()
+                )));
+            }
+            Ok((None, args.to_vec()))
+        }
+        None => Ok((None, Vec::new())),
+    }
 }

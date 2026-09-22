@@ -21,6 +21,7 @@ targets:
 | `wc -l`, `ls -l`, `stat` | `at-peek stat <path>…` |
 | `git status`, `git status --porcelain` | `at-recall state` |
 | `git diff`, `git diff --stat` | `at-recall diff [<rev>] [<path>…]` — add `--patch` for the hunks |
+| `git log`, `git log --oneline` | `at-recall log [<rev>] [<path>…]` |
 | anything not listed | `at-describe` — the catalogue, one screen |
 
 - The exact lines · every mention · how many · which files → `at-peek slice <file>:40-60` ·
@@ -39,9 +40,9 @@ targets:
   before editing it.
 - `at-peek` runs nothing at all; `at-recall` runs `git` and nothing else. That difference is why
   they are separate binaries, and why they are separate approvals if I have tiered them.
-- `at-recall` answers `state` and `diff`. `log`, `blame`, `show`, `churn` and the report recipes
-  are designed and not written — ask for the one you want rather than reaching for `git`, and name
-  the question, because that is what turns it into a verb.
+- `at-recall` answers `state`, `log` and `diff`. `blame`, `show`, `churn` and the report recipes are
+  designed and not written — ask for the one you want rather than reaching for `git`, and name the
+  question, because that is what turns it into a verb.
 
 ## Rationale
 
