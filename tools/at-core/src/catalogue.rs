@@ -38,6 +38,23 @@ pub struct Tool {
     pub verbs: &'static [Verb],
 }
 
+/// The frame of an answer without its body.
+///
+/// Shared rather than declared per tool, because it means the same thing everywhere it is offered:
+/// the header, the counts, the bounds and the exits, and none of the rows. It exists for the survey
+/// — several questions asked in a row, where the shape of each answer is what is wanted and the
+/// rows are not — which is otherwise assembled with `; echo "=== … ==="` and `| tail -3`, a tag the
+/// tool already prints and a bound hidden in a pipe.
+///
+/// A verb whose rows *are* its answer does not list the flag. That is the grammar saying so, rather
+/// than a mode that prints nothing.
+pub const SUMMARY: Flag = Flag {
+    name: "--summary",
+    takes_value: false,
+    value: "",
+    one_line: "The frame without the rows: what was read, what was cut, what to ask next",
+};
+
 pub fn find(verbs: &'static [Verb], name: &str) -> Option<&'static Verb> {
     verbs.iter().find(|verb| verb.name == name)
 }

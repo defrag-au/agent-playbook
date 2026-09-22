@@ -363,6 +363,14 @@ spec, and each one is a test.
     names a question the toolkit cannot yet answer.** `state`'s collapsed-directory caveat is the
     live example — it has no exit because there is no verb that expands a directory listing, which
     is what `at-peek tree` and `at-peek find` would supply.
+12. **A verb whose answer is a body can be asked for its frame instead.** `--summary` prints the
+    header, the context, the counts, the bounds and the exits, and none of the rows; the bound reads
+    `<n> files, not shown` so the count is the whole truth about a body nobody asked to see. It
+    exists because several questions in one turn were being assembled with `| tail -3`, which is a
+    bound hidden in a pipe — the exact failure this contract opens with. Two consequences worth
+    keeping: a verb whose rows *are* its answer does not list the flag at all (the grammar saying so
+    rather than a mode that prints nothing), and `--summary` in `diff` does not fetch the hunks it
+    would discard, so a survey pays for the frame only.
 
 ## Security: what an approval actually grants
 
@@ -660,7 +668,8 @@ What to count, from the transcript, in order of how much they would tell us:
 | 1 | Followed exits ÷ exits printed | High means the footer is doing the driving. Near zero means it is decoration, and the mechanism should be deleted rather than extended. |
 | 2 | Calls that were dead ends — exit 2, wrong verb, wrong flag, an empty answer where a fact was expected | The number the toolkit exists to reduce. Compare with the same task's earlier transcript, which is on record: `cargo fmt && git diff --stat`, then `status --porcelain && diff AGENTS.md`, then three separate `git diff <path>` calls. |
 | 3 | Calls where the agent re-derived a command an exit had already printed | Either the exit was not seen, or it was not trusted. Both are test failures: the first is a signpost problem, the second is a wording problem. |
-| 4 | Approval prompts | The original goal. Should be zero. |
+| 4 | `| tail` in an invocation, and `echo "=== … ==="` tags | Both are old habits the tools make unnecessary; either appearing means the accommodation is not discoverable. |
+| 5 | Approval prompts | The original goal. Should be zero. |
 
 There is deliberately no `--no-next` flag to make this a same-day A/B: an option that exists only
 to switch off a documented behaviour is a grammar entry a reader has to reason about forever. The

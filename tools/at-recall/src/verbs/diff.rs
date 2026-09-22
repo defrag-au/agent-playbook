@@ -52,17 +52,21 @@ pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
         .map(|file| file.counts().len())
         .max()
         .unwrap_or(0);
-    for file in &files {
-        budget.push(
-            &mut report,
-            format!("{:<width$}  {}", file.counts(), file.label),
-        );
+    if !opts.summary {
+        for file in &files {
+            budget.push(
+                &mut report,
+                format!("{:<width$}  {}", file.counts(), file.label),
+            );
+        }
     }
 
     let totals = totals(&files);
     let total = files.len();
     let shown = total - budget.dropped();
-    report.bound(if shown == total {
+    report.bound(if opts.summary {
+        format!("{}, {totals}, not shown", plural(total, "file"))
+    } else if shown == total {
         format!("{}, {totals}", plural(total, "file"))
     } else {
         format!(
@@ -72,15 +76,19 @@ pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
         )
     });
 
-    if opts.patch {
-        patch(
-            &mut report,
-            &mut budget,
-            opts,
-            &rev,
-            &paths,
-            &withheld(&files, opts),
-        )?;
+    // `--summary` does not fetch the hunks it would only discard: the patch is the most expensive
+    // thing this verb reads, and a survey of several questions is exactly where that would be paid
+    // for nothing.
+    let withheld = withheld(&files, opts);
+    if !withheld.is_empty() {
+        report.bound(format!(
+            "{} withheld from the hunks: {}",
+            plural(withheld.len(), "secret-shaped path"),
+            withheld.join(", ")
+        ));
+    }
+    if opts.patch && !opts.summary {
+        patch(&mut report, &mut budget, opts, &rev, &paths, &withheld)?;
     }
 
     let emitted = report.content_lines();
@@ -98,12 +106,34 @@ pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
         opts,
         &rev,
         &paths,
-        &withheld(&files, opts),
-        emitted,
-        dropped,
+        &withheld,
+        Counts {
+            rows: files.len(),
+            emitted,
+            dropped,
+        },
     );
 
-    Ok(Outcome::from_report(report))
+    // A summary found the files it is describing without printing them; the frame is the answer.
+    Ok(if opts.summary {
+        Outcome::from_frame(report)
+    } else {
+        Outcome::from_report(report)
+    })
+}
+
+/// What the answer counted, in the three terms an exit needs them.
+///
+/// `rows` is deliberately not `emitted + dropped`: in a summary nothing is printed, so the budget
+/// has counted nothing, and an exit built from it would offer `--limit 0` — which is what a survey
+/// of a six-file diff did before this existed.
+struct Counts {
+    /// Rows the answer has, one per file in the table, whichever of them were printed.
+    rows: usize,
+    /// Content lines printed.
+    emitted: usize,
+    /// Content lines the limit dropped.
+    dropped: usize,
 }
 
 /// The names a patch will not print, sorted and deduplicated.
@@ -125,21 +155,40 @@ fn withheld(files: &[FileStat], opts: &Opts) -> Vec<String> {
 /// The next questions this answer implies, in the order the contract fixes: widen what was cut,
 /// then read what was held back.
 ///
-/// `--patch` comes last and only on its own, because it is the one exit that is not a consequence of
-/// something the answer already said — the other two are what a cut bound and a withheld file are
-/// *for*. At most two lines, and none at all when the diff was complete and the hunks were already
-/// asked for.
+/// Two at most, and never more than one of the first kind: a summary withholds the body and offers
+/// it, a full answer offers the wider read when it was cut, and both then offer the one question the
+/// answer implies — which is where the survey turns into the follow-up.
 fn exits(
     report: &mut Report,
     opts: &Opts,
     rev: &Option<String>,
     paths: &[String],
     withheld: &[String],
-    emitted: usize,
-    dropped: usize,
+    counts: Counts,
 ) {
-    let total = emitted + dropped;
-    if dropped > 0 {
+    let total = counts.emitted + counts.dropped;
+
+    if opts.summary {
+        // The body, with a limit that fits what the frame counted. For a patch the frame did not
+        // count the hunks — they were never fetched — so the limit is left to the default, and that
+        // answer states its own cut.
+        let mut flags: Vec<String> = Vec::new();
+        if opts.patch {
+            flags.push("--patch".to_string());
+        } else {
+            flags.push(format!("--limit {}", counts.rows.min(MAX_LIMIT)));
+        }
+        report.next(
+            again(opts, "diff", rev.as_deref(), paths, &flags),
+            // `--limit` fits the rows the frame counted; `--patch` carries no limit, because the
+            // hunks were never counted, so it promises the hunks and not that they all fit.
+            if opts.patch {
+                "the hunks".to_string()
+            } else {
+                format!("{} in full", plural(counts.rows, "file"))
+            },
+        );
+    } else if counts.dropped > 0 {
         // `--patch` is carried, not assumed away: the exit has to ask the same question wider, and
         // a widen that returned the table where the caller had asked for hunks would answer
         // something else.
@@ -153,6 +202,7 @@ fn exits(
             format!("all {total} lines"),
         );
     }
+
     if !withheld.is_empty() {
         report.next(
             again(
@@ -164,8 +214,7 @@ fn exits(
             ),
             "the hunks of those files",
         );
-    }
-    if dropped == 0 && withheld.is_empty() && !opts.patch {
+    } else if counts.dropped == 0 && !opts.patch {
         report.next(
             again(
                 opts,
@@ -270,14 +319,6 @@ fn patch(
     paths: &[String],
     withheld: &[String],
 ) -> Result<(), Fail> {
-    if !withheld.is_empty() {
-        report.bound(format!(
-            "{} withheld from the hunks: {}",
-            plural(withheld.len(), "secret-shaped path"),
-            withheld.join(", ")
-        ));
-    }
-
     let mut pathspecs = paths.to_vec();
     for name in withheld {
         pathspecs.push(format!(":(exclude,literal){name}"));

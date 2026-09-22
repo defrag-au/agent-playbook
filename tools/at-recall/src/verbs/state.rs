@@ -59,13 +59,19 @@ pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
     report.content(format!("{:<9}  {}", "pending", pending(opts)?.join(", ")));
 
     let mut budget = Budget::new(opts.limit);
-    for line in status.lines() {
-        budget.push(&mut report, line);
+    if !opts.summary {
+        for line in status.lines() {
+            budget.push(&mut report, line);
+        }
     }
 
     let total = status.len();
     let shown = total - budget.dropped();
-    report.bound(if shown == total {
+    report.bound(if opts.summary && total > 0 {
+        // The rows are the body, and the body was not asked for — so the count is the whole truth
+        // about it rather than a statement about what was printed.
+        format!("{}, not shown", plural(total, "path"))
+    } else if shown == total {
         plural(total, "path")
     } else {
         format!(
@@ -89,9 +95,14 @@ pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
     }
     budget.width_caveat(&mut report);
 
-    // The exits, in the contract's order: widen a cut answer, then the one question this answer
-    // implies. A clean tree offers neither, which is the useful reading of a silent footer.
-    if budget.dropped() > 0 {
+    // The exits, in the contract's order: the body this answer withheld, then the one question it
+    // implies. At most two, and a clean tree offers neither — that silence is the useful reading.
+    let withheld_body = if opts.summary {
+        total
+    } else {
+        budget.dropped()
+    };
+    if withheld_body > 0 {
         report.next(
             again(
                 opts,
@@ -102,7 +113,8 @@ pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
             ),
             format!("all {}", plural(total, "path")),
         );
-    } else if status.tracks_changes() {
+    }
+    if status.tracks_changes() {
         report.next(again(opts, "diff", None, &[], &[]), "what changed in them");
     }
 

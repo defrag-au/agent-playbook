@@ -500,8 +500,11 @@ fn every_printed_exit_is_a_command_that_runs() {
     for args in [
         vec!["state"],
         vec!["state", "--limit", "1"],
+        vec!["state", "--summary"],
         vec!["diff"],
         vec!["diff", "--limit", "1"],
+        vec!["diff", "--summary"],
+        vec!["diff", "--summary", "--patch"],
         vec!["diff", "--patch"],
         vec!["diff", "--patch", "--limit", "4"],
         vec!["diff", "src/a.rs", "--patch", "--limit", "2"],
@@ -576,6 +579,92 @@ fn an_exit_keeps_the_tree_the_caller_named() {
 
     assert!(printed[0].0.contains("--root"), "{}", printed[0].0);
     assert_eq!(code(&run_printed(&printed[0].0)), 0);
+}
+
+#[test]
+fn a_summary_is_the_frame_without_the_rows() {
+    // The survey: several questions in a row, where the shape of each answer is wanted and the rows
+    // are not. `| tail -3` was how this was assembled before the flag existed, and a pipe that
+    // hides a bound is what the whole toolkit is against.
+    let repo = Repo::new("summary");
+    repo.write("src/a.rs", "one\n");
+    repo.write("src/b.rs", "alpha\n");
+    repo.write(".env", "TOKEN=placeholder-not-a-secret\n");
+    repo.commit("first");
+    repo.write("src/a.rs", "one\ntwo\n");
+    repo.write("src/b.rs", "alpha\nBETA\n");
+
+    let state = at_recall(repo.path(), &["state", "--summary"]);
+    let text = stdout(&state);
+    assert_eq!(code(&state), 0, "the frame is the answer here");
+    assert!(text.contains("2001-02-03  fixture  first"), "{text}");
+    assert!(text.contains("# 2 paths, not shown"), "{text}");
+    assert!(
+        !text.contains(" M  src/a.rs"),
+        "the rows are the body: {text}"
+    );
+    assert_eq!(
+        exits(&state).len(),
+        2,
+        "the declined body, then the question it implies"
+    );
+
+    let diff = at_recall(repo.path(), &["diff", "--summary"]);
+    let text = stdout(&diff);
+    assert_eq!(
+        code(&diff),
+        0,
+        "a survey that found files found them: {text}"
+    );
+    assert!(text.contains("# 2 files, +2 -0, not shown"), "{text}");
+    assert!(!text.contains("+1 -1"), "the table is the body: {text}");
+    let body = exits(&diff);
+    assert!(body[0].0.contains("--limit 2"), "{body:?}");
+    assert_eq!(body[0].1, "2 files in full");
+    assert!(body[1].0.contains("--patch"), "{body:?}");
+}
+
+#[test]
+fn a_summary_of_a_patch_is_the_frame_and_not_the_hunks() {
+    let repo = Repo::new("summary-patch");
+    repo.write("src/a.rs", "one\n");
+    repo.write(".env", "TOKEN=placeholder-not-a-secret\n");
+    repo.commit("first");
+    repo.write("src/a.rs", "one\ntwo\n");
+    repo.write(
+        ".env",
+        "TOKEN=placeholder-not-a-secret\nSECOND=placeholder\n",
+    );
+
+    let out = at_recall(repo.path(), &["diff", "--summary", "--patch"]);
+    let text = stdout(&out);
+    assert_eq!(code(&out), 0, "{text}");
+    assert!(!text.contains("diff --git"), "no hunk is fetched: {text}");
+    assert!(
+        text.contains("# 1 secret-shaped path withheld from the hunks: .env"),
+        "the caveat survives the summary, so the exit below has an antecedent: {text}"
+    );
+    let printed = exits(&out);
+    assert!(printed[0].0.contains("--patch"), "{printed:?}");
+    assert!(printed
+        .iter()
+        .any(|(c, _)| c.contains("--include-secret-paths")));
+}
+
+#[test]
+fn a_clean_tree_summarises_to_nothing_to_widen() {
+    let repo = Repo::new("summary-clean");
+    repo.write("src/a.rs", "one\n");
+    repo.commit("first");
+
+    let out = at_recall(repo.path(), &["state", "--summary"]);
+    let text = stdout(&out);
+    assert!(
+        text.contains("# 0 paths\n"),
+        "not `0 paths, not shown`, which would claim something was withheld: {text}"
+    );
+    assert!(!text.contains("not shown"), "{text}");
+    assert!(exits(&out).is_empty(), "{text}");
 }
 
 #[test]

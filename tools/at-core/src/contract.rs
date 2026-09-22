@@ -173,6 +173,19 @@ impl Outcome {
         };
         Outcome { report, exit }
     }
+
+    /// For a verb whose answer is its frame, because the body was withheld on request.
+    ///
+    /// A summary prints no content lines by construction, so [`Outcome::from_report`] would call a
+    /// survey that found six changed files "nothing to show" — and the exit code is the cheapest
+    /// reading of a survey there is. Reaching for this is a claim that the frame itself is the
+    /// answer, which is only true for a verb that says so in its own help.
+    pub fn from_frame(report: Report) -> Outcome {
+        Outcome {
+            report,
+            exit: Exit::Results,
+        }
+    }
 }
 
 /// `1 path` / `3 paths`, because "1 path(s)" reads like a tool that is not sure.
@@ -335,6 +348,14 @@ mod tests {
         report.header("at-peek", "stat", "root", "1 path");
         report.bound("1 path");
         assert_eq!(Outcome::from_report(report).exit, Exit::Nothing);
+    }
+
+    #[test]
+    fn a_frame_that_found_something_is_results() {
+        let mut report = Report::new();
+        report.header("at-recall", "diff", "repo", "working tree against HEAD");
+        report.bound("6 files, +98 -38, not shown");
+        assert_eq!(Outcome::from_frame(report).exit, Exit::Results);
     }
 
     #[test]

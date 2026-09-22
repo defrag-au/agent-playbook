@@ -39,6 +39,9 @@ pub struct Opts {
     pub include_secret_paths: bool,
     /// Whether hunks were asked for as well as the per-file table.
     pub patch: bool,
+    /// Whether the caller asked for the frame and not the rows: the verb computes what it needs to
+    /// state the shape, and prints none of the body.
+    pub summary: bool,
 }
 
 /// What one verb may still print, and what it gave up to stay inside `--limit`.

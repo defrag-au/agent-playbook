@@ -251,5 +251,6 @@ fn context(parsed: &Parsed) -> Result<Opts, Fail> {
         limit_clamped_from,
         include_secret_paths: parsed.has("--include-secret-paths"),
         patch: parsed.has("--patch"),
+        summary: parsed.has("--summary"),
     })
 }

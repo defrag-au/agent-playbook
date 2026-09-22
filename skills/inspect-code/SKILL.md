@@ -45,6 +45,29 @@ complete one.
 `# skipped by rule: target, node_modules` and `# skipped: 3 secret-shaped · 2 binary` are the same
 discipline: what it refused to read, named rather than dropped.
 
+## Surveying several questions
+
+Asking five things in a row is normal, and the two habits that assemble it — `; echo "=== x ==="` to
+tag each block, and `| tail -3` to keep each one short — are both worse than the tools:
+
+- **The header is the tag.** Every answer starts `# at-recall state · <root> · <branch> · <sha>`, so
+a block is self-labelling. An `echo` label is for `git`, which does not name itself.
+- **`--summary` is the short form.** It prints the frame — header, context, counts, bounds, exits —
+and none of the rows. Five questions cost about twenty lines instead of two hundred, and nothing has
+to be piped.
+- **`| tail -3` is a bound you did not read.** It hides the very lines that say what was cut. If
+an answer is too long to read, `--summary` it or narrow it with `--limit`/a path.
+
+```sh
+at-recall state --summary                       # branch, HEAD, pending, # 6 paths, not shown
+at-recall diff --summary                        # # 6 files, +78 -33, not shown
+at-recall diff src/a.rs src/b.rs --patch        # several paths, one invocation
+at-peek search 'fn main' tools/ --count         # at-peek's short forms are --count and --files-only
+```
+
+A `--summary` answer still ends with its exits, so the survey is where the loop starts: read the
+frames, then follow exactly one of them.
+
 ## The exits
 
 An answer ends with its exits, when it has any:
