@@ -1,0 +1,460 @@
+//! `at-recall diff` — what is the difference.
+//!
+//! The verb behind the single most common read in a working session, and the one the toolkit's
+//! bounding matters for most: `git diff` prints without a ceiling, and an agent that reads a whole
+//! diff has spent its context on the least of what it needed. The default answer is therefore a
+//! per-file table with the totals, and `--patch` is the caller asking for the hunks as well.
+//!
+//! Two decisions are worth stating because they are where a diff lies to a reader:
+//!
+//! * Nothing is reported for a path git does not track, and *nothing* looks exactly like
+//!   "unchanged". An empty answer with paths named is therefore explained — untracked, or not a
+//!   path at all — rather than left to read as agreement.
+//! * A diff prints content, so `--patch` withholds the files the deny-list refuses and names them.
+//!   The table does not: a file's name and its line counts are metadata, and a reader who cannot
+//!   see that a file changed cannot ask about it.
+
+use std::collections::BTreeSet;
+
+use at_core::contract::{secret_shaped, Fail, Report, MAX_LIMIT};
+
+use crate::facts::{self, borrowed, totals, FileStat};
+use crate::git::{with_paths, Noun};
+use crate::status::Status;
+use crate::verbs::{again, plural, split_rev_and_paths, Budget, Opts, Outcome};
+use crate::TOOL;
+
+pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
+    let mut report = Report::new();
+    if let Some(asked) = opts.limit_clamped_from {
+        report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
+    }
+
+    let (rev, paths) = split_rev_and_paths(args, opts)?;
+    let rev = default_revision(rev, opts);
+    refuse_filtered(opts, &rev, &paths)?;
+    report.header(TOOL, "diff", opts.root.name(), &comparison(&rev));
+
+    let files = facts::numstat(&opts.git, &rev, &paths, opts.ignore_space)?;
+    if files.is_empty() {
+        report.bound("no differences".to_string());
+        explain_empty(&mut report, opts, &paths)?;
+        return Ok(Outcome::from_report(report));
+    }
+    // What the flag hid, when there is something to hide: the same comparison without it, so the
+    // reader can see how much of the change is reindentation rather than reach for a second read.
+    let hidden = if opts.ignore_space {
+        Some(facts::numstat(&opts.git, &rev, &paths, false)?)
+    } else {
+        None
+    };
+
+    let mut budget = Budget::new(opts.limit);
+    let width = files
+        .iter()
+        .map(|file| file.counts().len())
+        .max()
+        .unwrap_or(0);
+    if !opts.summary {
+        for file in &files {
+            budget.push(
+                &mut report,
+                format!("{:<width$}  {}", file.counts(), file.label),
+            );
+        }
+    }
+
+    let totals = totals(&files);
+    let total = files.len();
+    let shown = total - budget.dropped();
+    report.bound(if opts.summary {
+        format!("{}, {totals}, not shown", plural(total, "file"))
+    } else if shown == total {
+        format!("{}, {totals}", plural(total, "file"))
+    } else {
+        format!(
+            "{}, {totals} · {shown} shown · --limit {}",
+            plural(total, "file"),
+            opts.limit
+        )
+    });
+    if let Some(raw) = &hidden {
+        space_bound(&mut report, &files, raw);
+    }
+
+    // `--summary` does not fetch the hunks it would only discard: the patch is the most expensive
+    // thing this verb reads, and a survey of several questions is exactly where that would be paid
+    // for nothing.
+    let withheld = withheld(&files, opts);
+    if !withheld.is_empty() {
+        report.bound(format!(
+            "{} withheld from the hunks: {}",
+            plural(withheld.len(), "secret-shaped path"),
+            withheld.join(", ")
+        ));
+    }
+    if opts.patch && !opts.summary {
+        patch(&mut report, &mut budget, opts, &rev, &paths, &withheld)?;
+    }
+
+    let emitted = report.content_lines();
+    let dropped = budget.dropped();
+    if dropped > 0 {
+        report.bound(format!(
+            "{emitted} of {} lines · --limit {} reached",
+            emitted + dropped,
+            opts.limit
+        ));
+    }
+    budget.width_caveat(&mut report);
+    exits(
+        &mut report,
+        opts,
+        &rev,
+        &paths,
+        &withheld,
+        Counts {
+            rows: files.len(),
+            emitted,
+            dropped,
+        },
+    );
+
+    // A summary found the files it is describing without printing them; the frame is the answer.
+    Ok(if opts.summary {
+        Outcome::from_frame(report)
+    } else {
+        Outcome::from_report(report)
+    })
+}
+
+/// What the answer counted, in the three terms an exit needs them.
+///
+/// `rows` is deliberately not `emitted + dropped`: in a summary nothing is printed, so the budget
+/// has counted nothing, and an exit built from it would offer `--limit 0` — which is what a survey
+/// of a six-file diff did before this existed.
+struct Counts {
+    /// Rows the answer has, one per file in the table, whichever of them were printed.
+    rows: usize,
+    /// Content lines printed.
+    emitted: usize,
+    /// Content lines the limit dropped.
+    dropped: usize,
+}
+
+/// The names a patch will not print, sorted and deduplicated.
+fn withheld(files: &[FileStat], opts: &Opts) -> Vec<String> {
+    if !opts.patch || opts.include_secret_paths {
+        return Vec::new();
+    }
+    let mut names: Vec<String> = files
+        .iter()
+        .flat_map(|file| file.names.iter())
+        .filter(|name| secret_shaped_path(name))
+        .cloned()
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+/// The next questions this answer implies, in the order the contract fixes: widen what was cut,
+/// then read what was held back.
+///
+/// Two at most, and never more than one of the first kind: a summary withholds the body and offers
+/// it, a full answer offers the wider read when it was cut, and both then offer the one question the
+/// answer implies — which is where the survey turns into the follow-up.
+fn exits(
+    report: &mut Report,
+    opts: &Opts,
+    rev: &Option<String>,
+    paths: &[String],
+    withheld: &[String],
+    counts: Counts,
+) {
+    let total = counts.emitted + counts.dropped;
+
+    if opts.summary {
+        // The body, with a limit that fits what the frame counted. For a patch the frame did not
+        // count the hunks — they were never fetched — so the limit is left to the default, and that
+        // answer states its own cut.
+        let flags = if opts.patch {
+            flags(opts, &[])
+        } else {
+            let limit = format!("--limit {}", counts.rows.min(MAX_LIMIT));
+            flags(opts, &[&limit])
+        };
+        report.next(
+            again(opts, "diff", rev.as_deref(), paths, &flags),
+            // `--limit` fits the rows the frame counted; `--patch` carries no limit, because the
+            // hunks were never counted, so it promises the hunks and not that they all fit.
+            if opts.patch {
+                "the hunks".to_string()
+            } else {
+                format!("{} in full", plural(counts.rows, "file"))
+            },
+        );
+    } else if counts.dropped > 0 {
+        // The exit has to ask the same question wider, and a widen that returned the table where
+        // the caller had asked for hunks — or for whitespace to be ignored — would answer something
+        // else, which is what `flags` is for.
+        let limit = format!("--limit {}", total.min(MAX_LIMIT));
+        report.next(
+            again(opts, "diff", rev.as_deref(), paths, &flags(opts, &[&limit])),
+            format!("all {total} lines"),
+        );
+    }
+
+    if !withheld.is_empty() {
+        report.next(
+            again(
+                opts,
+                "diff",
+                rev.as_deref(),
+                paths,
+                &flags(opts, &["--include-secret-paths"]),
+            ),
+            "the hunks of those files",
+        );
+    } else if counts.dropped == 0 && !opts.patch {
+        report.next(
+            again(
+                opts,
+                "diff",
+                rev.as_deref(),
+                paths,
+                &flags(opts, &["--patch"]),
+            ),
+            "the hunks",
+        );
+    }
+}
+
+/// The flags that define *which question* was asked, as opposed to how much of it to print. Every
+/// exit carries them, because an exit that quietly dropped one would answer a different question:
+/// hunks where the caller had asked for a whitespace-ignoring table is not the same read.
+fn flags(opts: &Opts, extra: &[&str]) -> Vec<String> {
+    let mut flags: Vec<String> = Vec::new();
+    if opts.patch {
+        flags.push("--patch".to_string());
+    }
+    if opts.ignore_space {
+        flags.push("--ignore-space".to_string());
+    }
+    flags.extend(extra.iter().map(|flag| (*flag).to_string()));
+    flags
+}
+
+/// What `--ignore-space` hid: the same comparison without it. Stated whenever it differs, and
+/// stated as nothing when it does not — silence would leave the reader unable to tell whether the
+/// flag did anything.
+fn space_bound(report: &mut Report, ignored: &[FileStat], raw: &[FileStat]) {
+    let raw_totals = totals(raw);
+    let only = raw.len().saturating_sub(ignored.len());
+    if raw_totals == totals(ignored) && only == 0 {
+        report.bound("no whitespace-only changes".to_string());
+    } else if only > 0 {
+        report.bound(format!(
+            "with whitespace: {}, {raw_totals} ({only} whitespace-only)",
+            plural(raw.len(), "file")
+        ));
+    } else {
+        report.bound(format!(
+            "with whitespace: {}, {raw_totals}",
+            plural(raw.len(), "file")
+        ));
+    }
+}
+
+/// Refuse a worktree comparison when the repository routes any of its paths through a filter
+/// driver.
+///
+/// A worktree diff asks git to turn a working-tree file into the blob it would commit, and a
+/// repository can choose the program that does that conversion: `filter.<driver>.clean`, selected
+/// by `.gitattributes`. This tool runs one program — git — so a change set that includes such a
+/// path is refused before anything reads the worktree. The alternative is worse both ways: diffing
+/// *with* the filter runs a program a repository named, as the reader, on a tool that exists to be
+/// allowlisted once; diffing *without* it prints raw bytes where the reader expects the filtered
+/// form of the file, and a diff that is quietly not the diff git would show is the failure this
+/// toolkit exists to remove.
+///
+/// The change set is gathered from the two sources that read no worktree content — the index
+/// against the revision, and the status against the index — and narrowed by the caller's own paths
+/// rather than by matching them here. Their union is every tracked path the comparison could name:
+/// a path that differs between the revision and the worktree differs either before the index or
+/// after it.
+fn refuse_filtered(opts: &Opts, rev: &Option<String>, paths: &[String]) -> Result<(), Fail> {
+    if matches!(rev, Some(rev) if rev.contains("..")) {
+        // Two commits and no worktree: no file is converted, so no filter can run.
+        return Ok(());
+    }
+
+    let mut changed: BTreeSet<String> = BTreeSet::new();
+    changed.extend(index_paths(opts, rev, paths)?);
+
+    let status = Status::read_paths(&opts.git, paths)?;
+    if status.unparsed() > 0 {
+        return Err(Fail::environment(
+            "the working tree state did not parse, so this diff cannot be checked against the \
+             filters a repository may configure"
+                .to_string(),
+        ));
+    }
+    changed.extend(status.paths());
+
+    if changed.is_empty() {
+        return Ok(());
+    }
+    let names: Vec<String> = changed.into_iter().collect();
+
+    // `unspecified` is "no pattern matched" and `unset` is a repository saying `-filter`; neither
+    // names a driver, so neither can run one.
+    let offenders: Vec<String> = opts
+        .git
+        .check_filter_attribute(&names)?
+        .into_iter()
+        .filter(|(_, value)| value != "unspecified" && value != "unset")
+        .map(|(path, value)| format!("{path} (filter={value})"))
+        .collect();
+    if offenders.is_empty() {
+        return Ok(());
+    }
+    Err(Fail::refused(format!(
+        "{} · a filter driver is a program the repository names, and this tool runs git only · \
+         `git diff` shows the filtered form",
+        offenders.join(", ")
+    )))
+}
+
+/// The paths the index differs on, from the one diff that converts no working-tree file.
+fn index_paths(opts: &Opts, rev: &Option<String>, paths: &[String]) -> Result<Vec<String>, Fail> {
+    let mut args: Vec<String> = ["--numstat", "--cached"]
+        .iter()
+        .map(|flag| (*flag).to_string())
+        .collect();
+    if let Some(rev) = rev {
+        args.push(rev.clone());
+    }
+    with_paths(&mut args, paths);
+    let raw = opts.git.run(Noun::Diff, &borrowed(&args))?;
+    Ok(raw
+        .lines()
+        .filter_map(facts::parse_numstat)
+        .flat_map(|file| file.names)
+        .collect())
+}
+
+/// The hunks, minus the files the deny-list refuses.
+///
+/// The exclusion is a pathspec rather than a filter over the patch text: git decides which file a
+/// hunk belongs to, so a file named with a space or a quote cannot make the two disagree. The names
+/// come from git's own listing, which is what makes them safe to pass back as pathspecs.
+fn patch(
+    report: &mut Report,
+    budget: &mut Budget,
+    opts: &Opts,
+    rev: &Option<String>,
+    paths: &[String],
+    withheld: &[String],
+) -> Result<(), Fail> {
+    let mut pathspecs = paths.to_vec();
+    for name in withheld {
+        pathspecs.push(format!(":(exclude,literal){name}"));
+    }
+
+    let args = facts::diff_args(rev, &pathspecs, &["--patch"], opts.ignore_space);
+    let hunks = opts.git.run(Noun::Diff, &borrowed(&args))?;
+    for line in hunks.lines() {
+        budget.push(report, line);
+    }
+    Ok(())
+}
+
+/// What a comparison with no revision given is against.
+///
+/// HEAD, stated rather than left to git's default — plain `git diff` compares the index with the
+/// working tree, which is a different answer to the same question, and the one a reader who asked
+/// "what have I changed" is not asking. On a branch with no commits there is no HEAD to name, and
+/// the index is the only thing in front of the worktree.
+fn default_revision(rev: Option<String>, opts: &Opts) -> Option<String> {
+    match rev {
+        Some(rev) => Some(rev),
+        None if opts.git.head_exists() => Some("HEAD".to_string()),
+        None => None,
+    }
+}
+
+/// The comparison, in the words the caller would use for it. A range names its own comparison, so
+/// it is printed as typed rather than paraphrased.
+fn comparison(rev: &Option<String>) -> String {
+    match rev {
+        Some(rev) if rev.contains("..") => rev.clone(),
+        Some(rev) => format!("working tree against {rev}"),
+        None => "working tree against the index (no commits yet)".to_string(),
+    }
+}
+
+/// `git diff` reports nothing for a path it does not track, and nothing reads as "unchanged". Say
+/// which of the three this is, and fail on a path that is not there at all.
+fn explain_empty(report: &mut Report, opts: &Opts, paths: &[String]) -> Result<(), Fail> {
+    for path in paths {
+        // A pattern that matches nothing is indistinguishable from a path that changed nothing, so
+        // the check is limited to the plain names it can actually answer for.
+        if path.contains(['*', '?', '[', ']']) || path.starts_with(':') {
+            continue;
+        }
+        let probe = opts
+            .git
+            .probe(
+                Noun::Status,
+                &[
+                    "--porcelain=v2",
+                    "-z",
+                    "--untracked-files=all",
+                    "--ignored=matching",
+                    "--",
+                    path,
+                ],
+            )
+            .unwrap_or_default();
+        // Both of these are paths git knows about and a diff between commits still cannot show,
+        // which is the reading a bare "no differences" invites.
+        if probe.split('\0').any(|record| record.starts_with("? ")) {
+            report.bound(format!(
+                "caveat: {path} is untracked, and a diff between commits cannot show it"
+            ));
+        } else if probe.split('\0').any(|record| record.starts_with("! ")) {
+            report.bound(format!(
+                "caveat: {path} is ignored by this repository, so no diff shows it"
+            ));
+        } else if std::fs::metadata(opts.root.dir().join(path)).is_err() {
+            return Err(Fail::environment(format!(
+                "{path} is neither a revision nor a path in {}, and no difference mentions it",
+                opts.root.name()
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Whether a path is one the deny-list refuses. Both the name and the whole path are checked: the
+/// name catches `.env` in any directory, and the path catches a file inside a directory that is
+/// itself named for secrets.
+fn secret_shaped_path(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    secret_shaped(name).is_some() || secret_shaped(path).is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_deny_list_sees_a_secret_name_in_any_directory() {
+        assert!(secret_shaped_path("config/.env"));
+        assert!(secret_shaped_path("deploy/relay.pem"));
+        assert!(secret_shaped_path("secrets/notes.md"));
+        assert!(!secret_shaped_path("src/cache.rs"));
+        assert!(!secret_shaped_path(".env.example"));
+    }
+}

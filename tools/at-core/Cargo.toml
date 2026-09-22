@@ -1,0 +1,10 @@
+[package]
+name = "at-core"
+version = "0.1.0"
+edition = "2021"
+description = "The output contract and path containment shared by the agent toolkit"
+license = "MIT"
+
+# No dependencies, deliberately: every `at-*` binary links this, including the one that spawns
+# git, so it stays small enough to read in a sitting.
+[dependencies]

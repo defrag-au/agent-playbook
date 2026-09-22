@@ -17,20 +17,28 @@ why it was replaced. See the README's "Why the tool is Rust and not a shell scri
 
 ## Building and testing
 
-There is no `flake.nix` here yet, so `cargo` is not on `PATH` on this machine. Two options:
+`flake.nix` provides the toolchain — `cargo`, `rustc`, `clippy` and `rustfmt`, from the same fenix
+channel the rest of the org builds with. None of them is on the default `PATH`, so the shell has to
+come from one of these:
 
 ```sh
-# borrow a sibling repo's realised devshell — works in a sandbox
-direnv exec ~/code/defrag/shared-crates cargo test
+nix develop -c cargo test                 # this repository's own devshell
 
-# or, from a shell where cargo is available
-cargo test
+# the same devshell, for a shell that is not interactive — an editor's, an agent's, a script's:
+direnv exec . cargo test
+direnv exec . cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
-Add `--offline` if cargo tries to reach the network. It should never need to: the crate has
-**no dependencies**, deliberately, so it builds with no network and no registry cache. That is
-a property to preserve, not an accident — the tool is the thing you reach for when a repo's
-toolchain is what is broken.
+`direnv allow .` once, from an interactive shell, is what makes `.envrc` (`use flake`) load on `cd` —
+which is why an interactive shell in this directory has `cargo` without being asked. A shell an
+ditor or an agent spawned sources no rc file and so runs no direnv hook: there, `command not found:
+cargo` means an unloaded shell, not a missing toolchain, and `direnv exec .` is the answer. Neither
+of them needs `defrag-nix`; see *The flake* below for why that is a constraint and not a limitation.
+
+Add `--offline` if cargo tries to reach the network. It should never need to: the composer
+crate has **no dependencies**, deliberately, so it builds with no network and no registry
+cache. That is a property to preserve, not an accident — the tool is the thing you reach for
+when a repo's toolchain is what is broken. The `tools/` crates hold the same line.
 
 Before pushing:
 
@@ -42,16 +50,25 @@ cargo test
 
 Clippy is clean at `-D warnings` and should stay that way.
 
-### The open question
+### The flake
 
-`rules/rust/devshell-first` says Rust tooling lives behind a Nix devshell, and this repository
-cannot follow its own rule. Two shapes are possible: reuse `defrag-nix`'s `rust-worker-stack`
-like the sibling repos (in lock-step, but ties a *transferable* repository to one org's flake),
-or a self-contained `nixpkgs` shell (transferable, but a second toolchain definition). Undecided
-on purpose — do not add one without settling it.
+`flake.nix` pins the same fenix channel `defrag-nix` does, and exports `playbook`, `agent-tools`
+(`at-peek`, `at-recall`, `at-describe`), a devshell, and a `checks` entry that runs the suite.
 
-Until then this repo is **not self-hosted**: there is no `projects/agent-playbook/` and no
-managed block in this file.
+**It cannot consume `defrag-nix`, and does not need to.** That input already points the other way:
+`defrag-nix` takes *this* repository as an input, for `packages.agent-tools`, and wires the binaries
+into the org's shells. An input back would be a cycle, and flake inputs are a DAG — Nix refuses to
+resolve one rather than doing something surprising with it. What is shared instead is the pin: both
+flakes build from the same fenix channel, so a bump is one `nix flake update` in each repository and
+they agree again afterwards. The lock is per repository; the toolchain is not inherited, it is
+matched.
+
+That is also the property worth keeping: a repository meant to be read by someone outside the org
+builds with nothing but its own flake. `defrag-nix`'s input uses `nixpkgs.follows` and
+`fenix.follows`, so neither is evaluated twice.
+
+The repo is still **not self-hosted**: there is no `projects/agent-playbook/` and no managed
+block in this file.
 
 ## Adding a rule
 

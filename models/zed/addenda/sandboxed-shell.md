@@ -24,6 +24,14 @@ like a permissions problem and is actually the sandbox. Use `direnv exec . <cmd>
 it reads the already-realised devshell out of `.direnv/` and needs no daemon. See
 [`rules/rust/devshell-first`](../../../rules/rust/devshell-first.md).
 
+## A spawned shell does not inherit the devshell
+
+`direnv` loads the devshell on `cd`, which only happens in an interactive shell. Commands an agent
+spawns run without it, so a tool that is "on `PATH` in the repo" is not on `PATH` for the agent —
+`which <tool>` returns nothing, and the failure reads as "not installed". Reach for it explicitly
+with `direnv exec . <tool> …` (which needs no daemon), or install it into the nix profile so it is
+on `PATH` unconditionally.
+
 ## Network access is per-host
 
 Outbound network is blocked by default. Access is granted per host through an HTTP/HTTPS
