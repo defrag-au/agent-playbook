@@ -113,6 +113,29 @@ impl Report {
         self.lines.push(format!("# {}", line.into()));
     }
 
+    /// The next question, printed as the command that asks it.
+    ///
+    /// The third kind of line: not content, not a bound. A bound says what was *not* shown; an exit
+    /// says what to ask next, and says it as something the reader can run rather than as something
+    /// it has to compose. Four rules make it a contract rather than a hint:
+    ///
+    /// * **It is literal and complete.** An approval over the grammar covers it, and no state
+    ///   crosses between invocations — an exit is an *address*, never a handle. A token that
+    ///   carried state would be unreadable to whoever reviews the invocation, which is the same
+    ///   objection that keeps this toolkit stateless.
+    /// * **It continues the question just asked.** The same binary, the same comparison, widened or
+    ///   deepened. A command that switched to a different tool would be a suggestion, and
+    ///   suggestions belong in the rule where they can be argued with.
+    /// * **It is built from the parts of the invocation that produced it**, so it cannot name a
+    ///   flag the parser would refuse, and cannot quietly point somewhere else — an exit drops the
+    ///   caller's `--root` only by being wrong.
+    /// * **There are at most two, in one order:** widen an answer that was cut, then read the part
+    ///   that was held back. An answer with nothing cut and nothing further to read offers none.
+    pub fn next(&mut self, command: impl Into<String>, why: impl Into<String>) {
+        self.lines
+            .push(format!("# next: {} · {}", command.into(), why.into()));
+    }
+
     /// How many content lines were produced. Zero means "nothing found", which is an exit
     /// code rather than an empty success.
     pub fn content_lines(&self) -> usize {
@@ -312,6 +335,19 @@ mod tests {
         report.header("at-peek", "stat", "root", "1 path");
         report.bound("1 path");
         assert_eq!(Outcome::from_report(report).exit, Exit::Nothing);
+    }
+
+    #[test]
+    fn an_exit_is_one_line_and_is_not_content() {
+        // Content is what the exit code counts, and an exit is not an answer — a verb that found
+        // nothing must not exit 0 because it suggested what to ask instead.
+        let mut report = Report::new();
+        report.next("at-recall diff --patch", "the hunks");
+        assert_eq!(report.content_lines(), 0);
+        assert_eq!(
+            report.render(),
+            "# next: at-recall diff --patch · the hunks\n"
+        );
     }
 
     #[test]

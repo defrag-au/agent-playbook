@@ -45,6 +45,24 @@ complete one.
 `# skipped by rule: target, node_modules` and `# skipped: 3 secret-shaped · 2 binary` are the same
 discipline: what it refused to read, named rather than dropped.
 
+## The exits
+
+An answer ends with its exits, when it has any:
+
+```
+# 14 of 367 lines · --limit 14 reached
+# next: at-recall diff HEAD --patch --limit 367 · all 367 lines
+```
+
+That is a command, not a suggestion — **run it as printed.** It is the same read you just made,
+widened (a cut answer offers the limit that would have fit) or deepened (the hunks behind the
+table, the files behind a refusal). It carries `--root` when you gave one, so it reads the tree you
+meant.
+
+A silent footer means what it says: nothing was cut, and there is nothing further at this level. If
+you need something the exits do not offer, the answer genuinely does not contain it — ask, rather
+than composing a pipeline to go looking.
+
 `at-recall state` exits 0 even on a clean tree, because the branch and HEAD *are* the answer to
 "what am I looking at" — read the count from the bound: `# 0 paths`. `at-recall diff` exits 1 when
 nothing differs, and 4 when it refused.

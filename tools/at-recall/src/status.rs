@@ -201,6 +201,13 @@ impl Status {
             .collect()
     }
 
+    /// Whether any *tracked* path has changed. Untracked is the one kind a diff between commits
+    /// cannot show, so a worktree of nothing but untracked files has no diff to offer — which is
+    /// why `state`'s exit is conditional rather than unconditional.
+    pub fn tracks_changes(&self) -> bool {
+        self.entries.iter().any(|entry| entry.code != "??")
+    }
+
     pub fn unparsed(&self) -> usize {
         self.unparsed
     }

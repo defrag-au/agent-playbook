@@ -111,6 +111,10 @@ fn toolkit() -> String {
     }
 
     out.push_str(
+        "\n# an answer's `# next:` line is a command: run it as printed, and it continues the\n",
+    );
+    out.push_str("# question you just asked — the same comparison, widened or deeper.\n");
+    out.push_str(
         "\n# at-describe knows the binaries it is linked with; one installed separately\n",
     );
     out.push_str("# does not appear here. Ask for detail with `at-describe at-peek`,\n");

@@ -13,7 +13,7 @@ use at_core::contract::{plural_of, Fail, Report, MAX_LIMIT};
 
 use crate::git::{Noun, GIT};
 use crate::status::Status;
-use crate::verbs::{plural, Budget, Opts, Outcome};
+use crate::verbs::{again, plural, Budget, Opts, Outcome};
 use crate::TOOL;
 
 /// The files git leaves behind when an operation is half-done, and what each one means. A list
@@ -88,6 +88,23 @@ pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
         ));
     }
     budget.width_caveat(&mut report);
+
+    // The exits, in the contract's order: widen a cut answer, then the one question this answer
+    // implies. A clean tree offers neither, which is the useful reading of a silent footer.
+    if budget.dropped() > 0 {
+        report.next(
+            again(
+                opts,
+                "state",
+                None,
+                &[],
+                &[format!("--limit {}", total.min(MAX_LIMIT))],
+            ),
+            format!("all {}", plural(total, "path")),
+        );
+    } else if status.tracks_changes() {
+        report.next(again(opts, "diff", None, &[], &[]), "what changed in them");
+    }
 
     Ok(Outcome::from_report(report))
 }

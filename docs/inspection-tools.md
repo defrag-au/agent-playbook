@@ -315,9 +315,9 @@ These are the invariants that make the tools cheap to read and safe to allowlist
 spec, and each one is a test.
 
 1. **Bounded, and the bound is stated.** Defaults around 200 lines / 50 search results / 20
-   commits; a `--limit` above the ceiling is clamped and says so. Every output that was cut ends
-   with a trailer naming the true total and the flag that widens it. Truncation is never silent
-   and never an error.
+   commits; a `--limit` above the ceiling is clamped and says so. Every output that was cut
+   carries a trailer naming the true total, and the command that widens it (see 11). Truncation is
+   never silent and never an error.
 2. **Deterministic.** Fixed sort orders, UTC ISO-8601 dates, no locale, no clock in the output,
    no `isatty` branch. Same input, same bytes — the same property
    `rendering_is_byte_stable` pins in this repository.
@@ -349,6 +349,20 @@ spec, and each one is a test.
     shown; a caveat says what would make the answer wrong — a base ref that was never fetched, a
     binary file that was skipped, a path the ignore rules excluded. Recipes carry both per
     section, and the JSON format has a field for each so a consumer cannot read one as the other.
+11. **An answer names its own next questions.** At most two, printed last, one line each:
+    `# next: at-recall diff --patch · the hunks`. These are *commands*, not hints — literal,
+    complete, runnable exactly as printed, with `--root` echoed whenever the caller named one.
+    That is what keeps an exit an **address rather than a handle**: no state crosses between
+    invocations, so a reviewer of the transcript sees precisely what will be read next, and any
+    page can be re-entered. They are results-conditional — a cut answer offers the wider read, a
+    withheld answer offers the flag that reads it, a complete table offers the hunks behind it,
+    and a clean tree offers nothing at all. `every_printed_exit_is_a_command_that_runs` executes
+    each one as printed, so an exit cannot name a flag the parser would refuse.
+
+    The corollary is a coverage test, and it is the point of the mechanism: **a bound with no exit
+    names a question the toolkit cannot yet answer.** `state`'s collapsed-directory caveat is the
+    live example — it has no exit because there is no verb that expands a directory listing, which
+    is what `at-peek tree` and `at-peek find` would supply.
 
 ## Security: what an approval actually grants
 
@@ -631,3 +645,24 @@ If the agent still reaches for `git log` after the rule is installed, the rule i
 verbs are not named after the questions, which is the failure mode this whole design is trying to
 avoid. If it still reaches for `sed` after `at-peek` is installed *and* whitelisted, the tool is
 wrong: something it needs to ask cannot be asked.
+
+### The exits experiment
+
+Question: **does an agent follow a printed exit instead of re-deriving the command?**
+
+Setup: `cnft.dev-workers`, one task asked cold — "write me a PR description for what I have
+changed" — with the `agent-tools` rule installed and the toolkit on `PATH`.
+
+What to count, from the transcript, in order of how much they would tell us:
+
+| # | Measure | Reading |
+| --- | --- | --- |
+| 1 | Followed exits ÷ exits printed | High means the footer is doing the driving. Near zero means it is decoration, and the mechanism should be deleted rather than extended. |
+| 2 | Calls that were dead ends — exit 2, wrong verb, wrong flag, an empty answer where a fact was expected | The number the toolkit exists to reduce. Compare with the same task's earlier transcript, which is on record: `cargo fmt && git diff --stat`, then `status --porcelain && diff AGENTS.md`, then three separate `git diff <path>` calls. |
+| 3 | Calls where the agent re-derived a command an exit had already printed | Either the exit was not seen, or it was not trusted. Both are test failures: the first is a signpost problem, the second is a wording problem. |
+| 4 | Approval prompts | The original goal. Should be zero. |
+
+There is deliberately no `--no-next` flag to make this a same-day A/B: an option that exists only
+to switch off a documented behaviour is a grammar entry a reader has to reason about forever. The
+comparison is against the pre-exits transcript, and measure 3 is the one that does not need a
+baseline at all.

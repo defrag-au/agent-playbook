@@ -20,7 +20,7 @@ use at_core::contract::{secret_shaped, Fail, Report, MAX_LIMIT};
 
 use crate::git::{rev, with_paths, Noun};
 use crate::status::Status;
-use crate::verbs::{plural, Budget, Opts, Outcome};
+use crate::verbs::{again, plural, Budget, Opts, Outcome};
 use crate::TOOL;
 
 /// What every diff run carries, whatever the caller asked for. `--no-color` because a repository
@@ -73,7 +73,14 @@ pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
     });
 
     if opts.patch {
-        patch(&mut report, &mut budget, opts, &rev, &paths, &files)?;
+        patch(
+            &mut report,
+            &mut budget,
+            opts,
+            &rev,
+            &paths,
+            &withheld(&files, opts),
+        )?;
     }
 
     let emitted = report.content_lines();
@@ -86,8 +93,90 @@ pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
         ));
     }
     budget.width_caveat(&mut report);
+    exits(
+        &mut report,
+        opts,
+        &rev,
+        &paths,
+        &withheld(&files, opts),
+        emitted,
+        dropped,
+    );
 
     Ok(Outcome::from_report(report))
+}
+
+/// The names a patch will not print, sorted and deduplicated.
+fn withheld(files: &[FileStat], opts: &Opts) -> Vec<String> {
+    if !opts.patch || opts.include_secret_paths {
+        return Vec::new();
+    }
+    let mut names: Vec<String> = files
+        .iter()
+        .flat_map(|file| file.names.iter())
+        .filter(|name| secret_shaped_path(name))
+        .cloned()
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+/// The next questions this answer implies, in the order the contract fixes: widen what was cut,
+/// then read what was held back.
+///
+/// `--patch` comes last and only on its own, because it is the one exit that is not a consequence of
+/// something the answer already said — the other two are what a cut bound and a withheld file are
+/// *for*. At most two lines, and none at all when the diff was complete and the hunks were already
+/// asked for.
+fn exits(
+    report: &mut Report,
+    opts: &Opts,
+    rev: &Option<String>,
+    paths: &[String],
+    withheld: &[String],
+    emitted: usize,
+    dropped: usize,
+) {
+    let total = emitted + dropped;
+    if dropped > 0 {
+        // `--patch` is carried, not assumed away: the exit has to ask the same question wider, and
+        // a widen that returned the table where the caller had asked for hunks would answer
+        // something else.
+        let mut flags: Vec<String> = Vec::new();
+        if opts.patch {
+            flags.push("--patch".to_string());
+        }
+        flags.push(format!("--limit {}", total.min(MAX_LIMIT)));
+        report.next(
+            again(opts, "diff", rev.as_deref(), paths, &flags),
+            format!("all {total} lines"),
+        );
+    }
+    if !withheld.is_empty() {
+        report.next(
+            again(
+                opts,
+                "diff",
+                rev.as_deref(),
+                paths,
+                &["--include-secret-paths".to_string()],
+            ),
+            "the hunks of those files",
+        );
+    }
+    if dropped == 0 && withheld.is_empty() && !opts.patch {
+        report.next(
+            again(
+                opts,
+                "diff",
+                rev.as_deref(),
+                paths,
+                &["--patch".to_string()],
+            ),
+            "the hunks",
+        );
+    }
 }
 
 /// Refuse a worktree comparison when the repository routes any of its paths through a filter
@@ -179,32 +268,18 @@ fn patch(
     opts: &Opts,
     rev: &Option<String>,
     paths: &[String],
-    files: &[FileStat],
+    withheld: &[String],
 ) -> Result<(), Fail> {
-    let withheld: Vec<String> = if opts.include_secret_paths {
-        Vec::new()
-    } else {
-        let mut names: Vec<String> = files
-            .iter()
-            .flat_map(|file| file.names.iter())
-            .filter(|name| secret_shaped_path(name))
-            .cloned()
-            .collect();
-        names.sort();
-        names.dedup();
-        names
-    };
-
     if !withheld.is_empty() {
         report.bound(format!(
-            "{} withheld from the hunks: {} · --include-secret-paths includes them",
+            "{} withheld from the hunks: {}",
             plural(withheld.len(), "secret-shaped path"),
             withheld.join(", ")
         ));
     }
 
     let mut pathspecs = paths.to_vec();
-    for name in &withheld {
+    for name in withheld {
         pathspecs.push(format!(":(exclude,literal){name}"));
     }
 

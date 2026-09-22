@@ -29,6 +29,8 @@ targets:
   inherit the devshell environment; an interactive one does.
 - Output that was cut says so, and so does anything that would make it wrong. Repeat both when
   you report the finding: `# 50 of 143` is the difference between a fact and a guess.
+- A `# next:` line is the next question, already spelled as a command. Run it as printed rather
+  than composing your own — it is the read you just made, widened or deepened.
 - The tools are for understanding, not for preparing an edit. Read the file with the editor tools
   before editing it.
 - `at-peek` runs nothing at all; `at-recall` runs `git` and nothing else. That difference is why

@@ -25,6 +25,9 @@ pub use at_core::contract::{plural, Outcome};
 pub struct Opts {
     /// The worktree, canonicalised. Every path git prints is relative to this.
     pub root: Root,
+    /// Whether the caller named the root rather than letting it be discovered. An exit that
+    /// dropped a `--root` it was given would answer about a different tree, so it is echoed.
+    pub root_was_explicit: bool,
     /// The one subprocess behind every verb.
     pub git: Git,
     /// Content lines this invocation may print, shared across every section it prints.
@@ -87,5 +90,74 @@ impl Budget {
                 self.cut
             ));
         }
+    }
+}
+
+/// The caller's own invocation, asked again with one thing changed — the same comparison, widened
+/// or deepened.
+///
+/// Rebuilt from the parts the caller supplied rather than typed out as a literal, so an exit cannot
+/// describe a command the parser would refuse, and cannot silently answer about a different tree:
+/// `--root` is echoed whenever the caller gave one, and nothing else about the invocation is
+/// assumed. A flag's spelling is the one thing a verb has to supply, which is why
+/// `tests/contract.rs` runs every exit it prints.
+pub fn again(
+    opts: &Opts,
+    verb: &str,
+    rev: Option<&str>,
+    paths: &[String],
+    flags: &[String],
+) -> String {
+    let mut command = format!("{} {verb}", crate::TOOL);
+    for part in rev
+        .map(String::from)
+        .into_iter()
+        .chain(paths.iter().cloned())
+    {
+        command.push(' ');
+        command.push_str(&quoted(&part));
+    }
+    for flag in flags {
+        command.push(' ');
+        command.push_str(flag);
+    }
+    if opts.root_was_explicit {
+        let dir = opts.root.dir().display().to_string();
+        command.push_str(&format!(" --root {}", quoted(&dir)));
+    }
+    command
+}
+
+/// Single quotes when a shell would need them, and only then — an exit should read like the command
+/// a person would type, not like a serialised argument list. `'` is closed and reopened, which is
+/// the only escape a single-quoted shell word needs.
+fn quoted(part: &str) -> String {
+    let plain = part
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "._/-~=:,+^@{}()[]".contains(c));
+    if plain {
+        return part.to_string();
+    }
+    format!("'{}'", part.replace('\'', "'\\''"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_plain_path_is_not_quoted() {
+        assert_eq!(quoted("src/main.rs"), "src/main.rs");
+        assert_eq!(quoted("HEAD~1..HEAD"), "HEAD~1..HEAD");
+    }
+
+    #[test]
+    fn a_path_with_a_space_is_quoted_once() {
+        assert_eq!(quoted("src/my file.rs"), "'src/my file.rs'");
+    }
+
+    #[test]
+    fn a_quote_in_a_path_survives_a_shell() {
+        assert_eq!(quoted("it's.rs"), r"'it'\''s.rs'");
     }
 }

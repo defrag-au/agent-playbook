@@ -152,6 +152,33 @@ fn content_lines(text: &str) -> usize {
     text.lines().filter(|line| !line.starts_with('#')).count()
 }
 
+/// The exits an answer printed, as `(command, why)`.
+fn exits(out: &Output) -> Vec<(String, String)> {
+    stdout(out)
+        .lines()
+        .filter_map(|line| line.strip_prefix("# next: "))
+        .map(|line| match line.split_once(" · ") {
+            Some((command, why)) => (command.to_string(), why.to_string()),
+            None => (line.to_string(), String::new()),
+        })
+        .collect()
+}
+
+/// Run one of the tool's own exits exactly as it was printed, through a shell — because an exit is
+/// a command line, quoting included, and the property under test is that the printed text runs.
+fn run_printed(command: &str) -> Output {
+    let directory = Path::new(BIN).parent().expect("binary directory");
+    let path = format!(
+        "{}:{}",
+        directory.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let mut shell = Command::new("sh");
+    shell.arg("-c").arg(command).env("PATH", path);
+    neutral(&mut shell);
+    shell.output().expect("run an exit")
+}
+
 fn snapshot(dir: &Path) -> Vec<String> {
     fn walk(root: &Path, dir: &Path, out: &mut Vec<String>) {
         for entry in fs::read_dir(dir).expect("read_dir") {
@@ -206,7 +233,8 @@ fn state_names_the_branch_the_head_and_the_changed_paths() {
     assert!(text.contains("upstream   none"), "{text}");
     assert!(text.contains("pending    none"), "{text}");
     assert!(text.contains(" M  src/a.rs"), "{text}");
-    assert!(text.ends_with("# 1 path\n"), "{text}");
+    // The count is a bound, and a bound is no longer the last line: the exits follow it.
+    assert!(text.contains("# 1 path\n"), "{text}");
 }
 
 #[test]
@@ -281,7 +309,7 @@ fn diff_defaults_to_the_working_tree_against_head() {
         "{text}"
     );
     assert!(text.contains("+2 -1  src/a.rs"), "{text}");
-    assert!(text.ends_with("# 1 file, +2 -1\n"), "{text}");
+    assert!(text.contains("# 1 file, +2 -1\n"), "{text}");
 }
 
 #[test]
@@ -292,7 +320,7 @@ fn diff_takes_several_paths_in_one_invocation() {
     let text = stdout(&at_recall(repo.path(), &["diff", "src/a.rs", "src/b.rs"]));
     assert!(text.contains("+2 -1  src/a.rs"), "{text}");
     assert!(text.contains("+1 -1  src/b.rs"), "{text}");
-    assert!(text.ends_with("# 2 files, +3 -2\n"), "{text}");
+    assert!(text.contains("# 2 files, +3 -2\n"), "{text}");
 
     let one = stdout(&at_recall(repo.path(), &["diff", "src/b.rs"]));
     assert!(!one.contains("src/a.rs"), "{one}");
@@ -425,7 +453,7 @@ fn patch_withholds_a_secret_shaped_file_and_names_it() {
     let text = stdout(&out);
     assert_eq!(code(&out), 0, "{}", stderr(&out));
     assert!(
-        text.contains(".env, deploy.key · --include-secret-paths includes them"),
+        text.contains("# 2 secret-shaped paths withheld from the hunks: .env, deploy.key"),
         "{text}"
     );
     assert!(
@@ -435,12 +463,119 @@ fn patch_withholds_a_secret_shaped_file_and_names_it() {
     // The table still names them: a file's name and its line counts are metadata, and a reader who
     // cannot see that a file changed cannot ask about it.
     assert!(text.contains("+1 -0  .env"), "{text}");
+    // The flag that reads them is offered the way every other continuation is: as a command.
+    let offered = exits(&out);
+    assert!(
+        offered
+            .iter()
+            .any(|(command, _)| command.contains("--include-secret-paths")),
+        "{offered:?}"
+    );
 
     let forced = stdout(&at_recall(
         repo.path(),
         &["diff", "--patch", "--include-secret-paths"],
     ));
     assert!(forced.contains("SECOND=also-placeholder"), "{forced}");
+}
+
+#[test]
+fn every_printed_exit_is_a_command_that_runs() {
+    // An exit that names a flag the parser refuses, or a path it cannot read, is worse than no exit:
+    // the reader trusts it, runs it, and eats the failure. This runs each one as printed.
+    let repo = Repo::new("exits-run");
+    repo.write("src/a.rs", "one\n");
+    repo.write("src/b.rs", "alpha\n");
+    repo.write(".env", "TOKEN=placeholder-not-a-secret\n");
+    repo.commit("first");
+    repo.write("src/a.rs", "one\ntwo\nthree\n");
+    repo.write("src/b.rs", "alpha\nBETA\n");
+    repo.write(
+        ".env",
+        "TOKEN=placeholder-not-a-secret\nSECOND=placeholder\n",
+    );
+    repo.write("notes.md", "scratch\n");
+
+    let mut checked = 0;
+    for args in [
+        vec!["state"],
+        vec!["state", "--limit", "1"],
+        vec!["diff"],
+        vec!["diff", "--limit", "1"],
+        vec!["diff", "--patch"],
+        vec!["diff", "--patch", "--limit", "4"],
+        vec!["diff", "src/a.rs", "--patch", "--limit", "2"],
+    ] {
+        let printed = exits(&at_recall(repo.path(), &args));
+        assert!(
+            !printed.is_empty(),
+            "{args:?} printed no exit, so this test is not looking"
+        );
+        for (command, why) in printed {
+            assert!(command.starts_with("at-recall "), "{command}");
+            assert!(!why.is_empty(), "{command} has no reason attached");
+            let ran = run_printed(&command);
+            assert_eq!(
+                code(&ran),
+                0,
+                "`{command}` asked again did not answer: {} {}",
+                stdout(&ran),
+                stderr(&ran)
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked >= 6, "only {checked} exits were exercised");
+}
+
+#[test]
+fn the_exits_are_the_questions_this_answer_implies() {
+    let repo = Repo::new("exits-shape");
+    repo.write("src/a.rs", "one\n");
+    repo.commit("first");
+
+    // A clean tree implies nothing, and says so by staying silent.
+    assert!(exits(&at_recall(repo.path(), &["state"])).is_empty());
+
+    // Untracked is the one kind of change a diff cannot show, so state does not offer one.
+    repo.write("notes.md", "scratch\n");
+    assert!(!stdout(&at_recall(repo.path(), &["state"])).contains("# next:"));
+
+    // A tracked change does.
+    repo.write("src/a.rs", "one\ntwo\n");
+    let state = exits(&at_recall(repo.path(), &["state"]));
+    assert_eq!(state.len(), 1, "{state:?}");
+    assert!(state[0].0.contains("at-recall diff"), "{state:?}");
+
+    // A cut answer is widened, and the widen asks the same question: no `--patch` dropped, no
+    // limit that would clamp.
+    let cut = exits(&at_recall(repo.path(), &["state", "--limit", "1"]));
+    assert!(cut[0].0.contains("--limit 2"), "{cut:?}");
+    assert_eq!(cut[0].1, "all 2 paths");
+
+    let table = exits(&at_recall(repo.path(), &["diff"]));
+    assert_eq!(table.len(), 1, "{table:?}");
+    assert!(table[0].0.contains("--patch"), "{table:?}");
+    assert_eq!(table[0].1, "the hunks");
+
+    let patched = exits(&at_recall(
+        repo.path(),
+        &["diff", "--patch", "--limit", "3"],
+    ));
+    assert_eq!(patched.len(), 1, "{patched:?}");
+    assert!(patched[0].0.contains("--patch"), "{patched:?}");
+    assert!(patched[0].0.contains("--limit"), "{patched:?}");
+}
+
+#[test]
+fn an_exit_keeps_the_tree_the_caller_named() {
+    // Every invocation in this suite passes `--root`, so an exit that dropped it would answer about
+    // the test runner's own directory — and would do the same to anyone working in a second tree.
+    let repo = dirty("exits-root");
+    let printed = exits(&at_recall(repo.path(), &["diff"]));
+
+    assert!(printed[0].0.contains("--root"), "{}", printed[0].0);
+    assert_eq!(code(&run_printed(&printed[0].0)), 0);
 }
 
 #[test]
