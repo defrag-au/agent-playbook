@@ -28,6 +28,12 @@ skill that cannot be described cannot be discovered, and one that cannot be invo
 fire — so none of them was ever loaded by anything. They were rules wearing a skill's file
 layout.
 
+The original text of all eight is archived at
+[`archive/skills-pre-playbook/`](archive/skills-pre-playbook/README.md), because this file
+characterises them and a reader should be able to check. They were retired from
+`~/.agents/skills/` on 2026-09-22 — which is not under version control, so the archive is the
+only tracked copy of the wording.
+
 | Skill | Went to | Why |
 | --- | --- | --- |
 | `the-working-first-engineering-rule` | `rules/core/working-first` | Constrains every response |
