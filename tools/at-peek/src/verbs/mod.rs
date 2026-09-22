@@ -23,6 +23,9 @@ pub use crate::contract::{plural, Outcome};
 
 pub struct Opts {
     pub root: Root,
+    /// Whether the caller named the root rather than letting it be discovered. An exit that dropped a
+    /// `--root` it was given would answer about a different tree, so it is echoed.
+    pub root_was_explicit: bool,
     pub limit: usize,
     /// Set when the caller asked for more than [`crate::contract::MAX_LIMIT`], so the clamp
     /// can be announced rather than silently applied.
@@ -31,6 +34,19 @@ pub struct Opts {
     pub max_files: usize,
     pub max_files_clamped_from: Option<usize>,
     pub include_secret_paths: bool,
+    /// Whether the caller asked for the frame and not the rows. Only the verbs whose answer has a
+    /// coarser form that is itself a fact — a count, a total — offer it, so the flag table says
+    /// which those are rather than a mode printing nothing.
+    pub summary: bool,
+}
+
+/// The verbs' spelling of [`at_core::contract::again`]: the targets the caller gave, in the order
+/// they gave them, and the root echoed whenever they named one.
+pub fn again(opts: &Opts, verb: &str, targets: &[String], flags: &[String]) -> String {
+    let root = opts
+        .root_was_explicit
+        .then(|| opts.root.dir().display().to_string());
+    at_core::contract::again(crate::TOOL, verb, targets, flags, root.as_deref())
 }
 
 /// A target that resolved, survived the deny-list, and read as text.

@@ -61,16 +61,23 @@ an answer is too long to read, `--summary` it or narrow it with `--limit`/a path
 ```sh
 at-recall state --summary                       # branch, HEAD, pending, # 6 paths, not shown
 at-recall diff --summary                        # # 6 files, +78 -33, not shown
+at-peek search 'fn main' --summary               # # 12 matches in 4 files, not shown
 at-recall diff src/a.rs src/b.rs --patch        # several paths, one invocation
-at-peek search 'fn main' tools/ --count         # at-peek's short forms are --count and --files-only
 ```
 
 A `--summary` answer still ends with its exits, so the survey is where the loop starts: read the
-frames, then follow exactly one of them.
+frames, then follow exactly one of them. `stat` and `slice` have no `--summary` — their rows *are*
+the answer, so there is no frame to ask for; `at-peek search` also has `--count` and `--files-only`
+as shapes between the listing and the frame.
 
 ## The exits
 
 An answer ends with its exits, when it has any:
+
+```
+# 10 of 119 lines
+# next: at-peek slice src/cache.rs:11-40 · the lines that follow
+```
 
 ```
 # 14 of 367 lines · --limit 14 reached
@@ -79,8 +86,8 @@ An answer ends with its exits, when it has any:
 
 That is a command, not a suggestion — **run it as printed.** It is the same read you just made,
 widened (a cut answer offers the limit that would have fit) or deepened (the hunks behind the
-table, the files behind a refusal). It carries `--root` when you gave one, so it reads the tree you
-meant.
+table, the lines after the range, the files behind a refusal). It carries `--root` when you gave
+one, so it reads the tree you meant.
 
 A silent footer means what it says: nothing was cut, and there is nothing further at this level. If
 you need something the exits do not offer, the answer genuinely does not contain it — ask, rather

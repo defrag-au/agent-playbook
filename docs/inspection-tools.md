@@ -357,20 +357,26 @@ spec, and each one is a test.
     page can be re-entered. They are results-conditional — a cut answer offers the wider read, a
     withheld answer offers the flag that reads it, a complete table offers the hunks behind it,
     and a clean tree offers nothing at all. `every_printed_exit_is_a_command_that_runs` executes
-    each one as printed, so an exit cannot name a flag the parser would refuse.
+    each one as printed, in both binaries, so an exit cannot name a flag the parser would refuse.
+
+    Exits replace prose that used to sit inside a bound: `slice` used to end
+    `at-peek slice f.rs:1-412 for the rest`, which named the continuation without being one.
+    Now the bound states the size and the exit is the command.
 
     The corollary is a coverage test, and it is the point of the mechanism: **a bound with no exit
     names a question the toolkit cannot yet answer.** `state`'s collapsed-directory caveat is the
     live example — it has no exit because there is no verb that expands a directory listing, which
     is what `at-peek tree` and `at-peek find` would supply.
-12. **A verb whose answer is a body can be asked for its frame instead.** `--summary` prints the
-    header, the context, the counts, the bounds and the exits, and none of the rows; the bound reads
-    `<n> files, not shown` so the count is the whole truth about a body nobody asked to see. It
-    exists because several questions in one turn were being assembled with `| tail -3`, which is a
-    bound hidden in a pipe — the exact failure this contract opens with. Two consequences worth
-    keeping: a verb whose rows *are* its answer does not list the flag at all (the grammar saying so
-    rather than a mode that prints nothing), and `--summary` in `diff` does not fetch the hunks it
-    would discard, so a survey pays for the frame only.
+12. **A verb whose answer has a coarser form that is itself a fact can be asked for that instead.**
+    `--summary` prints the header, the context, the counts, the bounds and the exits, and none of the
+    rows; the bound reads `<n> files, not shown` so the count is the whole truth about a body nobody
+    asked to see. It exists because several questions in one turn were being assembled with
+    `| tail -3`, which is a bound hidden in a pipe — the exact failure this contract opens with. It
+    is on `state` and `diff` (the count, the totals) and on `search` (the count, and where the walk
+    stopped); `stat` and `slice` do not list the flag, because their rows are the whole answer and
+    there is no coarser fact to offer — the grammar saying so rather than a mode that prints nothing.
+    `--summary` in `diff` does not fetch the hunks it would discard, so a survey pays for the frame
+    only, and a summary still exits 0 when it found something it did not print.
 
 ## Security: what an approval actually grants
 

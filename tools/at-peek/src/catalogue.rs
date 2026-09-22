@@ -5,7 +5,7 @@
 // Re-exported rather than imported privately, so a module that already depends on the catalogue —
 // the argument parser, which reads its flag table — does not have to reach past it into `at-core`
 // for a type.
-pub use at_core::catalogue::{exit_codes, flag_names, Flag, Tool, Verb};
+pub use at_core::catalogue::{exit_codes, flag_names, Flag, Tool, Verb, SUMMARY};
 
 const LIMIT: Flag = Flag {
     name: "--limit",
@@ -73,9 +73,18 @@ pub static VERBS: &[Verb] = &[
     Verb {
         name: "search",
         question: "Every mention",
-        usage: "at-peek search <pattern> [path…] [--count | --files-only] [--limit N] [--max-files N]",
-        notes: "Regex, walked in path order; no path searches the whole root. Matches are counted over every file the walk considers, so the total under the listing is the real one. Directory names skipped by rule are named in the output — real gitignore semantics are not here yet. `--count` and `--files-only` are alternatives, not options to combine.",
-        flags: &[COUNT, FILES_ONLY, LIMIT, MAX_FILES, ROOT, SECRETS, HOW],
+        usage: "at-peek search <pattern> [path…] [--count | --files-only] [--summary] [--limit N] [--max-files N]",
+        notes: "Regex, walked in path order; no path searches the whole root. Matches are counted over every file the walk considers, so the total under the listing is the real one. Directory names skipped by rule are named in the output — real gitignore semantics are not here yet. `--count` and `--files-only` are alternatives, not options to combine; `--summary` is the coarser answer again — how many, and where the walk stopped — without the rows.",
+        flags: &[
+            COUNT,
+            FILES_ONLY,
+            SUMMARY,
+            LIMIT,
+            MAX_FILES,
+            ROOT,
+            SECRETS,
+            HOW,
+        ],
     },
 ];
 

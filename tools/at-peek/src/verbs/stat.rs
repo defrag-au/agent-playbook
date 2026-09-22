@@ -5,7 +5,7 @@
 //! than counted, because a line count for one is a number that means nothing.
 
 use crate::contract::{iso8601_utc, Fail, Report, MAX_LIMIT};
-use crate::verbs::{open, plural, Opts, Outcome};
+use crate::verbs::{again, open, plural, Opts, Outcome};
 use crate::TOOL;
 
 pub fn run(targets: &[String], opts: &Opts) -> Result<Outcome, Fail> {
@@ -57,6 +57,17 @@ pub fn run(targets: &[String], opts: &Opts) -> Result<Outcome, Fail> {
             opts.limit
         )
     });
+    if shown < targets.len() {
+        report.next(
+            again(
+                opts,
+                "stat",
+                targets,
+                &[format!("--limit {}", targets.len().min(MAX_LIMIT))],
+            ),
+            format!("all {}", plural(targets.len(), "path")),
+        );
+    }
 
     Ok(Outcome::from_report(report))
 }

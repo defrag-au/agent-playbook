@@ -17,7 +17,7 @@ use regex::Regex;
 use crate::contract::{
     secret_shaped, truncate, Fail, Report, MAX_FILES, MAX_LIMIT, MAX_LINE_WIDTH,
 };
-use crate::verbs::{plural, read_text, Content, Opts, Outcome};
+use crate::verbs::{again, plural, read_text, Content, Opts, Outcome};
 use crate::TOOL;
 
 /// Directory names the walk refuses outright. Not gitignore semantics — the output names what
@@ -174,34 +174,43 @@ pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
         &format!("/{pattern}/ in {scope}"),
     );
 
-    let listed = match mode {
-        Mode::Matches => {
-            for (rel, line, text) in &shown {
-                report.content(format!("{rel}:{line}:{text}"));
-            }
-            shown.len()
+    // The rows, unless the frame was asked for. `--summary` is the coarse answer again: how many
+    // matches, where they are not, and where the walk stopped.
+    let listed = if opts.summary {
+        match mode {
+            Mode::Matches => total,
+            Mode::Count | Mode::FilesOnly => counted.len(),
         }
-        Mode::Count => {
-            // Both columns are padded, so a column of counts can be compared by eye. The
-            // widths come from the rows actually listed, so a limit does not leave a gap on
-            // every line.
-            let rows = &counted[..counted.len().min(opts.limit)];
-            let paths = rows.iter().map(|(rel, _)| rel.len()).max().unwrap_or(0);
-            let hits = rows
-                .iter()
-                .map(|(_, hits)| hits.to_string().len())
-                .max()
-                .unwrap_or(1);
-            for (rel, count) in rows {
-                report.content(format!("{rel:<paths$}  {count:>hits$}"));
+    } else {
+        match mode {
+            Mode::Matches => {
+                for (rel, line, text) in &shown {
+                    report.content(format!("{rel}:{line}:{text}"));
+                }
+                shown.len()
             }
-            rows.len()
-        }
-        Mode::FilesOnly => {
-            for (rel, _) in counted.iter().take(opts.limit) {
-                report.content(rel.clone());
+            Mode::Count => {
+                // Both columns are padded, so a column of counts can be compared by eye. The
+                // widths come from the rows actually listed, so a limit does not leave a gap on
+                // every line.
+                let rows = &counted[..counted.len().min(opts.limit)];
+                let paths = rows.iter().map(|(rel, _)| rel.len()).max().unwrap_or(0);
+                let hits = rows
+                    .iter()
+                    .map(|(_, hits)| hits.to_string().len())
+                    .max()
+                    .unwrap_or(1);
+                for (rel, count) in rows {
+                    report.content(format!("{rel:<paths$}  {count:>hits$}"));
+                }
+                rows.len()
             }
-            counted.len().min(opts.limit)
+            Mode::FilesOnly => {
+                for (rel, _) in counted.iter().take(opts.limit) {
+                    report.content(rel.clone());
+                }
+                counted.len().min(opts.limit)
+            }
         }
     };
 
@@ -226,9 +235,92 @@ pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
             "caveat: {truncated_lines} line(s) wider than {MAX_LINE_WIDTH} characters, truncated"
         ));
     }
-    report.bound(coverage(mode, listed, &counted, total, opts.limit));
+    let mut coverage = coverage(mode, listed, &counted, total, opts.limit);
+    if opts.summary && listed > 0 {
+        coverage.push_str(", not shown");
+    }
+    report.bound(coverage);
+    exits(
+        &mut report,
+        opts,
+        mode,
+        pattern,
+        named,
+        listed,
+        &walk,
+        total,
+        &counted,
+    );
 
-    Ok(Outcome::from_report(report))
+    // A summary found the matches it is counting without printing them, so the frame is the answer.
+    // With nothing found there is no frame to be the answer to, and the honest code is the ordinary
+    // "nothing to show".
+    Ok(if opts.summary && listed > 0 {
+        Outcome::from_frame(report)
+    } else {
+        Outcome::from_report(report)
+    })
+}
+
+/// The exits: the body a summary withheld, or a listing the limit cut, then a walk that stopped.
+///
+/// The mode flag travels with the exit, because `--count` and `--files-only` are different answers
+/// to the same question and a widen that quietly returned the other one would not be the same read.
+/// A walk that stopped has no count to name, so the suggested ceiling is twice the one that
+/// stopped it — stated in the reason, because a number nobody can derive should say where it came
+/// from.
+fn exits(
+    report: &mut Report,
+    opts: &Opts,
+    mode: Mode,
+    pattern: &str,
+    named: &[String],
+    listed: usize,
+    walk: &Walk,
+    total: usize,
+    counted: &[(String, usize)],
+) {
+    let mut targets: Vec<String> = vec![pattern.to_string()];
+    targets.extend(named.iter().cloned());
+    let shape: Vec<String> = match mode {
+        Mode::Matches => Vec::new(),
+        Mode::Count => vec!["--count".to_string()],
+        Mode::FilesOnly => vec!["--files-only".to_string()],
+    };
+
+    let rows = match mode {
+        Mode::Matches => total,
+        Mode::Count | Mode::FilesOnly => counted.len(),
+    };
+    // The rows are matches in one mode and files in the others, and a widen that promised the wrong
+    // noun would be describing a different answer.
+    let all = match mode {
+        Mode::Matches => format!("all {}", matches(rows)),
+        Mode::Count | Mode::FilesOnly => format!("all {}", plural(rows, "file")),
+    };
+
+    if opts.summary {
+        // The frame withheld the rows, so the rows are what it offers; a widen would say nothing,
+        // because the frame already counted everything there is.
+        if rows > 0 {
+            let mut flags = shape.clone();
+            flags.push(format!("--limit {}", rows.min(MAX_LIMIT)));
+            report.next(again(opts, "search", &targets, &flags), all);
+        }
+    } else if listed < rows {
+        let mut flags = shape.clone();
+        flags.push(format!("--limit {}", rows.min(MAX_LIMIT)));
+        report.next(again(opts, "search", &targets, &flags), all);
+    }
+
+    if walk.capped {
+        let mut flags = shape;
+        flags.push(format!(
+            "--max-files {}",
+            opts.max_files.saturating_mul(2).min(MAX_FILES)
+        ));
+        report.next(again(opts, "search", &targets, &flags), "twice the walk");
+    }
 }
 
 /// Depth-first, one directory at a time, in sorted order, so the same tree always produces the

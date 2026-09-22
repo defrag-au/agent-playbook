@@ -67,6 +67,31 @@ fn content_lines(text: &str) -> usize {
     text.lines().filter(|line| !line.starts_with('#')).count()
 }
 
+/// The exits an answer printed, as `(command, why)`.
+fn printed_exits(text: &str) -> Vec<(String, String)> {
+    text.lines()
+        .filter_map(|line| line.strip_prefix("# next: "))
+        .map(|line| match line.split_once(" · ") {
+            Some((command, why)) => (command.to_string(), why.to_string()),
+            None => (line.to_string(), String::new()),
+        })
+        .collect()
+}
+
+/// Run one of the tool's own exits exactly as it was printed, through a shell — because an exit is
+/// a command line, quoting included, and the property under test is that the printed text runs.
+fn run_printed(command: &str) -> Output {
+    let directory = Path::new(BIN).parent().expect("binary directory");
+    let path = format!(
+        "{}:{}",
+        directory.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let mut shell = Command::new("sh");
+    shell.arg("-c").arg(command).env("PATH", path);
+    shell.output().expect("run an exit")
+}
+
 fn numbered_lines(n: usize) -> String {
     (1..=n)
         .map(|i| format!("line {i}"))
@@ -102,7 +127,14 @@ fn a_slice_always_states_how_much_of_the_file_it_is() {
         text.contains("2 of 4 lines"),
         "the file is bigger than the window: {text}"
     );
-    assert!(text.contains("for the rest"), "and how to widen: {text}");
+    // The rest of the file is offered as a command rather than as prose inside the bound: the
+    // reader should be able to continue without composing the range themselves.
+    assert!(
+        printed_exits(&text)
+            .iter()
+            .any(|(command, _)| command.contains("slice src/one.rs:4-4")),
+        "and how to widen: {text}"
+    );
 }
 
 #[test]
@@ -119,6 +151,129 @@ fn no_output_exceeds_the_cap() {
         "the default cap is the contract: {text}"
     );
     assert!(text.contains("200 of 5000 lines"), "{text}");
+}
+
+#[test]
+fn every_printed_exit_is_a_command_that_runs() {
+    // An exit that names a flag the parser refuses, or a target it cannot read, is worse than no
+    // exit: the reader trusts it, runs it, and eats the failure.
+    let fixture = Fixture::new("exits-run");
+    fixture.write("a.txt", &numbered_lines(40));
+    fixture.write("b.txt", &numbered_lines(40));
+    fixture.write("many.txt", &numbered_lines(3000));
+
+    let mut checked = 0;
+    for (verb, args) in [
+        ("stat", vec!["a.txt", "b.txt", "many.txt", "--limit", "2"]),
+        ("slice", vec!["a.txt", "b.txt", "--limit", "5"]),
+        ("slice", vec!["many.txt", "--limit", "20"]),
+        ("slice", vec!["a.txt:1-3"]),
+        ("search", vec!["line", "--limit", "2"]),
+        ("search", vec!["line", "--count", "--limit", "1"]),
+        ("search", vec!["line", "--max-files", "2"]),
+    ] {
+        let out = at_peek(fixture.path(), verb, &args);
+        let text = stdout(&out);
+        let exits = printed_exits(&text);
+        assert!(!exits.is_empty(), "{verb} {args:?} printed no exit: {text}");
+        for (command, why) in exits {
+            assert!(command.starts_with("at-peek "), "{command}");
+            assert!(!why.is_empty(), "{command} has no reason attached");
+            let ran = run_printed(&command);
+            assert_eq!(
+                ran.status.code(),
+                Some(0),
+                "`{command}` asked again did not answer: {} {}",
+                stdout(&ran),
+                stderr(&ran)
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked >= 5, "only {checked} exits were exercised");
+}
+
+#[test]
+fn stat_names_the_paths_a_limit_cut() {
+    let fixture = Fixture::new("stat-cut");
+    fixture.write("a.txt", "one\n");
+    fixture.write("b.txt", "one\n");
+
+    let out = at_peek(fixture.path(), "stat", &["a.txt", "b.txt", "--limit", "1"]);
+    let text = stdout(&out);
+
+    assert!(text.contains("1 of 2 paths"), "{text}");
+    let exits = printed_exits(&text);
+    assert_eq!(exits.len(), 1, "{exits:?}");
+    assert!(exits[0].0.contains("a.txt b.txt --limit 2"), "{exits:?}");
+}
+
+#[test]
+fn a_search_summary_is_the_count_without_the_listing() {
+    let fixture = Fixture::new("search-summary");
+    fixture.write("a.txt", "needle one\nother\nneedle two\n");
+    fixture.write("b.txt", "needle three\n");
+
+    let out = at_peek(fixture.path(), "search", &["needle", "--summary"]);
+    let text = stdout(&out);
+
+    assert_eq!(
+        content_lines(&text),
+        0,
+        "the frame is the answer here: {text}"
+    );
+    assert!(text.contains("3 matches in 2 files, not shown"), "{text}");
+    // The one exit is the same question in full, in the shape that was asked for.
+    let exits = printed_exits(&text);
+    assert_eq!(exits.len(), 1, "{exits:?}");
+    assert!(exits[0].0.contains("needle --limit 3"), "{exits:?}");
+    assert_eq!(exits[0].1, "all 3 matches");
+}
+
+#[test]
+fn a_search_widen_keeps_the_shape_it_was_asked_in() {
+    let fixture = Fixture::new("search-shape");
+    fixture.write("a.txt", "needle\n");
+    fixture.write("b.txt", "needle\n");
+
+    let count = stdout(&at_peek(
+        fixture.path(),
+        "search",
+        &["needle", "--count", "--limit", "1"],
+    ));
+    let exits = printed_exits(&count);
+    assert!(
+        exits[0].0.contains("--count") && exits[0].0.contains("--limit 2"),
+        "a widen of --count is still --count: {exits:?}"
+    );
+    assert_eq!(
+        exits[0].1, "all 2 files",
+        "the rows are files here: {exits:?}"
+    );
+}
+
+#[test]
+fn a_capped_walk_offers_a_wider_walk_and_says_where_the_number_came_from() {
+    let fixture = Fixture::new("search-capped");
+    for index in 0..8 {
+        fixture.write(&format!("f{index}.txt"), "needle\n");
+    }
+
+    let text = stdout(&at_peek(
+        fixture.path(),
+        "search",
+        &["needle", "--max-files", "2", "--summary"],
+    ));
+
+    assert!(text.contains("stopped after 2 files considered"), "{text}");
+    // The body the summary withheld, and the wider walk. Two exits, and the second says where its
+    // number came from.
+    let exits = printed_exits(&text);
+    assert_eq!(exits.len(), 2, "{exits:?}");
+    assert!(exits[0].0.contains("--limit 2"), "{exits:?}");
+    let walk = &exits[1];
+    assert!(walk.0.contains("--max-files 4"), "{exits:?}");
+    assert_eq!(walk.1, "twice the walk");
 }
 
 #[test]
@@ -176,8 +331,8 @@ fn the_limit_is_shared_across_targets() {
         "a batch cannot print more than the cap: {text}"
     );
     assert!(
-        text.contains("next: at-peek slice b.txt:2-4"),
-        "a mid-target cut resumes: {text}"
+        text.contains("next: at-peek slice b.txt:2-4 c.txt"),
+        "a mid-target cut resumes, and carries the target it never reached: {text}"
     );
     assert!(
         text.contains("1 target not shown"),

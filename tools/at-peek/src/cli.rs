@@ -186,7 +186,8 @@ fn parse(verb: &'static Verb, args: &[String]) -> Result<Parsed, Fail> {
 }
 
 fn options(parsed: &Parsed) -> Result<Opts, Fail> {
-    let root = match parsed.value("--root") {
+    let named_root = parsed.value("--root").map(str::to_string);
+    let root = match &named_root {
         Some(path) => Root::at(Path::new(path))?,
         None => {
             let cwd = std::env::current_dir().map_err(|e| {
@@ -234,10 +235,12 @@ fn options(parsed: &Parsed) -> Result<Opts, Fail> {
 
     Ok(Opts {
         root,
+        root_was_explicit: named_root.is_some(),
         limit,
         limit_clamped_from,
         max_files,
         max_files_clamped_from,
         include_secret_paths: parsed.has("--include-secret-paths"),
+        summary: parsed.has("--summary"),
     })
 }

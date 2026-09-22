@@ -31,8 +31,8 @@ targets:
   you report the finding: `# 50 of 143` is the difference between a fact and a guess.
 - A `# next:` line is the next question, already spelled as a command. Run it as printed rather
   than composing your own — it is the read you just made, widened or deepened.
-- Several questions in one turn → `at-recall … --summary` (the frame: what was read, what was cut,
-  what to ask next), and several targets in one invocation (`diff <path> <path>`, `slice
+- Several questions in one turn → ask for the frame (`--summary`: the counts, bounds and exits,
+  without the rows) and put several targets in one invocation (`diff <path> <path>`, `slice
   <path>:40-60 <path>:1-20`) rather than a loop. Never `| tail -3`: a tail is a bound you did not
   read, and the bound is the part that makes the answer reportable.
 - The tools are for understanding, not for preparing an edit. Read the file with the editor tools

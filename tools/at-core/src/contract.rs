@@ -113,7 +113,7 @@ impl Report {
         self.lines.push(format!("# {}", line.into()));
     }
 
-    /// The next question, printed as the command that asks it.
+    /// A next question, printed as the command that asks it.
     ///
     /// The third kind of line: not content, not a bound. A bound says what was *not* shown; an exit
     /// says what to ask next, and says it as something the reader can run rather than as something
@@ -126,9 +126,9 @@ impl Report {
     /// * **It continues the question just asked.** The same binary, the same comparison, widened or
     ///   deepened. A command that switched to a different tool would be a suggestion, and
     ///   suggestions belong in the rule where they can be argued with.
-    /// * **It is built from the parts of the invocation that produced it**, so it cannot name a
-    ///   flag the parser would refuse, and cannot quietly point somewhere else — an exit drops the
-    ///   caller's `--root` only by being wrong.
+    /// * **It is built from the parts of the invocation that produced it** — [`again`] does that, so
+    ///   an exit cannot name a flag the parser would refuse, and cannot quietly point somewhere
+    ///   else: an exit drops the caller's `--root` only by being wrong.
     /// * **There are at most two, in one order:** widen an answer that was cut, then read the part
     ///   that was held back. An answer with nothing cut and nothing further to read offers none.
     pub fn next(&mut self, command: impl Into<String>, why: impl Into<String>) {
@@ -203,6 +203,52 @@ pub fn plural_of(count: usize, singular: &str, plural: &str) -> String {
     } else {
         format!("{count} {plural}")
     }
+}
+
+/// The caller's own invocation, asked again with one thing changed — the same question, widened or
+/// deepened.
+///
+/// Shared, because an exit has to be spellable the same way in every tool: it is a command line a
+/// reader may paste, so a path with a space comes back quoted, and `root` is echoed whenever the
+/// caller named one — an exit that dropped a `--root` would read a different tree and answer about
+/// it with a straight face.
+///
+/// `positionals` carries the revision and paths the caller gave, in the order they gave them, and
+/// `flags` only what changes about this asking. Nothing is assumed: what is not passed is not
+/// printed.
+pub fn again(
+    tool: &str,
+    verb: &str,
+    positionals: &[String],
+    flags: &[String],
+    root: Option<&str>,
+) -> String {
+    let mut command = format!("{tool} {verb}");
+    for part in positionals {
+        command.push(' ');
+        command.push_str(&quoted(part));
+    }
+    for flag in flags {
+        command.push(' ');
+        command.push_str(flag);
+    }
+    if let Some(root) = root {
+        command.push_str(&format!(" --root {}", quoted(root)));
+    }
+    command
+}
+
+/// Single quotes when a shell would need them, and only then — an exit should read like the command
+/// a person would type, not like a serialised argument list. `'` is closed and reopened, which is
+/// the only escape a single-quoted shell word needs.
+fn quoted(part: &str) -> String {
+    let plain = part
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "._/-~=:,+^@{}()[]".contains(c));
+    if plain {
+        return part.to_string();
+    }
+    format!("'{}'", part.replace('\'', "'\\''"))
 }
 
 /// Whether a file name is secret-shaped, and which rule matched.
@@ -368,6 +414,34 @@ mod tests {
         assert_eq!(
             report.render(),
             "# next: at-recall diff --patch · the hunks\n"
+        );
+    }
+
+    #[test]
+    fn an_exit_command_quotes_only_what_needs_it() {
+        assert_eq!(quoted("src/main.rs"), "src/main.rs");
+        assert_eq!(quoted("HEAD~1..HEAD"), "HEAD~1..HEAD");
+        assert_eq!(quoted("src/my file.rs"), "'src/my file.rs'");
+        // `'` inside single quotes: closed, escaped, reopened — what a shell needs, and nothing
+        // more elaborate than a person would type.
+        assert_eq!(quoted("it's.rs"), r"'it'\''s.rs'");
+    }
+
+    #[test]
+    fn an_exit_carries_the_parts_it_was_given_and_nothing_else() {
+        assert_eq!(
+            again(
+                "at-recall",
+                "diff",
+                &["HEAD".to_string(), "src/a.rs".to_string()],
+                &["--patch".to_string()],
+                Some("/tmp/a b"),
+            ),
+            "at-recall diff HEAD src/a.rs --patch --root '/tmp/a b'"
+        );
+        assert_eq!(
+            again("at-peek", "slice", &["src/a.rs:1-5".to_string()], &[], None),
+            "at-peek slice src/a.rs:1-5"
         );
     }
 
