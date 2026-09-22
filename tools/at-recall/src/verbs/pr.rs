@@ -14,9 +14,10 @@
 //!   cut says so underneath.
 //! * **Recipes are code, not configuration.** The sections are named in the catalogue, so `--with`
 //!   selects from a set a reviewer can read.
-//! * **One trust tier.** It reads commits and no working-tree file, so the filter-driver refusal
-//!   that guards `diff` cannot apply here — there is no conversion for a repository to name a
-//!   program for.
+//! * **One trust tier.** It reads commits and the worktree's *status*, and no working-tree file:
+//!   `git status` reports a path as changed from what it can see without converting the file into
+//!   the blob it would commit, so there is no conversion for a repository to name a program for and
+//!   the filter-driver refusal that guards `diff` cannot apply here.
 //!
 //! What it does not do: write the description. The reason a change exists is the one thing here that
 //! is not derivable from the repository, and that is the reader's to supply.
@@ -26,6 +27,7 @@ use at_core::contract::{Exit, Fail, Report, MAX_LIMIT};
 use crate::catalogue::PR_SECTIONS;
 use crate::facts::{self, FileStat};
 use crate::git::Noun;
+use crate::status::Status;
 use crate::verbs::{again, plural, Budget, Opts, Outcome};
 use crate::TOOL;
 
@@ -48,6 +50,17 @@ pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
     report.bound(format!(
         "caveat: {base} is a local ref and this tool never fetches — the remote may be ahead"
     ));
+    // A branch's commits are not the whole change set, and work still sitting in the working tree is
+    // what a reader writing the description from this is likeliest to leave out. Untracked paths are
+    // deliberately not counted: they have no version in HEAD to have changed from, and a repository
+    // with a directory of half-written notes would then carry this caveat forever.
+    let uncommitted = Status::read_tracked(&opts.git)?.tracked_changes();
+    if uncommitted > 0 {
+        report.bound(format!(
+            "caveat: {} changed since HEAD and not in {commit_range} · at-recall state names them",
+            plural(uncommitted, "tracked path")
+        ));
+    }
 
     let commits = if wanted.commits {
         Some(facts::commits(&opts.git, &commit_range, &[], opts.limit)?)

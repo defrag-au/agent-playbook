@@ -60,20 +60,34 @@ impl Status {
         Status::read_paths(git, &[])
     }
 
+    /// The tracked paths only, for a caller whose question is "does HEAD's version of any file
+    /// differ from what is on disk". Untracked names are one of `state`'s answers, and producing
+    /// them means walking every untracked directory — so this asks git not to do that walk rather
+    /// than filtering its result afterwards.
+    ///
+    /// It is also the read with no conversion in it. `git status` reports a path as modified from
+    /// what it can see without turning the file into the blob it would commit, which is what makes
+    /// this safe to run in a repository that names a `clean` filter — unlike a comparison against
+    /// the working tree, which has to convert the file and is why `diff` refuses one.
+    pub fn read_tracked(git: &Git) -> Result<Status, Fail> {
+        Status::read_with(git, &[], "no")
+    }
+
     /// The state of the paths a caller named, or of the whole worktree when none were.
     /// `--untracked-files=normal` is explicit because it is a repository setting
     /// (`status.showUntrackedFiles`), and a repository that had turned it off would otherwise make
     /// this report a clean tree that is not clean.
     pub fn read_paths(git: &Git, paths: &[String]) -> Result<Status, Fail> {
-        let mut args: Vec<String> = [
-            "--porcelain=v2",
-            "--branch",
-            "--untracked-files=normal",
-            "-z",
-        ]
-        .iter()
-        .map(|flag| (*flag).to_string())
-        .collect();
+        Status::read_with(git, paths, "normal")
+    }
+
+    fn read_with(git: &Git, paths: &[String], untracked: &str) -> Result<Status, Fail> {
+        let mut args: Vec<String> = vec![
+            "--porcelain=v2".to_string(),
+            "--branch".to_string(),
+            format!("--untracked-files={untracked}"),
+            "-z".to_string(),
+        ];
         with_paths(&mut args, paths);
         let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
         Status::parse(&git.run(Noun::Status, &borrowed)?)
@@ -201,11 +215,21 @@ impl Status {
             .collect()
     }
 
+    /// How many *tracked* paths differ from HEAD — the count of what a commit does not contain.
+    /// Untracked is excluded: an untracked file has no version in HEAD to have changed from, and a
+    /// repository with a directory of half-written notes would otherwise carry a caveat forever.
+    pub fn tracked_changes(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|entry| entry.code != "??")
+            .count()
+    }
+
     /// Whether any *tracked* path has changed. Untracked is the one kind a diff between commits
     /// cannot show, so a worktree of nothing but untracked files has no diff to offer — which is
     /// why `state`'s exit is conditional rather than unconditional.
     pub fn tracks_changes(&self) -> bool {
-        self.entries.iter().any(|entry| entry.code != "??")
+        self.tracked_changes() > 0
     }
 
     pub fn unparsed(&self) -> usize {

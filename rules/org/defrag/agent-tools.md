@@ -43,10 +43,12 @@ targets:
   they are separate binaries, and why they are separate approvals if I have tiered them.
 - A **recipe** is one verb that composes the reads its sibling verbs use, so a count cannot disagree
   with the listing beside it: `at-recall pr` answers "write me a PR description" with the base, the
-  branch's commits and the diffstat by kind. Ask for the recipe rather than composing the sequence —
-  `pr --with commits,diffstat,areas` selects sections, and its `# next:` lines name the primitives
-  (`log`, `diff`) when you want the detail behind it. It prints the facts a description is written
-  from and does not write the description: why a change exists is not in the repository.
+  branch's commits and the diffstat by kind, and a caveat naming tracked files that have changed
+  since HEAD — those are in no commit, and a description written from the branch alone leaves them
+  out. Ask for the recipe rather than composing the sequence — `pr --with commits,diffstat,areas`
+  selects sections, and its `# next:` lines name the primitives (`log`, `diff`) when you want the
+  detail behind it. It prints the facts a description is written from and does not write the
+  description: why a change exists is not in the repository.
 - `at-recall` answers `state`, `log`, `diff` and the `pr` recipe. `blame`, `show` and `churn`, and the
   `review` and `release` recipes, are designed and not written — ask for the one you want rather than
   reaching for `git`, and name the question, because that is what turns it into a verb.

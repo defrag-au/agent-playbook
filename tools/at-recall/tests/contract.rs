@@ -856,6 +856,10 @@ fn pr_answers_for_the_whole_branch_in_one_read() {
         text.contains("areas      2 files · 1 docs · 1 code"),
         "{text}"
     );
+    assert!(
+        !text.contains("changed since HEAD"),
+        "a clean working tree says nothing about one: {text}"
+    );
     // Nothing was cut, so no total line and no widen: the answer is complete and says nothing about
     // limits, which is what "no bound" has to look like.
     assert!(!text.contains("reached"), "{text}");
@@ -1023,6 +1027,49 @@ fn pr_states_the_whitespace_delta_without_being_asked() {
 }
 
 #[test]
+fn pr_says_when_the_working_tree_holds_work_no_commit_has() {
+    // The catch that matters most when the answer is used to write a description: a branch's commits
+    // are not the whole change set. Untracked files are deliberately not counted — they have no
+    // version in HEAD to differ from, and a repository with a directory of half-written notes would
+    // otherwise carry this caveat forever.
+    let repo = branched("pr-uncommitted");
+    repo.write("notes/scratch.md", "half a thought\n");
+
+    let untracked = stdout(&at_recall(repo.path(), &["pr", "--base", "main"]));
+    assert!(untracked.contains("commits    2 commits"), "{untracked}");
+    assert!(
+        !untracked.contains("changed since HEAD"),
+        "an untracked file is not a change a commit is missing: {untracked}"
+    );
+
+    repo.write("src/a.rs", "one\ntwo\nthree\n");
+    repo.write(
+        "Cargo.toml",
+        "[package]\nname = \"fixture\"\nedition = \"2021\"\n",
+    );
+    let two = stdout(&at_recall(repo.path(), &["pr", "--base", "main"]));
+    assert!(
+        two.contains("caveat: 2 tracked paths changed since HEAD and not in main..HEAD"),
+        "{two}"
+    );
+
+    // The caveat is about the whole answer, not about the section that would have shown the files.
+    let areas = stdout(&at_recall(
+        repo.path(),
+        &["pr", "--base", "main", "--with", "areas"],
+    ));
+    assert!(areas.contains("changed since HEAD"), "{areas}");
+
+    // And it holds the singular, because one line either way is what makes it read as a sentence.
+    repo.git(&["checkout", "--", "Cargo.toml"]);
+    let one = stdout(&at_recall(repo.path(), &["pr", "--base", "main"]));
+    assert!(
+        one.contains("caveat: 1 tracked path changed since HEAD and not in main..HEAD"),
+        "{one}"
+    );
+}
+
+#[test]
 fn a_repository_filter_does_not_stop_the_pr_recipe() {
     // `diff` refuses a repository that configures a clean filter because reading the working tree
     // would run a program the repository names. This recipe reads commits and the diff between two
@@ -1044,10 +1091,19 @@ fn a_repository_filter_does_not_stop_the_pr_recipe() {
     // for — so the evidence is cleared immediately before the tool is asked anything. Clearing it
     // earlier would leave `git add -A` to put it back, and the test would pass on its own setup.
     repo.forget("filter");
+    // The path the filter covers is modified and uncommitted, which is the read the caveat needs:
+    // `git status` has to report it without converting it, or the recipe would run the repository's
+    // program to answer a question about the branch.
+    repo.write("a.foo", "one\ntwo\n");
 
     let out = at_recall(repo.path(), &["pr", "--base", "main"]);
     assert_eq!(code(&out), 0, "{} {}", stdout(&out), stderr(&out));
     assert!(stdout(&out).contains("src/a.rs"), "{}", stdout(&out));
+    assert!(
+        stdout(&out).contains("caveat: 1 tracked path changed since HEAD"),
+        "the uncommitted path is reported without being read: {}",
+        stdout(&out)
+    );
     assert!(
         !repo.ran("filter"),
         "the recipe ran a program the repository named"

@@ -273,20 +273,21 @@ with the diffstat trimmed — the numbers are the run's, not a sketch:
 $ at-recall pr
 # at-recall pr · cnft.dev-workers · base origin/main
 # caveat: origin/main is a local ref and this tool never fetches — the remote may be ahead
+# caveat: 2 tracked paths changed since HEAD and not in origin/main..HEAD · at-recall state names them
 commits    3 commits
   2ea6ec8e  2026-09-22  Damon Oehlman  .
   d08b3219  2026-09-22  Damon Oehlman  include view art in asset card
   7b4b5543  2026-09-22  Damon Oehlman  experiments with at tooling
 diffstat   17 files, +1463 -539
-  +891 -0    AGENTS.md                                                  docs
-  +169 -229  Cargo.lock                                                 lockfile
-  +55 -55    Cargo.toml                                                 manifest
-  ...
+  +891 -0    AGENTS.md                                                                  docs
+  +169 -229  Cargo.lock                                                                 lockfile
+  +55 -55    Cargo.toml                                                                 manifest
+  ... (14 more rows)
 areas      17 files · 2 manifest · 2 lockfile · 3 docs · 10 code
 # next: at-recall diff origin/main...HEAD --patch · the hunks
 ```
 
-Four ways the built verb settled differently from the sketch above, each for the same reason — a
+Five ways the built verb settled differently from the sketch above, each for the same reason — a
 number a reader cannot check is not a fact:
 
 - **The header names the base and not the merge base.** The base is what the reader must judge; the
@@ -298,6 +299,18 @@ number a reader cannot check is not a fact:
   fact a reviewer knows to ask for.
 - **`areas` prints only the kinds that are present.** `0 schema · 0 generated` is a sketch of a
   schema that has no content; the count of kinds absent from a change set is not a fact about it.
+- **It counts the work the commits do not contain**, which the sketch did not have at all and which
+  turned out to matter most in use. A second read of the worktree's *status* — not a comparison
+  against it, which would convert files and so run whatever `clean` filter the repository names —
+  and one line when tracked paths differ from HEAD:
+
+```
+# caveat: 2 tracked paths changed since HEAD and not in main..HEAD · at-recall state names them
+```
+
+Untracked paths are excluded. They have no version in HEAD to differ from, and a repository holding
+a directory of half-written design notes would otherwise carry that caveat on every run — which is
+the shape of a warning a reader learns to skip.
 
 Two that hold as designed: the base resolution order (`--base`, then the branch's upstream, then
 `origin/HEAD`, then a refusal naming `--base`) and the exit naming primitives rather than the recipe

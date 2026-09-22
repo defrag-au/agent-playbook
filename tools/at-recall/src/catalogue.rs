@@ -120,11 +120,14 @@ pub static VERBS: &[Verb] = &[
                 (the change set by kind, which is what the first paragraph of a description is \
                 written from). The base is `--base`, else the branch's upstream, else `origin/HEAD`; \
                 nothing is fetched, so it is the ref this repository has locally and the output says \
-                so on every run. It prints facts and never conclusions — a path's kind comes from \
-                its name, not its contents — and it does not write the description, because why the \
-                change exists is the one fact not in the repository. Every section carries its \
-                count, so a cut section says what it was cut from, and a branch with nothing on top \
-                of its base exits 1 rather than 0: there is no description to write.",
+                so on every run. It also says when tracked paths have changed since HEAD, because \
+                those are in no commit and a description written from this would leave them out \
+                (untracked paths are not counted — they have no version in HEAD to differ from). It \
+                prints facts and never conclusions — a path's kind comes from its name, not its \
+                contents — and it does not write the description, because why the change exists is \
+                the one fact not in the repository. Every section carries its count, so a cut \
+                section says what it was cut from, and a branch with nothing on top of its base \
+                exits 1 rather than 0: there is no description to write.",
         flags: &[BASE, WITH, LIMIT, ROOT, HOW],
     },
 ];

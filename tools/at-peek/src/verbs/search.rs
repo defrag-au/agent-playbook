@@ -68,11 +68,33 @@ struct Walk {
     unreadable: usize,
 }
 
+/// What was asked: the pattern, and the paths named after it. Kept together because an exit has to
+/// repeat both to be the same question — a widen that dropped a named path would search somewhere
+/// else and call it the same read.
+struct Query<'a> {
+    pattern: &'a str,
+    named: &'a [String],
+}
+
+/// What the walk found, as the numbers a bound and an exit are written from. Grouped because they
+/// are read together and mean nothing apart: `listed` is rows printed, `total` is matches over every
+/// file considered, and the two differ only by the limit.
+struct Findings<'a> {
+    listed: usize,
+    total: usize,
+    counted: &'a [(String, usize)],
+    walk: &'a Walk,
+}
+
 pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
     let Some((pattern, named)) = paths.split_first() else {
         return Err(Fail::usage(
             "`search` needs a pattern · at-peek search <pattern> [path…]",
         ));
+    };
+    let query = Query {
+        pattern, // `&String` derefs to the `&str` an exit is built from
+        named,
     };
     let regex = Regex::new(pattern).map_err(|e| {
         Fail::usage(format!(
@@ -235,22 +257,18 @@ pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
             "caveat: {truncated_lines} line(s) wider than {MAX_LINE_WIDTH} characters, truncated"
         ));
     }
-    let mut coverage = coverage(mode, listed, &counted, total, opts.limit);
+    let found = Findings {
+        listed,
+        total,
+        counted: &counted,
+        walk: &walk,
+    };
+    let mut coverage = coverage(mode, &found, opts.limit);
     if opts.summary && listed > 0 {
         coverage.push_str(", not shown");
     }
     report.bound(coverage);
-    exits(
-        &mut report,
-        opts,
-        mode,
-        pattern,
-        named,
-        listed,
-        &walk,
-        total,
-        &counted,
-    );
+    exits(&mut report, opts, mode, &query, &found);
 
     // A summary found the matches it is counting without printing them, so the frame is the answer.
     // With nothing found there is no frame to be the answer to, and the honest code is the ordinary
@@ -269,19 +287,9 @@ pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
 /// A walk that stopped has no count to name, so the suggested ceiling is twice the one that
 /// stopped it — stated in the reason, because a number nobody can derive should say where it came
 /// from.
-fn exits(
-    report: &mut Report,
-    opts: &Opts,
-    mode: Mode,
-    pattern: &str,
-    named: &[String],
-    listed: usize,
-    walk: &Walk,
-    total: usize,
-    counted: &[(String, usize)],
-) {
-    let mut targets: Vec<String> = vec![pattern.to_string()];
-    targets.extend(named.iter().cloned());
+fn exits(report: &mut Report, opts: &Opts, mode: Mode, query: &Query, found: &Findings) {
+    let mut targets: Vec<String> = vec![query.pattern.to_string()];
+    targets.extend(query.named.iter().cloned());
     let shape: Vec<String> = match mode {
         Mode::Matches => Vec::new(),
         Mode::Count => vec!["--count".to_string()],
@@ -289,8 +297,8 @@ fn exits(
     };
 
     let rows = match mode {
-        Mode::Matches => total,
-        Mode::Count | Mode::FilesOnly => counted.len(),
+        Mode::Matches => found.total,
+        Mode::Count | Mode::FilesOnly => found.counted.len(),
     };
     // The rows are matches in one mode and files in the others, and a widen that promised the wrong
     // noun would be describing a different answer.
@@ -307,13 +315,13 @@ fn exits(
             flags.push(format!("--limit {}", rows.min(MAX_LIMIT)));
             report.next(again(opts, "search", &targets, &flags), all);
         }
-    } else if listed < rows {
+    } else if found.listed < rows {
         let mut flags = shape.clone();
         flags.push(format!("--limit {}", rows.min(MAX_LIMIT)));
         report.next(again(opts, "search", &targets, &flags), all);
     }
 
-    if walk.capped {
+    if found.walk.capped {
         let mut flags = shape;
         flags.push(format!(
             "--max-files {}",
@@ -406,38 +414,33 @@ fn skip_bound(
     }
 }
 
-fn coverage(
-    mode: Mode,
-    listed: usize,
-    counted: &[(String, usize)],
-    total: usize,
-    limit: usize,
-) -> String {
-    let files = plural(counted.len(), "file");
-    let hits = matches(total);
+fn coverage(mode: Mode, found: &Findings, limit: usize) -> String {
+    let files = plural(found.counted.len(), "file");
+    let hits = matches(found.total);
+    let rows = found.counted.len();
     match mode {
         Mode::Matches => {
-            if listed < total {
-                format!("{listed} of {hits} in {files} · --limit {limit}")
+            if found.listed < found.total {
+                format!("{} of {hits} in {files} · --limit {limit}", found.listed)
             } else {
                 format!("{hits} in {files}")
             }
         }
         Mode::Count => {
-            if listed < counted.len() {
+            if found.listed < rows {
                 format!(
-                    "{hits} in {files} · {listed} of {} files shown (--limit {limit})",
-                    counted.len()
+                    "{hits} in {files} · {} of {rows} files shown (--limit {limit})",
+                    found.listed
                 )
             } else {
                 format!("{hits} in {files}")
             }
         }
         Mode::FilesOnly => {
-            if listed < counted.len() {
+            if found.listed < rows {
                 format!(
-                    "{files} · {hits} · {listed} of {} shown (--limit {limit})",
-                    counted.len()
+                    "{files} · {hits} · {} of {rows} shown (--limit {limit})",
+                    found.listed
                 )
             } else {
                 format!("{files} · {hits}")

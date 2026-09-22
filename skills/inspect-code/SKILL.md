@@ -123,6 +123,16 @@ path name only, first rule wins — and then the change set by kind:
 `# areas      17 files · 2 manifest · 2 lockfile · 3 docs · 10 code`. It reports unasked when part of
 a diff is nothing but whitespace: `# whitespace only: 1 file, +1 -1 of the lines`.
 
+It also states what the commits do **not** contain, because that is what a description written from
+the branch alone leaves out:
+
+```
+# caveat: 2 tracked paths changed since HEAD and not in main..HEAD · at-recall state names them
+```
+
+Untracked files are not counted — they have no version in HEAD to differ from — so this catches work
+you modified and did not commit, and stays quiet for a directory of half-written notes.
+
 Two things it will not do, and both matter when you write the description:
 
 - **It never fetches.** The base is whatever this repository has locally, and every answer says so:
