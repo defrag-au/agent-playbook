@@ -19,13 +19,19 @@ pub fn render(resolved: &Resolved) -> String {
     // "# Personal instructions — personal", and for a repo block the project name is already
     // in the file's path and in the provenance line below.
     out.push_str(&format!("# {}\n\n", resolved.target.title));
+    // No root path. It was here so a reader could find the playbook that produced the block, and
+    // it read as provenance — but a path is only true on the machine that rendered it, it differs
+    // between a checkout (`/Users/…`) and the packaged copy (`/nix/store/…`), and that difference
+    // made every `check` from a devshell report `stale` against a block that was in fact in sync.
+    // What identifies a rule is the file named in its own comment, which is playbook-relative and
+    // says the same thing everywhere. Which *revision* a block came from is a separate question —
+    // the flake knows its own rev and could bake it in, at the cost of a bump making every
+    // installed block stale by design.
     out.push_str(&format!(
         "Generated from agent-playbook (`projects/{}` + `models/{}`).\n\
-         Rule sources live under `{}` — each heading's HTML comment names its file there.\n\
+         Each rule's source file is named in the comment above its heading.\n\
          To change a rule, change the rule — not this block.\n",
-        resolved.project.name,
-        resolved.target.name,
-        resolved.root.display()
+        resolved.project.name, resolved.target.name
     ));
 
     if !resolved.emphasis.is_empty() {

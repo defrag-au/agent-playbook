@@ -9,9 +9,11 @@ use crate::load::{has_errors, load_addendum, load_memory, load_project, load_rul
 use crate::model::{Activation, Diagnostic, Layer, Project, Rule, Section, Target};
 
 pub struct Resolved {
-    /// The playbook root this was resolved from. Carried so the rendered block can name
-    /// it: the generated file lives in another repository, where a relative link into
-    /// the playbook would be dead on arrival.
+    /// The playbook root this was resolved from. Kept for callers that report where an answer came
+    /// from — `check` names it when it is the packaged copy rather than a checkout. It is
+    /// deliberately **not** rendered into the block: a path is only true on the machine that made
+    /// it, so embedding one made a block installed from a checkout and a block checked against the
+    /// packaged copy differ by that line alone.
     pub root: PathBuf,
     pub project: Project,
     pub target: Target,

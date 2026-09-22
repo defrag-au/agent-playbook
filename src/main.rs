@@ -6,8 +6,8 @@ use std::process::ExitCode;
 
 use playbook::install::{self, Outcome};
 use playbook::load::{
-    census, find_root, included_by_some_target, list_projects, list_targets, load_project,
-    load_target,
+    census, find_root, find_root_with_source, included_by_some_target, list_projects, list_targets,
+    load_project, load_target, RootSource,
 };
 use playbook::model::{Activation, Diagnostic};
 use playbook::render;
@@ -23,6 +23,7 @@ commands
   list       print the resolution table for a project + target
   install    write the block into a repository's agent file
   check      exit 1 if a repository's block is stale
+  root       print the rule tree being resolved against, and how it was found
   projects   list known projects and targets
   rules      list every rule, and which projects activate it
 
@@ -32,7 +33,8 @@ options
   --repo <path>      repository root (install, check)
   --file <name>      filename within the repo (default: the target's default_file)
   --out <file>       write to a file instead of stdout (compose)
-  --root <dir>       playbook root (default: found from the working directory)
+  --root <dir>       playbook root (default: found from the working directory, then
+                     beside the installed binary — `playbook root` says which)
   -h, --help         this
 
 examples
@@ -40,6 +42,7 @@ examples
   playbook compose --project shared-crates --target claude-code
   playbook install --project shared-crates --repo ~/code/defrag/shared-crates
   playbook check --project archivist --repo ~/code/hodlcroft/archivist
+  playbook root
 ";
 
 #[derive(Default)]
@@ -75,6 +78,7 @@ fn main() -> ExitCode {
         "list" => cmd_list(&opts),
         "install" => cmd_install(&opts, false),
         "check" => cmd_install(&opts, true),
+        "root" => cmd_root(&opts),
         "projects" => cmd_projects(&opts),
         "rules" => cmd_rules(&opts),
         other => Err(format!("unknown command `{other}`")),
@@ -126,6 +130,26 @@ fn parse_opts(args: &[String]) -> Result<Opts, String> {
 
 fn root_of(opts: &Opts) -> Result<PathBuf, String> {
     find_root(opts.root.as_deref().map(Path::new))
+}
+
+/// The root and where it came from, for the two commands that report a verdict about a repository.
+fn root_of_with_source(opts: &Opts) -> Result<(PathBuf, RootSource), String> {
+    find_root_with_source(opts.root.as_deref().map(Path::new))
+}
+
+/// Say which tree a verdict came from, when it is not the one the caller is standing in.
+///
+/// `check` against the packaged copy and `check` against the checkout you just edited print the
+/// same `ok`, and only one of them is about your change. Silence when the root came from
+/// `--root`, `PLAYBOOK_ROOT` or the working directory: the caller named it or is in it.
+fn note_root(root: &Path, source: RootSource) {
+    if source.is_packaged() {
+        println!(
+            "# root: {} · {} — pass `--root <checkout>` to resolve against a working tree",
+            root.display(),
+            source.as_str()
+        );
+    }
 }
 
 /// `~/x` to `$HOME/x`. The playbook stores repo paths with a tilde because that is how a
@@ -259,7 +283,8 @@ fn or_dash(list: &[String]) -> String {
 }
 
 fn cmd_install(opts: &Opts, check: bool) -> Result<ExitCode, String> {
-    let root = root_of(opts)?;
+    let (root, source) = root_of_with_source(opts)?;
+    note_root(&root, source);
     let repo = expand_tilde(opts.repo.as_deref().ok_or("`--repo` is required")?);
     if !repo.is_dir() {
         return Err(format!("no such directory: {}", repo.display()));
@@ -328,6 +353,17 @@ fn cmd_install(opts: &Opts, check: bool) -> Result<ExitCode, String> {
             Ok(ExitCode::from(1))
         }
     }
+}
+
+/// Which rule tree is being resolved against, and how it was found.
+///
+/// The composer is installed in every devshell now, so "which copy am I using" is a question
+/// that comes up whenever a rule change does not seem to take effect — and the answer is not
+/// visible in any other command's output.
+fn cmd_root(opts: &Opts) -> Result<ExitCode, String> {
+    let (root, source) = root_of_with_source(opts)?;
+    println!("{} · {}", root.display(), source.as_str());
+    Ok(ExitCode::SUCCESS)
 }
 
 fn cmd_projects(opts: &Opts) -> Result<ExitCode, String> {

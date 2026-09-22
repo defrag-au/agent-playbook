@@ -26,19 +26,27 @@ that pin a toolchain do it through a `flake.nix` devshell — what that means in
 
 ## The agent toolkit
 
-`agent-playbook`'s flake builds a read-only toolkit — `at-peek` (the working tree), `at-recall`
-(history and state) and `at-describe` (the catalogue) — and `defrag-nix` wires it into every defrag
-devshell. A further tool is a line in that flake's `cargoBuildFlags`.
+`agent-playbook`'s flake builds two things, and `defrag-nix` wires both into every defrag devshell:
 
-It is on `PATH` in an **interactive** shell in those repos, because direnv's hook runs on `cd`.
-A shell spawned by an agent does not inherit that environment, so it reaches the toolkit as
-`direnv exec . at-peek …` — which reads the realised `.direnv/` and needs no nix daemon. A `nix
-profile install` of `agent-tools` puts it on `PATH` unconditionally instead.
+- **The inspectors** — `at-peek` (the working tree), `at-recall` (history and state) and
+  `at-describe` (the catalogue). A further tool is a line in that flake's `cargoBuildFlags`.
+- **The composer** — `playbook`, which resolves the rules for a project and target and can
+  `check`/`install` a repository's managed block. It carries its own rule tree, so it needs no
+  checkout: `playbook root` prints which tree it is resolving against and how it found it. A
+  change to a rule reaches a shell only after it is committed and `defrag-nix` re-locks it, so
+  `--root ~/code/defrag/agent-playbook` resolves against the working tree instead.
+
+They are on `PATH` in an **interactive** shell in those repos, because direnv's hook runs on `cd`.
+A shell spawned by an agent does not inherit that environment, so it reaches them as
+`direnv exec . at-peek …` or `direnv exec . playbook check …` — which reads the realised `.direnv/`
+and needs no nix daemon. A `nix profile install` of `agent-tools` puts the inspectors on `PATH`
+unconditionally instead.
 
 `at-peek` has no write path, spawns no subprocess and makes no network calls. `at-recall` has no
-write path either, and runs exactly one program — `git`, with read verbs only. That difference is
-why they are separate binaries, and why they are separate approvals when the grants are tiered.
-Which verb to reach for is `rules/org/defrag/agent-tools`; the traps are the `inspect-code` skill.
+write path either, and runs exactly one program — `git`, with read verbs only. `playbook` writes
+one file, the managed block, and only under `install`. That difference is why they are separate
+binaries, and why they are separate approvals when the grants are tiered. Which verb to reach for is
+`rules/org/defrag/agent-tools`; the traps are the `inspect-code` skill.
 
 ## Where reference material lives
 

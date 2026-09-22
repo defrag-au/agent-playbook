@@ -56,6 +56,12 @@
         };
 
       # The composer: reads rules/ for a project and target and writes a repo's block.
+      #
+      # It carries its own data tree in `share/playbook`, so an installed binary is
+      # self-locating: `rules/`, `models/`, `projects/`, `memory/` and `templates/` are read
+      # relative to the executable when there is no checkout to walk up from. Without this the
+      # only root an installed composer could name is the build directory it was compiled in,
+      # which is gone by the time anyone runs it — see `find_root` in src/load.rs.
       composerFor =
         rustPlatform:
         rustPlatform.buildRustPackage {
@@ -64,6 +70,10 @@
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
           cargoBuildFlags = [ "-p" "agent-playbook" ];
+          postInstall = ''
+            mkdir -p $out/share/playbook
+            cp -R rules models projects memory templates $out/share/playbook/
+          '';
         };
 
       # The at-* toolkit. One derivation for every binary: they are tiers of the same toolkit — a
@@ -142,23 +152,41 @@
         }
       );
 
-      # `nix flake check` runs the suite rather than only evaluating the outputs. The
-      # workspace has no dependencies, so this needs no registry and no vendoring: copy the
-      # source out of the store (read-only) and run the tests from the copy.
+      # `nix flake check` runs the suite rather than only evaluating the outputs.
       checks = forAllSystems (
         system:
         let
           pkgs = pkgsFor system;
+          rustPlatform = rustPlatformFor pkgs;
+          playbook = composerFor rustPlatform;
         in
         {
-          tests = pkgs.runCommand "agent-playbook-tests" {
-            nativeBuildInputs = [ (rustToolchainFor system) ];
-          } ''
-            cp -r ${./.} src
-            chmod -R u+w src
-            cd src
-            export CARGO_HOME="$TMPDIR/cargo"
-            cargo test --workspace --offline --locked
+          # Through `buildRustPackage` rather than a bare `runCommand` with the toolchain on PATH:
+          # the workspace has a real dependency now (`at-peek` uses `regex`), and a bare build has
+          # no registry and no vendoring, so it cannot resolve it — which is what this entry did
+          # from the day the toolkit landed until now. The vendoring here comes from the same
+          # `cargoLock` the packages use.
+          #
+          # `git` is on the PATH for the same reason it is in a devshell: the contract tests drive
+          # the real binary, and the binary runs `git` against a fixture repository.
+          tests = rustPlatform.buildRustPackage {
+            pname = "agent-playbook-tests";
+            version = (lib.importTOML ./Cargo.toml).package.version;
+            src = ./.;
+            cargoLock.lockFile = ./Cargo.lock;
+            nativeBuildInputs = [ pkgs.git ];
+            buildPhase = "cargo build --workspace --offline";
+            doCheck = true;
+            checkPhase = "cargo test --workspace --offline";
+            installPhase = "touch $out";
+          };
+
+          # The composer finds its own rule tree from a directory that is not a checkout. That is
+          # the whole reason the tree ships in `share/playbook`: a packaged binary whose only
+          # fallback was the directory it was compiled in would resolve to nothing, and the
+          # failure would first be seen by whoever ran `playbook check` from a devshell.
+          self-locating = pkgs.runCommand "playbook-self-locating" { } ''
+            ${playbook}/bin/playbook root | grep -q "${playbook}/share/playbook"
             touch $out
           '';
         }

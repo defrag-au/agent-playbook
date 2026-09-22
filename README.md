@@ -132,7 +132,18 @@ playbook rules
 ```
 
 Run it from anywhere inside the playbook (the root is found by walking up), or pass
-`--root`. To build:
+`--root`. `playbook` is also on `PATH` in every defrag devshell — `defrag-nix` wires it in
+alongside the `at-*` toolkit — where it resolves against the rule tree it was packaged with, which
+is what CI wants and what `playbook root` reports:
+
+```sh
+playbook check --project cnft-dev-workers --repo ~/code/defrag/cnft.dev-workers
+playbook root     # /nix/store/…-playbook-0.1.0/share/playbook · the packaged copy
+```
+
+A rule change in this repository reaches a consumer shell after it is committed, pushed, and
+re-locked in `defrag-nix`; until then, `--root ~/code/defrag/agent-playbook` resolves against the
+working tree. To build:
 
 ```sh
 nix develop -c cargo build --release   # or: cargo build --release, if cargo is on PATH
