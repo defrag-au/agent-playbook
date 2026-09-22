@@ -1,3 +1,10 @@
+[workspace]
+members = ["tools/at-peek", "tools/at-describe"]
+resolver = "2"
+# The agent toolkit lives here as separate crates rather than as modules of this one, so the
+# composer keeps its no-dependency property at the crate level: `playbook` is still std-only,
+# and only the tools take dependencies. See docs/inspection-tools.md.
+
 [package]
 name = "agent-playbook"
 version = "0.1.0"

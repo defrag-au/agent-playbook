@@ -5,3 +5,14 @@ version = 4
 [[package]]
 name = "agent-playbook"
 version = "0.1.0"
+
+[[package]]
+name = "at-describe"
+version = "0.1.0"
+dependencies = [
+ "at-peek",
+]
+
+[[package]]
+name = "at-peek"
+version = "0.1.0"

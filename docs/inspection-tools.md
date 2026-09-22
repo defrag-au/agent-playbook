@@ -1,9 +1,10 @@
 # Read-only inspection tools for agents
 
-**Status:** proposal, 2026-09-22, revised same day. Nothing is built, nothing is installed.
-This document is the plan. The rule and skill drafts at the end are deliberately *not* in
-`rules/` or `skills/` yet: a rule whose tool does not exist is an orphan, and
-`no_rule_is_unreachable` fails the suite.
+**Status:** proposal, 2026-09-22; step 1 built the same day. `tools/at-peek` (`stat`, `slice`) and
+`tools/at-describe` exist as workspace members of this repository, with 21 contract tests and no
+external dependencies. Everything else here is still the plan: the remaining verbs, `at-recall`,
+the recipes, and the rule and skill drafts at the end — which are deliberately *not* in `rules/`
+or `skills/` yet, because a rule whose tool is one verb-pair old is a rule nothing can follow.
 
 Output in the sections below is illustrative. The *shapes* are the contract; the values are not.
 In prose, `at-peek` and `at-recall` shorten to `peek` and `recall`; in a command they never do.
@@ -302,8 +303,9 @@ spec, and each one is a test.
    `rendering_is_byte_stable` pins in this repository.
 3. **Self-locating.** `path:line:` prefixes and a header naming the root, verb and target, so a
    transcript line can be cited and a reviewer can see exactly what was read. Multi-root
-   workspaces are explicit: one root per invocation, resolved from the cwd, `--root <name>` to
-   name a sibling.
+   workspaces are explicit: one root per invocation, resolved from the cwd, `--root <path>` to
+   address another tree. The flag takes a *path*, not a name — naming a sibling would need a
+   registry of workspace roots, and a registry is configuration, which a whitelist cannot see.
 4. **Closed flag set.** An unknown flag is exit 2, never a warning. Nothing is forwarded to git,
    no `--` pass-through, no pattern that becomes an option. The complete grammar of what the
    tool can be asked to do is readable in `--help`.
@@ -315,8 +317,10 @@ spec, and each one is a test.
    mirrors the text, defined as ordinary structs — which is also what the tests assert against,
    so the human format can be tuned without breaking the spec.
 8. **Exit codes.** `0` results, `1` nothing found, `2` usage, `3` environment (not a repository,
-   unreadable path). Needing to distinguish "no matches" from "failed" without parsing output is
-   the difference between an agent reporting a fact and reporting a guess.
+   unreadable path), `4` refused (a path outside the root, a secret-shaped path). Needing to
+   distinguish "no matches" from "failed" without parsing output is the difference between an
+   agent reporting a fact and reporting a guess — and `4` is separate from `2` because a refusal
+   is not a mistyped command, and separate from `3` because the path does exist.
 9. **Path containment.** Arguments resolve inside the worktree root; `..` and symlink escapes are
    refused. Absolute paths only if they land inside a known root. There is no cross-root search
    in v1 — a search that silently widened past the approved root would be exactly the approval

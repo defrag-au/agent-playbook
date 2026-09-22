@@ -1,0 +1,12 @@
+[package]
+name = "at-peek"
+version = "0.1.0"
+edition = "2021"
+description = "Tier 1 of the agent toolkit: read-only inspection of the working tree"
+license = "MIT"
+
+# No dependencies, deliberately, and for a stronger reason than the composer's: at-peek is
+# the binary that gets blanket-allowed, so its build has to be auditable by reading it, and
+# its grammar has to stay small enough that an approval over it is total. Both properties
+# survive a dependency only if the dependency is read too. Nothing here needs one yet.
+[dependencies]
