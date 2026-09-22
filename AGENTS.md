@@ -42,15 +42,17 @@ cargo test
 
 Clippy is clean at `-D warnings` and should stay that way.
 
-### The flake, and why it is self-contained
+### The flake
 
-`flake.nix` has one input — `nixpkgs` — and no org flake, so someone who has never heard of
-this org can `nix build` it. It exports `playbook`, `agent-tools` (`at-peek` + `at-describe`),
-a devshell, and a `checks` entry that runs the suite. This was the open question; it is settled
-in favour of transferability, at the cost of a second toolchain definition to maintain.
+`flake.nix` pins the same fenix toolchain `defrag-nix` does, and exports `playbook`,
+`agent-tools` (`at-peek` + `at-describe`), a devshell, and a `checks` entry that runs the suite.
+It deliberately does not reuse `defrag-nix`'s shells — a repository meant to be read by someone
+outside the org should not need an org flake to build — but it does pin the same toolchain, so a
+version bump moves every repository at once.
 
 `defrag-nix` consumes `packages.agent-tools` from here and wires it into the org's shells, so
-the derivation lives next to the source it builds rather than in the org flake.
+the derivation lives next to the source it builds rather than in the org flake. That input uses
+`nixpkgs.follows` and `fenix.follows`, so neither is evaluated twice.
 
 The repo is still **not self-hosted**: there is no `projects/agent-playbook/` and no managed
 block in this file.

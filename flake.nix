@@ -1,13 +1,20 @@
 {
   description = "Resolve and render agent rules for a project + target, and the at-* inspection toolkit";
 
-  # One input, deliberately. This repository is meant to be usable by someone who has
-  # never heard of the org it came from, so a stranger can `nix build` it with nothing
-  # else to fetch — which rules out borrowing a toolchain from a sibling repo.
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  # Two inputs, both public. `fenix` is the toolchain every other repository in the org
+  # builds with, and pinning the same one here is worth the input it costs: `nix build`,
+  # the devshell below, and the sibling repos all agree, rather than this being a second
+  # rustc that drifts on the next bump.
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
 
   outputs =
-    { nixpkgs, ... }:
+    { nixpkgs, fenix, ... }:
     let
       lib = nixpkgs.lib;
       systems = [
@@ -19,10 +26,37 @@
       forAllSystems = lib.genAttrs systems;
       pkgsFor = system: import nixpkgs { inherit system; };
 
+      # Assembled the way defrag-nix assembles it, from the same fenix pin, so a toolchain
+      # bump moves this repository with the rest of the org rather than separately. No
+      # wasm targets: nothing here builds for wasm.
+      rustToolchainFor =
+        system:
+        let
+          fenixPkgs = fenix.packages.${system};
+        in
+        fenixPkgs.combine [
+          fenixPkgs.stable.cargo
+          fenixPkgs.stable.clippy
+          fenixPkgs.stable.rustc
+          fenixPkgs.stable.rustfmt
+        ];
+
+      # `makeRustPlatform` wants cargo and rustc separately; a combined toolchain carries
+      # both, so it is passed twice.
+      rustPlatformFor =
+        pkgs:
+        let
+          toolchain = rustToolchainFor pkgs.stdenv.hostPlatform.system;
+        in
+        pkgs.makeRustPlatform {
+          cargo = toolchain;
+          rustc = toolchain;
+        };
+
       # The composer: reads rules/ for a project and target and writes a repo's block.
       composerFor =
-        pkgs:
-        pkgs.rustPlatform.buildRustPackage {
+        rustPlatform:
+        rustPlatform.buildRustPackage {
           pname = "playbook";
           version = (lib.importTOML ./Cargo.toml).package.version;
           src = ./.;
@@ -34,9 +68,8 @@
       # the same toolkit and are always installed together, and a third tool is a line in
       # cargoBuildFlags and a line in installPhase.
       #
-      # Built with the same rustPlatform this flake's devshell provides, so the package
-      # and `nix develop -c cargo test` agree about the toolchain instead of being two
-      # definitions that drift apart.
+      # Built with the same toolchain the devshell below provides, from the same fenix pin
+      # the sibling repositories use.
       #
       # Not a `cargo run` shim over a checkout: an agent working in another repository may
       # write nothing outside its own tree, so a first-invocation compile elsewhere fails
@@ -44,8 +77,8 @@
       # re-pointed by editing this repository — which matters, because the whole point of
       # these binaries is to be allowlisted once and trusted thereafter.
       toolkitFor =
-        pkgs:
-        pkgs.rustPlatform.buildRustPackage {
+        rustPlatform:
+        rustPlatform.buildRustPackage {
           pname = "agent-tools";
           # From the crate that names the toolkit, so the two cannot drift.
           version = (lib.importTOML ./tools/at-peek/Cargo.toml).package.version;
@@ -78,9 +111,9 @@
       packages = forAllSystems (
         system:
         let
-          pkgs = pkgsFor system;
-          playbook = composerFor pkgs;
-          agent-tools = toolkitFor pkgs;
+          rustPlatform = rustPlatformFor (pkgsFor system);
+          playbook = composerFor rustPlatform;
+          agent-tools = toolkitFor rustPlatform;
         in
         {
           inherit playbook agent-tools;
@@ -91,7 +124,8 @@
 
       # `nix develop` here, so this repository can follow its own
       # `rules/rust/devshell-first` — which it could not before this flake existed. The
-      # four components come from the same rustPlatform the packages are built with.
+      # shell's rustc and cargo are the ones the packages are built with, because both
+      # come from this one combined toolchain.
       devShells = forAllSystems (
         system:
         let
@@ -99,12 +133,7 @@
         in
         {
           default = pkgs.mkShell {
-            packages = with pkgs; [
-              cargo
-              clippy
-              rustc
-              rustfmt
-            ];
+            packages = [ (rustToolchainFor system) ];
           };
         }
       );
@@ -119,10 +148,7 @@
         in
         {
           tests = pkgs.runCommand "agent-playbook-tests" {
-            nativeBuildInputs = [
-              pkgs.cargo
-              pkgs.rustc
-            ];
+            nativeBuildInputs = [ (rustToolchainFor system) ];
           } ''
             cp -r ${./.} src
             chmod -R u+w src
