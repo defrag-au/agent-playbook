@@ -74,7 +74,8 @@ Full resolution rules, including how `activation` and `overrides` are evaluated,
 ## Repository layout
 
 ```
-Cargo.toml        the tool: no dependencies, std only
+Cargo.toml        the workspace manifest; the composer is std-only, deliberately
+flake.nix         the devshell, and packages: `playbook` and `agent-tools`
 src/              resolution engine + CLI
   frontmatter.rs    flat `key: value` readers
   model.rs          Rule, Project, Target, Layer, Activation
@@ -83,6 +84,7 @@ src/              resolution engine + CLI
   render.rs         the managed block
   install.rs        splice and check
   main.rs           the CLI
+tools/            the read-only agent toolkit: at-peek, at-describe
 tests/            spec tests for the resolution model
 rules/            one file per standing constraint, flat frontmatter
   core/           model-, language- and org-agnostic
@@ -95,7 +97,7 @@ references/       crate cheat sheets and API notes
 models/           compose-time overlays: generic, claude-code, deepseek-flash, zed
 projects/         one directory per repository: project.conf + rules/
 templates/        scaffolds for new rules, skills, projects and overlays
-docs/             precedence model, rule format, migration inventory
+docs/             precedence model, rule format, migration inventory, inspection tools
 dist/             generated output (gitignored)
 ```
 
@@ -164,11 +166,6 @@ an agent to follow mid-session, which is when the pattern is actually noticed.
 
 ## Open questions
 
-- **A flake.** The repo has a `Cargo.toml` and no `flake.nix`, so its own `devshell-first`
-  rule cannot be followed from inside it. Two shapes are possible and they trade off
-  differently: reuse `defrag-nix`'s `rust-worker-stack` like the sibling repos do (in
-  lock-step, but ties a *transferable* repository to one org's flake), or a self-contained
-  `nixpkgs` shell (transferable, but a second toolchain definition to maintain). Undecided.
 - **CI.** `playbook check` is the natural CI gate for the consuming repos, but it needs the
   playbook present. Until there is a remote, the block is installed by hand.
 

@@ -17,20 +17,20 @@ why it was replaced. See the README's "Why the tool is Rust and not a shell scri
 
 ## Building and testing
 
-There is no `flake.nix` here yet, so `cargo` is not on `PATH` on this machine. Two options:
+`flake.nix` provides the toolchain:
 
 ```sh
-# borrow a sibling repo's realised devshell — works in a sandbox
-direnv exec ~/code/defrag/shared-crates cargo test
+nix develop -c cargo test
 
-# or, from a shell where cargo is available
+# in a sandbox, which cannot reach the nix daemon socket:
+direnv allow .          # once, from an unsandboxed shell
 cargo test
 ```
 
-Add `--offline` if cargo tries to reach the network. It should never need to: the crate has
-**no dependencies**, deliberately, so it builds with no network and no registry cache. That is
-a property to preserve, not an accident — the tool is the thing you reach for when a repo's
-toolchain is what is broken.
+Add `--offline` if cargo tries to reach the network. It should never need to: the composer
+crate has **no dependencies**, deliberately, so it builds with no network and no registry
+cache. That is a property to preserve, not an accident — the tool is the thing you reach for
+when a repo's toolchain is what is broken. The `tools/` crates hold the same line.
 
 Before pushing:
 
@@ -42,16 +42,18 @@ cargo test
 
 Clippy is clean at `-D warnings` and should stay that way.
 
-### The open question
+### The flake, and why it is self-contained
 
-`rules/rust/devshell-first` says Rust tooling lives behind a Nix devshell, and this repository
-cannot follow its own rule. Two shapes are possible: reuse `defrag-nix`'s `rust-worker-stack`
-like the sibling repos (in lock-step, but ties a *transferable* repository to one org's flake),
-or a self-contained `nixpkgs` shell (transferable, but a second toolchain definition). Undecided
-on purpose — do not add one without settling it.
+`flake.nix` has one input — `nixpkgs` — and no org flake, so someone who has never heard of
+this org can `nix build` it. It exports `playbook`, `agent-tools` (`at-peek` + `at-describe`),
+a devshell, and a `checks` entry that runs the suite. This was the open question; it is settled
+in favour of transferability, at the cost of a second toolchain definition to maintain.
 
-Until then this repo is **not self-hosted**: there is no `projects/agent-playbook/` and no
-managed block in this file.
+`defrag-nix` consumes `packages.agent-tools` from here and wires it into the org's shells, so
+the derivation lives next to the source it builds rather than in the org flake.
+
+The repo is still **not self-hosted**: there is no `projects/agent-playbook/` and no managed
+block in this file.
 
 ## Adding a rule
 
