@@ -22,6 +22,8 @@ targets:
 
 - The exact lines · every mention · how many · which files → `at-peek slice <file>:40-60` ·
   `at-peek search <pat>` · `at-peek search <pat> --count` · `at-peek search <pat> --files-only`.
+- `which at-peek` empty → `direnv exec . at-peek <verb>`. An agent's spawned shell does not
+  inherit the devshell environment; an interactive one does.
 - Output that was cut says so, and so does anything that would make it wrong. Repeat both when
   you report the finding: `# 50 of 143` is the difference between a fact and a guess.
 - `at-peek` is for understanding, not for preparing an edit. Read the file with the editor tools

@@ -50,5 +50,6 @@ discipline: what it refused to read, named rather than dropped.
   skipped. If a search looks incomplete, read the trailer before concluding the code is absent.
 - **A walk is bounded by `--max-files`** (default 20000) and says so when it stops. Narrow the
   path rather than raising it.
-- **If `at-peek` is not on `PATH`**, say so and fall back to the shell tools — do not silently
-  reproduce the pipeline this exists to replace.
+- **If `which at-peek` finds nothing**, the devshell environment is not loaded — a spawned shell
+  does not inherit it, only an interactive one does. Reach for it explicitly:
+  `direnv exec . at-peek search '<pat>'`. Do not fall back to `rg` without saying so.
