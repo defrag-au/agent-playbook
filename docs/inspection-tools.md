@@ -1,11 +1,26 @@
 # Read-only inspection tools for agents
 
-**Status:** proposal, 2026-09-22; part built. `tools/at-peek` (`stat`, `slice`, `search`) and
-`tools/at-describe` exist as workspace members, with 32 contract tests and one dependency
-(`regex`, taken for `search`). The toolkit is packaged by this repository's `flake.nix` and
-wired into the org's shells by `defrag-nix`. Everything else here is still the plan: the
-remaining verbs (`tree`, `find`, `outline`, `scope`), `at-recall`, the recipes, and the rule and
-skill drafts at the end — which stay drafts until the verbs they name exist.
+**Status:** proposal, 2026-09-22; part built. Built and tested: `tools/at-core` (the shared output
+contract and path containment), `tools/at-peek` (`stat`, `slice`, `search`), `tools/at-recall`
+(`state`, `diff`), and `tools/at-describe` (the catalogue). The toolkit is packaged by this
+repository's `flake.nix` and wired into the org's shells by `defrag-nix`. Everything else here is
+still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in `peek`; `log`, `show`,
+`blame`, `why`, `churn`, `search` in `recall`), the recipes, and the rule and skill drafts at the
+end — which stay drafts until the verbs they name exist.
+
+Three things the implementation settled that this document did not anticipate, each of them a test
+rather than a paragraph (`tools/at-recall/tests/contract.rs`):
+
+- **A worktree diff can run a program the repository names.** `git diff` invokes
+  `filter.<driver>.clean`, selected by `.gitattributes`, to convert a working-tree file into the
+  blob it would commit. `at-recall` therefore gathers its change set from the two reads that convert
+  nothing — the index against the revision, and the status against the index — and refuses by name
+  rather than running it, or printing raw bytes where the filtered form was expected.
+- **`git diff` with no revision compares the index with the worktree**, which is not the answer to
+  "what have I changed". `at-recall diff` names `HEAD` explicitly rather than inheriting that
+  default, and the header says which comparison it made.
+- **`--no-optional-locks` is load-bearing**, not tidiness: without it a read refreshes the index, so
+  `no_command_writes` snapshots `.git` as well as the tree.
 
 Output in the sections below is illustrative. The *shapes* are the contract; the values are not.
 In prose, `at-peek` and `at-recall` shorten to `peek` and `recall`; in a command they never do.
@@ -159,8 +174,12 @@ line numbers on every line, and a trailer stating what was *not* shown and how t
 
 ## `at-recall` — history
 
+Two of the verbs below are built — `state` and `diff` — and the rest are the design. Built means
+their shapes are asserted from outside the binary; the table is the specification for what is not.
+
 Revisions accept `@` (HEAD), `@~N`, `@^`, a short hash, a branch or tag name, and `A..B`.
-Anything beginning with `-` is rejected as a rev, so a revision can never be read as a flag.
+Anything beginning with `-` is rejected as a rev, so a revision can never be read as a flag, and
+`@{…}` is refused by name whether or not it resolves: the reflog is not read.
 
 | Verb | Answers | Default shape |
 | --- | --- | --- |
@@ -567,30 +586,32 @@ the text format is checked for shape only, so prose can be tuned without a test 
 
 ## Decisions to settle before code
 
-1. **One source for the catalogue.** The verb table now exists twice — in the rule below and in
-   `at-describe` — and that is the drift this playbook was built to stop. Either `at-describe`'s
-   table is generated from the rule, or a table in the tools is generated into the rule at compose
-   time; `playbook check` is already what would catch it going stale, so the second shape needs no
-   machinery beyond a generator. Names are settled: the `at-` namespace, which retires the
-   collision check the earlier draft of this section asked for.
+1. ~~**One source for the catalogue.**~~ **Settled.** `at-describe` links the verb tables from
+   `at-peek` and `at-recall` rather than restating them, and every table lives in `at-core`'s
+   vocabulary, so the catalogue cannot describe a grammar the parsers do not enforce. The rule
+   quotes the substitutions rather than the table, so it has nothing to go stale. `at-describe`
+   also lists only the binaries it is linked with, which is why a separately installed tool does
+   not appear in it.
 2. **Sequencing.** Primitives first, recipes second: `at-peek`'s read verbs, then `at-recall`'s
    state/log/diff/blame/search, then `at-describe` and the recipes. A recipe written against
    half-finished primitives bakes in the wrong section shapes — and the recipes are the largest
-   single win, so they are a milestone rather than an afterthought.
-3. **Where the code lives.** A new `~/code/defrag/agent-tools` repository is the recommendation:
-   it is transferable tooling, and putting it in `agent-playbook` would fight that repository's
-   deliberate zero-dependency, data-tree character — and it would make the playbook's unresolved
-   flake question a prerequisite for this work. In `shared-crates` it would arrive as
-   org-coupled when the point is that it is not.
+   single win, so they are a milestone rather than an afterthought. `at-describe` came early, with
+   the first two verbs, because the rule needs it to tell an agent where to ask.
+3. ~~**Where the code lives.**~~ **Settled, against the recommendation:** `agent-playbook/tools/`.
+   The argument for a separate repository was transferability, and it is still the argument for one
+   — but the flake question this document called a prerequisite was answered on the way (the
+   playbook has its own `flake.nix` now, pinning the same fenix toolchain as `defrag-nix`), and one
+   repository is one place the rule and the verbs it names can be kept in step.
 4. **Symbol extraction.** (a) A zero-dependency per-language scanner: cheap, no parser, honest
    but approximate, and it must degrade to a listing rather than guess. (b) `tree-sitter` plus a
    grammar per language: accurate, ~40 crates of dependency surface, and a grammar to keep
    current per language. (c) Shell out to `ctags`: breaks the tools-when-the-toolchain-is-broken
    property, which is most of the reason these are standalone binaries.
    Recommendation: (a) for v1, with the honesty rule enforced in output rather than in a comment.
-5. **The install path.** Nix profile, a `~/bin` symlink set, or a released static binary. This is
-   also what the `memory/environment.md` line waits on, and the same flake question the playbook
-   has not answered for itself — worth settling once for both rather than twice.
+5. ~~**The install path.**~~ **Settled:** a `nix profile install` of the flake's `agent-tools`
+   output, which puts all three binaries on `PATH` unconditionally — the `direnv exec .` fallback
+   stays documented for a shell that has not been installed into. `defrag-nix` exposes
+   `packages.agent-tools` so a repository's devshell gets it without a second install.
 6. **Grant granularity.** The tiering assumes approvals are per-command-prefix, which gives three
    levels: `at-*` for the toolkit, `at-peek *` for the working tree, `at-recall search *` for one
    verb. If the harness grants more coarsely the split buys nothing — but it costs nothing either,

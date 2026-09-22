@@ -187,7 +187,11 @@ pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
             // every line.
             let rows = &counted[..counted.len().min(opts.limit)];
             let paths = rows.iter().map(|(rel, _)| rel.len()).max().unwrap_or(0);
-            let hits = rows.iter().map(|(_, hits)| hits.to_string().len()).max().unwrap_or(1);
+            let hits = rows
+                .iter()
+                .map(|(_, hits)| hits.to_string().len())
+                .max()
+                .unwrap_or(1);
             for (rel, count) in rows {
                 report.content(format!("{rel:<paths$}  {count:>hits$}"));
             }

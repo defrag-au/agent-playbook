@@ -1,10 +1,12 @@
 //! The verbs.
 //!
 //! Each returns an [`Outcome`] — a report and the exit code it implies — so that "nothing
-//! found" is a fact the caller can branch on rather than an empty success. Any target that
-//! fails fails the whole invocation: a partial result that looks complete is the failure this
-//! toolkit exists to remove, and it is cheaper to re-run without the bad target than to
-//! notice that one line of a batch was missing.
+//! found" is a fact the caller can branch on rather than an empty success, and so a verb cannot
+//! print content and then exit as though it had found none. Both live in the contract in
+//! `at-core`, because `at-recall` answers in the same shape and the two must not drift. Any
+//! target that fails fails the whole invocation: a partial result that looks complete is the
+//! failure this toolkit exists to remove, and it is cheaper to re-run without the bad target
+//! than to notice that one line of a batch was missing.
 
 pub mod search;
 pub mod slice;
@@ -14,8 +16,10 @@ use std::fs;
 use std::path::Path;
 use std::time::SystemTime;
 
-use crate::contract::{secret_shaped, Exit, Fail, Report};
+use crate::contract::{secret_shaped, Fail};
 use crate::paths::{self, Root, Target};
+
+pub use crate::contract::{plural, Outcome};
 
 pub struct Opts {
     pub root: Root,
@@ -27,22 +31,6 @@ pub struct Opts {
     pub max_files: usize,
     pub max_files_clamped_from: Option<usize>,
     pub include_secret_paths: bool,
-}
-
-pub struct Outcome {
-    pub report: Report,
-    pub exit: Exit,
-}
-
-impl Outcome {
-    pub fn from_report(report: Report) -> Outcome {
-        let exit = if report.content_lines() > 0 {
-            Exit::Results
-        } else {
-            Exit::Nothing
-        };
-        Outcome { report, exit }
-    }
 }
 
 /// A target that resolved, survived the deny-list, and read as text.
@@ -135,14 +123,5 @@ pub fn open(opts: &Opts, arg: &str) -> Result<Opened, Fail> {
         Content::NotUtf8(offset) => Err(Fail::environment(format!(
             "{rel} is not UTF-8 text (first bad byte at offset {offset})"
         ))),
-    }
-}
-
-/// `1 path` / `3 paths`, because "1 path(s)" reads like a tool that is not sure.
-pub fn plural(count: usize, noun: &str) -> String {
-    if count == 1 {
-        format!("1 {noun}")
-    } else {
-        format!("{count} {noun}s")
     }
 }

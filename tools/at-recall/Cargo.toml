@@ -1,0 +1,12 @@
+[package]
+name = "at-recall"
+version = "0.1.0"
+edition = "2021"
+description = "Tier 2 of the agent toolkit: read-only inspection of history and the working tree"
+license = "MIT"
+
+# One dependency, and it is the shared contract — no `regex`, and none of the working-tree verbs
+# `at-peek` carries. This is the binary that spawns `git`, so what it links should be readable in
+# a sitting.
+[dependencies]
+at-core = { path = "../at-core" }

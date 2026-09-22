@@ -26,18 +26,19 @@ that pin a toolchain do it through a `flake.nix` devshell — what that means in
 
 ## The agent toolkit
 
-`agent-playbook`'s flake builds a read-only toolkit — `at-peek` (working tree) and, later,
-`at-recall` (history) — and `defrag-nix` wires it into every defrag devshell. `at-describe` lists
-what it can do.
+`agent-playbook`'s flake builds a read-only toolkit — `at-peek` (the working tree), `at-recall`
+(history and state) and `at-describe` (the catalogue) — and `defrag-nix` wires it into every defrag
+devshell. A further tool is a line in that flake's `cargoBuildFlags`.
 
 It is on `PATH` in an **interactive** shell in those repos, because direnv's hook runs on `cd`.
 A shell spawned by an agent does not inherit that environment, so it reaches the toolkit as
 `direnv exec . at-peek …` — which reads the realised `.direnv/` and needs no nix daemon. A `nix
-profile install` of `agent-tools` would put it on `PATH` unconditionally instead.
+profile install` of `agent-tools` puts it on `PATH` unconditionally instead.
 
-It has no write path, spawns no subprocess and makes no network calls, which is what makes that
-`PATH` entry safe to allowlist as a prefix. Which verb to reach for is
-`rules/org/defrag/agent-tools`; the traps are the `inspect-code` skill.
+`at-peek` has no write path, spawns no subprocess and makes no network calls. `at-recall` has no
+write path either, and runs exactly one program — `git`, with read verbs only. That difference is
+why they are separate binaries, and why they are separate approvals when the grants are tiered.
+Which verb to reach for is `rules/org/defrag/agent-tools`; the traps are the `inspect-code` skill.
 
 ## Where reference material lives
 

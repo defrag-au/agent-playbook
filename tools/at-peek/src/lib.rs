@@ -9,9 +9,12 @@
 
 pub mod catalogue;
 pub mod cli;
-pub mod contract;
-pub mod paths;
 pub mod verbs;
+
+// The output contract and path containment live in `at-core`, shared with `at-recall` — and
+// re-exported under the names the modules here already use, so nothing else had to move when they
+// left. A tool that spawns git should not have to link this one to reach the contract.
+pub use at_core::{contract, paths};
 
 /// The name a transcript and an allowlist entry use.
 pub const TOOL: &str = "at-peek";

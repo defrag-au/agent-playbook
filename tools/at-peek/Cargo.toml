@@ -5,10 +5,10 @@ edition = "2021"
 description = "Tier 1 of the agent toolkit: read-only inspection of the working tree"
 license = "MIT"
 
-# One dependency, and it is here for one reason: `search` is the verb that has to displace
-# `rg`, and a pattern language that cannot express what an agent meant is a downgrade rather
-# than a replacement. `regex` is pure Rust, no C, no network at runtime, and it is what
-# ripgrep itself uses. Nothing else in the toolkit takes a dependency, and the no-write
-# property does not depend on the count — that one is structural.
+# Two dependencies. `at-core` is the sibling holding the contract every tool shares; `regex` is
+# here for one reason — `search` is the verb that has to displace `rg`, and a pattern language
+# that cannot express what an agent meant is a downgrade rather than a replacement. Neither is a
+# capability: the no-write property is structural, and does not depend on the count.
 [dependencies]
+at-core = { path = "../at-core" }
 regex = "1"

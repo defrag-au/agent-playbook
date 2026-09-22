@@ -16,17 +16,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "at-core"
+version = "0.1.0"
+
+[[package]]
 name = "at-describe"
 version = "0.1.0"
 dependencies = [
  "at-peek",
+ "at-recall",
 ]
 
 [[package]]
 name = "at-peek"
 version = "0.1.0"
 dependencies = [
+ "at-core",
  "regex",
+]
+
+[[package]]
+name = "at-recall"
+version = "0.1.0"
+dependencies = [
+ "at-core",
 ]
 
 [[package]]

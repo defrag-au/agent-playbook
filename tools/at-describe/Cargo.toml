@@ -5,8 +5,9 @@ edition = "2021"
 description = "Tier 0 of the agent toolkit: the catalogue, and nothing else"
 license = "MIT"
 
-# One dependency, and it is a sibling in this workspace rather than a crate from a registry:
-# at-describe prints verb tables, and the tables live with the verbs so the two cannot drift.
-# Nothing else is linked.
+# The toolkit's verb tables, linked so this catalogue cannot describe a grammar the binaries do
+# not enforce. Both are siblings in this workspace rather than crates from a registry. Nothing else
+# is linked.
 [dependencies]
 at-peek = { path = "../at-peek" }
+at-recall = { path = "../at-recall" }

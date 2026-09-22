@@ -129,6 +129,46 @@ impl Report {
     }
 }
 
+/// A verb's answer, and the exit code it implies.
+///
+/// Every verb returns one of these rather than printing, so that "nothing was found" is a fact
+/// the caller can branch on instead of an empty success — and so the code and the output cannot
+/// disagree, which they could if a verb printed and then chose a code separately.
+pub struct Outcome {
+    pub report: Report,
+    pub exit: Exit,
+}
+
+impl Outcome {
+    /// Exit 0 when something was printed, 1 when the read succeeded and found nothing. A verb
+    /// that needs a different code — a refusal, an environment failure — sets `exit` itself.
+    pub fn from_report(report: Report) -> Outcome {
+        let exit = if report.content_lines() > 0 {
+            Exit::Results
+        } else {
+            Exit::Nothing
+        };
+        Outcome { report, exit }
+    }
+}
+
+/// `1 path` / `3 paths`, because "1 path(s)" reads like a tool that is not sure.
+///
+/// A noun the `+s` rule gets wrong passes its own plural to [`plural_of`]: this toolkit has one,
+/// and `2 directorys` was printed by it before the second form existed.
+pub fn plural(count: usize, noun: &str) -> String {
+    plural_of(count, noun, &format!("{noun}s"))
+}
+
+/// The same, for a noun whose plural is not `+s`.
+pub fn plural_of(count: usize, singular: &str, plural: &str) -> String {
+    if count == 1 {
+        format!("1 {singular}")
+    } else {
+        format!("{count} {plural}")
+    }
+}
+
 /// Whether a file name is secret-shaped, and which rule matched.
 /// This is a guard rail, not a boundary: it stops an accidental `slice .env` and an
 /// accidental sweep over a key file, and `--include-secret-paths` reads one anyway. The
@@ -230,6 +270,48 @@ mod tests {
             iso8601_utc(UNIX_EPOCH + Duration::from_secs(1_000_000_000)),
             "2001-09-09T01:46:40Z"
         );
+    }
+
+    #[test]
+    fn plural_agrees_with_itself_on_one() {
+        assert_eq!(plural(1, "path"), "1 path");
+        assert_eq!(plural(0, "path"), "0 paths");
+        assert_eq!(plural(3, "path"), "3 paths");
+    }
+
+    #[test]
+    fn a_noun_with_its_own_plural_uses_it() {
+        assert_eq!(
+            plural_of(1, "untracked directory", "untracked directories"),
+            "1 untracked directory"
+        );
+        assert_eq!(
+            plural_of(2, "untracked directory", "untracked directories"),
+            "2 untracked directories"
+        );
+    }
+
+    #[test]
+    fn an_empty_report_is_nothing_rather_than_success() {
+        let outcome = Outcome::from_report(Report::new());
+        assert_eq!(outcome.exit, Exit::Nothing);
+    }
+
+    #[test]
+    fn a_report_with_content_is_results() {
+        let mut report = Report::new();
+        report.content("a line");
+        assert_eq!(Outcome::from_report(report).exit, Exit::Results);
+    }
+
+    #[test]
+    fn a_header_alone_is_not_content() {
+        // The failure this guards: a verb that prints only bounds and exits 0, so a caller reads
+        // "there is something here" out of an empty answer.
+        let mut report = Report::new();
+        report.header("at-peek", "stat", "root", "1 path");
+        report.bound("1 path");
+        assert_eq!(Outcome::from_report(report).exit, Exit::Nothing);
     }
 
     #[test]

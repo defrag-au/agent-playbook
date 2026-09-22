@@ -6,10 +6,9 @@ paid for on every turn.
 
 ## Batch independent calls
 
-If two reads do not depend on each other, they go in the same response. A file listing, a
-`grep` for a symbol, and a read of a known path are three independent things: one response,
-not three. Sequential exploratory calls are the most common way a fast model wastes its own
-speed.
+If two reads do not depend on each other, they go in the same response. A file listing, a search
+for a symbol, and a read of a known path are three independent things: one response, not three.
+Sequential exploratory calls are the most common way a fast model wastes its own speed.
 
 ## Do not re-read after a successful write
 

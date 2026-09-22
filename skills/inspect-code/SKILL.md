@@ -1,13 +1,14 @@
 ---
 name: inspect-code
-description: Use when finding, reading, counting or locating code — replaces rg, grep, sed, cat, head and wc for that job with the read-only at-peek verbs, and covers what to do when the toolkit is not installed.
+description: Use when finding, reading, counting or locating code or history — replaces rg, grep, sed, cat, head, wc, git status, git diff and git log for that job with the read-only at-peek and at-recall verbs, and covers what to do when the toolkit is not installed.
 ---
 
 # Reading code and history with the agent toolkit
 
 The situation that should have brought you here: you are about to run `rg`, `grep`, `sed`, `cat`,
-`head` or `wc` to look at code. Don't — reach for `at-peek` instead. It is read-only, bounded by
-construction, and its output says what it did not show.
+`head`, `wc`, `git status`, `git diff` or `git log` to look at something. Don't — reach for
+`at-peek` for the working tree and `at-recall` for history and state. Both are read-only, bounded
+by construction, and their output says what they did not show.
 
 `at-describe` lists everything the toolkit can do, on one screen. This skill is the mapping and
 the traps.
@@ -15,16 +16,23 @@ the traps.
 ## The mapping
 
 ```sh
+# the working tree — at-peek runs nothing at all
 at-peek search 'render_claim'                 # every mention, walked from the repo root
 at-peek search 'fn \w+' tools/ --count        # matches per file, with the real total
 at-peek search 'FIXME' --files-only           # just the paths
 at-peek slice crates/x/src/lib.rs:40-60       # these exact lines, numbered
 at-peek slice crates/x/src/lib.rs:40+20       # twenty lines from 40
 at-peek stat crates/x/src/lib.rs              # lines, bytes, language, mtime
+
+# history and state — at-recall runs git, read verbs only, and never the reflog
+at-recall state                               # branch, HEAD, merge or rebase in progress, changed paths
+at-recall diff                                # what changed, one line per file, with the totals
+at-recall diff crates/x/src/lib.rs --patch    # the hunks, for one file
+at-recall diff HEAD~1..HEAD                   # a range of history: reads no working-tree file
 ```
 
-`--limit N` caps the output (default 200 lines / 50 matches); `--root <path>` points the tool at
-another tree; `--max-files N` bounds a walk. Every ceiling is announced when it clamps.
+`--limit N` caps the output (default 200 lines); `--root <path>` points the tool at another tree;
+`--max-files N` bounds a walk. Every ceiling is announced when it clamps.
 
 ## What the output tells you
 
@@ -37,14 +45,31 @@ complete one.
 `# skipped by rule: target, node_modules` and `# skipped: 3 secret-shaped · 2 binary` are the same
 discipline: what it refused to read, named rather than dropped.
 
+`at-recall state` exits 0 even on a clean tree, because the branch and HEAD *are* the answer to
+"what am I looking at" — read the count from the bound: `# 0 paths`. `at-recall diff` exits 1 when
+nothing differs, and 4 when it refused.
+
 ## Traps
 
-- **`at-peek` is not a read for the purposes of editing.** It does not satisfy the editor tools'
-  read-before-edit check, so a `slice` followed by an edit gets a stale-read refusal. Use it to
+- **Neither tool is a read for the purposes of editing.** They do not satisfy the editor tools'
+  read-before-edit check, so a `slice` followed by an edit gets a stale-read refusal. Use them to
   understand, then read the file with the editor tools before changing it.
 - **`path:40-60` is one token, not two arguments**, and ranges are 1-based and inclusive.
 - **`at-peek` never opens `.git`.** "Is this file tracked", "what branch is this" and "who wrote
-  it" are not `at-peek` questions, and the tool that answers them does not exist yet — ask.
+  it" are `at-recall` questions — of which only the first two are answered so far. `blame` is
+  designed and not written; ask rather than reaching for `git`.
+- **A revision is a revision only if it resolves.** `at-recall diff <first>` treats its first
+  argument as a revision when it names a commit and as a path otherwise — git's own rule, so
+  `diff main` works and `diff src/main.rs` does. A range (`A..B`, `A...B`) that does not resolve
+  is an error rather than a path, and `HEAD@{1}` is refused by name: this tool does not read the
+  reflog.
+- **`at-recall diff` compares against HEAD, not the index**, so staged and unstaged changes both
+  count. An untracked file never appears — no diff between commits can show it — and the tool says
+  so rather than printing "no differences" and leaving you to guess.
+- **A repository that routes paths through a filter driver is refused by name.** `filter.<driver>.clean`
+  in `.gitattributes` is a program the repository names, and `at-recall` runs git only. The refusal
+  lists the paths (`a.foo (filter=lfs)`); if you need the filtered form, that is a `git diff` to ask
+  about.
 - **`search` does not honour `.gitignore`.** It refuses a fixed list of directory names
   (`target`, `node_modules`, `.direnv`, `dist`, `result`, `.tmp`, `.git`) and names what it
   skipped. If a search looks incomplete, read the trailer before concluding the code is absent.
