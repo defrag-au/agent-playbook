@@ -26,9 +26,11 @@
       forAllSystems = lib.genAttrs systems;
       pkgsFor = system: import nixpkgs { inherit system; };
 
-      # Assembled the way defrag-nix assembles it, from the same fenix pin, so a toolchain
-      # bump moves this repository with the rest of the org rather than separately. No
-      # wasm targets: nothing here builds for wasm.
+      # Assembled the way defrag-nix assembles it, from the same fenix channel, so a bump in both
+      # places leaves every repository on one rustc rather than this one drifting. The pin is
+      # matched, not inherited, and could not be inherited: defrag-nix takes this repository as an
+      # input (for `agent-tools`), so an input back would be a cycle. No wasm targets: nothing here
+      # builds for wasm.
       rustToolchainFor =
         system:
         let

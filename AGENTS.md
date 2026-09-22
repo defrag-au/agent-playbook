@@ -17,15 +17,23 @@ why it was replaced. See the README's "Why the tool is Rust and not a shell scri
 
 ## Building and testing
 
-`flake.nix` provides the toolchain:
+`flake.nix` provides the toolchain — `cargo`, `rustc`, `clippy` and `rustfmt`, from the same fenix
+channel the rest of the org builds with. None of them is on the default `PATH`, so the shell has to
+come from one of these:
 
 ```sh
-nix develop -c cargo test
+nix develop -c cargo test                 # this repository's own devshell
 
-# in a sandbox, which cannot reach the nix daemon socket:
-direnv allow .          # once, from an unsandboxed shell
-cargo test
+# the same devshell, for a shell that is not interactive — an editor's, an agent's, a script's:
+direnv exec . cargo test
+direnv exec . cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
+
+`direnv allow .` once, from an interactive shell, is what makes `.envrc` (`use flake`) load on `cd` —
+which is why an interactive shell in this directory has `cargo` without being asked. A shell an
+ditor or an agent spawned sources no rc file and so runs no direnv hook: there, `command not found:
+cargo` means an unloaded shell, not a missing toolchain, and `direnv exec .` is the answer. Neither
+of them needs `defrag-nix`; see *The flake* below for why that is a constraint and not a limitation.
 
 Add `--offline` if cargo tries to reach the network. It should never need to: the composer
 crate has **no dependencies**, deliberately, so it builds with no network and no registry
@@ -44,15 +52,20 @@ Clippy is clean at `-D warnings` and should stay that way.
 
 ### The flake
 
-`flake.nix` pins the same fenix toolchain `defrag-nix` does, and exports `playbook`,
-`agent-tools` (`at-peek` + `at-describe`), a devshell, and a `checks` entry that runs the suite.
-It deliberately does not reuse `defrag-nix`'s shells — a repository meant to be read by someone
-outside the org should not need an org flake to build — but it does pin the same toolchain, so a
-version bump moves every repository at once.
+`flake.nix` pins the same fenix channel `defrag-nix` does, and exports `playbook`, `agent-tools`
+(`at-peek`, `at-recall`, `at-describe`), a devshell, and a `checks` entry that runs the suite.
 
-`defrag-nix` consumes `packages.agent-tools` from here and wires it into the org's shells, so
-the derivation lives next to the source it builds rather than in the org flake. That input uses
-`nixpkgs.follows` and `fenix.follows`, so neither is evaluated twice.
+**It cannot consume `defrag-nix`, and does not need to.** That input already points the other way:
+`defrag-nix` takes *this* repository as an input, for `packages.agent-tools`, and wires the binaries
+into the org's shells. An input back would be a cycle, and flake inputs are a DAG — Nix refuses to
+resolve one rather than doing something surprising with it. What is shared instead is the pin: both
+flakes build from the same fenix channel, so a bump is one `nix flake update` in each repository and
+they agree again afterwards. The lock is per repository; the toolchain is not inherited, it is
+matched.
+
+That is also the property worth keeping: a repository meant to be read by someone outside the org
+builds with nothing but its own flake. `defrag-nix`'s input uses `nixpkgs.follows` and
+`fenix.follows`, so neither is evaluated twice.
 
 The repo is still **not self-hosted**: there is no `projects/agent-playbook/` and no managed
 block in this file.
