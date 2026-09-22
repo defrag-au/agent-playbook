@@ -13,6 +13,12 @@ pub const DEFAULT_LIMIT: usize = 200;
 /// The ceiling `--limit` cannot raise. A caller can never ask for an unbounded read.
 pub const MAX_LIMIT: usize = 2000;
 
+/// Files a walk may consider before it stops and says so. Higher than any sane repository,
+/// low enough that pointing the tool at the wrong root cannot become a ten-minute read.
+pub const DEFAULT_MAX_FILES: usize = 20_000;
+/// The ceiling `--max-files` cannot raise.
+pub const MAX_FILES: usize = 200_000;
+
 /// Characters a single output line may carry before it is truncated and flagged. Long lines
 /// are the real token cost — one minified file would otherwise be a whole context window.
 pub const MAX_LINE_WIDTH: usize = 500;
@@ -124,7 +130,6 @@ impl Report {
 }
 
 /// Whether a file name is secret-shaped, and which rule matched.
-///
 /// This is a guard rail, not a boundary: it stops an accidental `slice .env` and an
 /// accidental sweep over a key file, and `--include-secret-paths` reads one anyway. The
 /// committed-placeholder case is deliberately excluded — `.env.example` is a template, and
@@ -160,6 +165,20 @@ pub fn secret_shaped(file_name: &str) -> Option<&'static str> {
         return Some("a name containing `credential`");
     }
     None
+}
+
+/// Cut a line at the width cap and say so, rather than silently shortening it.
+pub fn truncate(line: &str) -> (String, bool) {
+    let mut out = String::new();
+    for (index, character) in line.chars().enumerate() {
+        if index == MAX_LINE_WIDTH {
+            let extra = line.chars().count() - index;
+            out.push_str(&format!(" ...(+{extra} characters)"));
+            return (out, true);
+        }
+        out.push(character);
+    }
+    (out, false)
 }
 
 /// UTC, ISO-8601, seconds resolution.

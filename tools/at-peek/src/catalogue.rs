@@ -47,6 +47,24 @@ const HELP: Flag = Flag {
     value: "",
     one_line: "This verb's flags (`-h` is the same flag)",
 };
+const COUNT: Flag = Flag {
+    name: "--count",
+    takes_value: false,
+    value: "",
+    one_line: "Matches per file, instead of the matching lines",
+};
+const FILES_ONLY: Flag = Flag {
+    name: "--files-only",
+    takes_value: false,
+    value: "",
+    one_line: "Paths containing a match, without lines",
+};
+const MAX_FILES: Flag = Flag {
+    name: "--max-files",
+    takes_value: true,
+    value: "N",
+    one_line: "Files a walk considers before it stops; default 20000, ceiling 200000",
+};
 
 const VERB_FLAGS: &[Flag] = &[LIMIT, ROOT, SECRETS, HELP];
 
@@ -68,6 +86,13 @@ pub static VERBS: &[Verb] = &[
                 cannot print more than one verb's worth. Any target that fails fails the \
                 invocation.",
         flags: VERB_FLAGS,
+    },
+    Verb {
+        name: "search",
+        question: "Every mention",
+        usage: "at-peek search <pattern> [path…] [--count | --files-only] [--limit N] [--max-files N]",
+        notes: "Regex, walked in path order; no path searches the whole root. Matches are counted over every file the walk considers, so the total under the listing is the real one. Directory names skipped by rule are named in the output — real gitignore semantics are not here yet. `--count` and `--files-only` are alternatives, not options to combine.",
+        flags: &[COUNT, FILES_ONLY, LIMIT, MAX_FILES, ROOT, SECRETS, HELP],
     },
 ];
 

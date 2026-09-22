@@ -450,6 +450,9 @@ fn no_command_writes() {
         ("slice", vec!["src/one.rs"]),
         ("slice", vec![".."]),
         ("slice", vec![".env"]),
+        ("search", vec!["fn"]),
+        ("search", vec!["fn", "--count"]),
+        ("search", vec!["fn", "--files-only"]),
     ] {
         let _ = at_peek(fixture.path(), verb, &args);
     }
@@ -459,6 +462,178 @@ fn no_command_writes() {
         before, after,
         "a read-only tool that writes is not read-only"
     );
+}
+
+#[test]
+fn search_finds_matches_and_states_the_total() {
+    let fixture = Fixture::new("search-basic");
+    fixture.write("src/one.rs", "alpha\nneedle here\nbeta\n");
+    fixture.write("src/two.rs", "gamma\n");
+
+    let out = at_peek(fixture.path(), "search", &["needle"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0));
+    assert!(text.contains("src/one.rs:2:needle here"), "{text}");
+    assert!(text.contains("1 match in 1 file"), "{text}");
+}
+
+#[test]
+fn search_walks_the_whole_root_when_given_only_a_pattern() {
+    let fixture = Fixture::new("search-walk");
+    fixture.write("src/a.rs", "needle\n");
+    fixture.write("docs/nested/b.md", "needle\n");
+
+    let out = at_peek(fixture.path(), "search", &["needle"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0));
+    assert!(text.contains("src/a.rs:1:needle"), "{text}");
+    assert!(text.contains("docs/nested/b.md:1:needle"), "{text}");
+    assert!(text.contains("2 matches in 2 files"), "{text}");
+    assert!(
+        text.contains("walked 2 files"),
+        "the walk says what it walked: {text}"
+    );
+}
+
+#[test]
+fn count_mode_reports_per_file_totals() {
+    let fixture = Fixture::new("search-count");
+    fixture.write("a.txt", "needle\nneedle\n");
+    fixture.write("b.txt", "needle\nneedle\nneedle\n");
+
+    let out = at_peek(fixture.path(), "search", &["needle", "--count"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0));
+    assert!(text.contains("a.txt  2"), "{text}");
+    assert!(text.contains("b.txt  3"), "{text}");
+    assert!(text.contains("5 matches in 2 files"), "{text}");
+}
+
+#[test]
+fn files_only_lists_the_paths() {
+    let fixture = Fixture::new("search-files-only");
+    fixture.write("a.txt", "needle\nneedle\n");
+    fixture.write("b.txt", "nothing\n");
+
+    let out = at_peek(fixture.path(), "search", &["needle", "--files-only"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(content_lines(&text), 1, "one path: {text}");
+    assert!(text.contains("a.txt"), "{text}");
+    assert!(text.contains("1 file · 2 matches"), "{text}");
+}
+
+#[test]
+fn search_truncation_is_announced() {
+    let fixture = Fixture::new("search-truncated");
+    fixture.write("a.txt", &"needle\n".repeat(10));
+
+    let out = at_peek(fixture.path(), "search", &["needle", "--limit", "2"]);
+    let text = stdout(&out);
+
+    assert_eq!(content_lines(&text), 2);
+    assert!(
+        text.contains("2 of 10 matches in 1 file · --limit 2"),
+        "{text}"
+    );
+}
+
+#[test]
+fn count_and_files_only_together_is_a_usage_error() {
+    let fixture = Fixture::new("search-modes");
+    fixture.write("a.txt", "needle\n");
+
+    let out = at_peek(
+        fixture.path(),
+        "search",
+        &["needle", "--count", "--files-only"],
+    );
+
+    assert_eq!(out.status.code(), Some(2));
+    assert!(stderr(&out).contains("pass one"), "{}", stderr(&out));
+}
+
+#[test]
+fn an_invalid_regex_is_a_usage_error() {
+    let fixture = Fixture::new("search-bad-regex");
+    fixture.write("a.txt", "needle\n");
+
+    let out = at_peek(fixture.path(), "search", &["needle("]);
+
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        stderr(&out).contains("not a valid regex"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+#[test]
+fn search_names_the_directories_it_skipped_by_rule() {
+    let fixture = Fixture::new("search-skip");
+    fixture.write("src/a.rs", "needle\n");
+    fixture.write("target/generated.rs", "needle\n");
+
+    let out = at_peek(fixture.path(), "search", &["needle"]);
+    let text = stdout(&out);
+
+    assert!(
+        !text.contains("target/generated.rs"),
+        "a build tree is not searched: {text}"
+    );
+    assert!(text.contains("skipped by rule: target"), "{text}");
+}
+
+#[test]
+fn search_respects_the_deny_list_and_can_be_forced() {
+    let fixture = Fixture::new("search-secrets");
+    fixture.write(".env", "TOKEN=needle\n");
+    fixture.write("a.txt", "needle\n");
+
+    let out = at_peek(fixture.path(), "search", &["needle"]);
+    let text = stdout(&out);
+    assert!(!text.contains("TOKEN=needle"), "{text}");
+    assert!(text.contains("skipped: 1 secret-shaped"), "{text}");
+
+    let forced = at_peek(
+        fixture.path(),
+        "search",
+        &["needle", "--include-secret-paths"],
+    );
+    assert!(
+        stdout(&forced).contains("TOKEN=needle"),
+        "{}",
+        stdout(&forced)
+    );
+}
+
+#[test]
+fn search_stops_at_max_files_and_says_so() {
+    let fixture = Fixture::new("search-max-files");
+    for name in ["a", "b", "c", "d", "e"] {
+        fixture.write(&format!("{name}.txt"), "needle\n");
+    }
+
+    let out = at_peek(fixture.path(), "search", &["needle", "--max-files", "2"]);
+    let text = stdout(&out);
+
+    assert!(text.contains("stopped after 2 files considered"), "{text}");
+}
+
+#[test]
+fn search_counts_a_binary_file_rather_than_printing_it() {
+    let fixture = Fixture::new("search-binary");
+    fixture.write_bytes("blob.bin", b"needle\x00needle\n");
+
+    let out = at_peek(fixture.path(), "search", &["needle"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(1), "nothing printable: {text}");
+    assert!(text.contains("skipped: 1 binary"), "{text}");
 }
 
 fn empty_or_meta(bytes: &[u8]) -> bool {

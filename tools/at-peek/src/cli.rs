@@ -9,7 +9,7 @@
 use std::path::Path;
 
 use crate::catalogue::{self, Verb};
-use crate::contract::{Exit, Fail, DEFAULT_LIMIT, MAX_LIMIT};
+use crate::contract::{Exit, Fail, DEFAULT_LIMIT, DEFAULT_MAX_FILES, MAX_FILES, MAX_LIMIT};
 use crate::paths::Root;
 use crate::verbs::{self, Opts};
 
@@ -71,6 +71,10 @@ fn dispatch(args: &[String]) -> Result<Exit, Fail> {
     let outcome = match verb.name {
         "stat" => verbs::stat::run(&parsed.positionals, &opts)?,
         "slice" => verbs::slice::run(&parsed.positionals, &opts)?,
+        "search" => {
+            let mode = verbs::search::Mode::of(parsed.has("--count"), parsed.has("--files-only"))?;
+            verbs::search::run(&parsed.positionals, &opts, mode)?
+        }
         other => {
             return Err(Fail::usage(format!(
                 "`{other}` is catalogued but not implemented"
@@ -211,10 +215,29 @@ fn options(parsed: &Parsed) -> Result<Opts, Fail> {
         None => (DEFAULT_LIMIT, None),
     };
 
+    let (max_files, max_files_clamped_from) = match parsed.value("--max-files") {
+        Some(raw) => {
+            let asked = raw
+                .parse::<usize>()
+                .map_err(|_| Fail::usage(format!("--max-files {raw} is not a number")))?;
+            if asked == 0 {
+                return Err(Fail::usage("--max-files 0 considers no files"));
+            }
+            if asked > MAX_FILES {
+                (MAX_FILES, Some(asked))
+            } else {
+                (asked, None)
+            }
+        }
+        None => (DEFAULT_MAX_FILES, None),
+    };
+
     Ok(Opts {
         root,
         limit,
         limit_clamped_from,
+        max_files,
+        max_files_clamped_from,
         include_secret_paths: parsed.has("--include-secret-paths"),
     })
 }

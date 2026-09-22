@@ -5,7 +5,7 @@
 //! ninety-two, which is how a truncated read becomes a confident report. Every slice ends with
 //! the file's real size and, when the limit cut it, the range that resumes.
 
-use crate::contract::{Fail, Report, MAX_LIMIT, MAX_LINE_WIDTH};
+use crate::contract::{truncate, Fail, Report, MAX_LIMIT, MAX_LINE_WIDTH};
 use crate::verbs::{open, Opts, Outcome};
 use crate::TOOL;
 
@@ -103,19 +103,4 @@ pub fn run(targets: &[String], opts: &Opts) -> Result<Outcome, Fail> {
     }
 
     Ok(Outcome::from_report(report))
-}
-
-/// Cut a line at the width cap and say so, rather than silently shortening it. One minified
-/// file in a search result is otherwise a whole context window.
-fn truncate(line: &str) -> (String, bool) {
-    let mut out = String::new();
-    for (index, character) in line.chars().enumerate() {
-        if index == MAX_LINE_WIDTH {
-            let extra = line.chars().count() - index;
-            out.push_str(&format!(" ...(+{extra} characters)"));
-            return (out, true);
-        }
-        out.push(character);
-    }
-    (out, false)
 }

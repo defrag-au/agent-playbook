@@ -24,6 +24,16 @@ Repositories are laid out as `~/code/<org>/<repo>`.
 that pin a toolchain do it through a `flake.nix` devshell — what that means in practice is the
 `rust-devshell-first` rule, not a fact about the machine.
 
+## The agent toolkit
+
+`agent-playbook`'s flake builds a read-only toolkit — `at-peek` (working tree) and, later,
+`at-recall` (history) — and `defrag-nix` wires it into every defrag devshell, so `at-peek` is on
+`PATH` wherever I am working. `at-describe` lists what it can do.
+
+It has no write path, spawns no subprocess and makes no network calls, which is what makes that
+`PATH` entry safe to allowlist as a prefix. Which verb to reach for is
+`rules/org/defrag/agent-tools`; the traps are the `inspect-code` skill.
+
 ## Where reference material lives
 
 Crate cheat sheets are in `references/crates/` in the playbook. `~/.claude/crate-refs/` was the

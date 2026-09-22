@@ -1,10 +1,11 @@
 # Read-only inspection tools for agents
 
-**Status:** proposal, 2026-09-22; step 1 built the same day. `tools/at-peek` (`stat`, `slice`) and
-`tools/at-describe` exist as workspace members of this repository, with 21 contract tests and no
-external dependencies. Everything else here is still the plan: the remaining verbs, `at-recall`,
-the recipes, and the rule and skill drafts at the end — which are deliberately *not* in `rules/`
-or `skills/` yet, because a rule whose tool is one verb-pair old is a rule nothing can follow.
+**Status:** proposal, 2026-09-22; part built. `tools/at-peek` (`stat`, `slice`, `search`) and
+`tools/at-describe` exist as workspace members, with 32 contract tests and one dependency
+(`regex`, taken for `search`). The toolkit is packaged by this repository's `flake.nix` and
+wired into the org's shells by `defrag-nix`. Everything else here is still the plan: the
+remaining verbs (`tree`, `find`, `outline`, `scope`), `at-recall`, the recipes, and the rule and
+skill drafts at the end — which stay drafts until the verbs they name exist.
 
 Output in the sections below is illustrative. The *shapes* are the contract; the values are not.
 In prose, `at-peek` and `at-recall` shorten to `peek` and `recall`; in a command they never do.

@@ -6,10 +6,12 @@
 //! toolkit exists to remove, and it is cheaper to re-run without the bad target than to
 //! notice that one line of a batch was missing.
 
+pub mod search;
 pub mod slice;
 pub mod stat;
 
 use std::fs;
+use std::path::Path;
 use std::time::SystemTime;
 
 use crate::contract::{secret_shaped, Exit, Fail, Report};
@@ -21,6 +23,9 @@ pub struct Opts {
     /// Set when the caller asked for more than [`crate::contract::MAX_LIMIT`], so the clamp
     /// can be announced rather than silently applied.
     pub limit_clamped_from: Option<usize>,
+    /// Files a walk may consider before it stops and says so.
+    pub max_files: usize,
+    pub max_files_clamped_from: Option<usize>,
     pub include_secret_paths: bool,
 }
 
@@ -59,6 +64,28 @@ impl Opened {
     }
 }
 
+/// What reading a file produced. A binary or non-UTF-8 file is a fact about the file rather
+/// than a failure: `search` counts it and moves on, `slice` says so and shows nothing.
+pub enum Content {
+    Text(String),
+    Binary(usize),
+    NotUtf8(usize),
+}
+
+/// Read a file that is already known to be inside the root. `name` is what the caller wants
+/// in a message — a path relative to the root, never the absolute one.
+pub fn read_text(path: &Path, name: &str) -> Result<Content, Fail> {
+    let bytes =
+        fs::read(path).map_err(|e| Fail::environment(format!("cannot read {name}: {e}")))?;
+    if let Some(offset) = bytes.iter().take(8192).position(|byte| *byte == 0) {
+        return Ok(Content::Binary(offset));
+    }
+    match String::from_utf8(bytes) {
+        Ok(text) => Ok(Content::Text(text)),
+        Err(e) => Ok(Content::NotUtf8(e.utf8_error().valid_up_to())),
+    }
+}
+
 /// Resolve and read one target, or say why not.
 pub fn open(opts: &Opts, arg: &str) -> Result<Opened, Fail> {
     let target = paths::parse_target(arg)?;
@@ -87,33 +114,28 @@ pub fn open(opts: &Opts, arg: &str) -> Result<Opened, Fail> {
 
     let len = meta.len();
     let modified = meta.modified().ok();
-    let bytes = fs::read(&abs).map_err(|e| Fail::environment(format!("cannot read {rel}: {e}")))?;
 
-    if let Some(offset) = bytes.iter().take(8192).position(|byte| *byte == 0) {
-        return Ok(Opened {
+    match read_text(&abs, &rel)? {
+        Content::Text(text) => Ok(Opened {
+            target,
+            rel,
+            text,
+            len,
+            modified,
+            binary: None,
+        }),
+        Content::Binary(offset) => Ok(Opened {
             target,
             rel,
             text: String::new(),
             len,
             modified,
             binary: Some(offset),
-        });
+        }),
+        Content::NotUtf8(offset) => Err(Fail::environment(format!(
+            "{rel} is not UTF-8 text (first bad byte at offset {offset})"
+        ))),
     }
-
-    let text = String::from_utf8(bytes).map_err(|e| {
-        Fail::environment(format!(
-            "{rel} is not UTF-8 text (first bad byte at offset {})",
-            e.utf8_error().valid_up_to()
-        ))
-    })?;
-    Ok(Opened {
-        target,
-        rel,
-        text,
-        len,
-        modified,
-        binary: None,
-    })
 }
 
 /// `1 path` / `3 paths`, because "1 path(s)" reads like a tool that is not sure.
