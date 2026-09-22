@@ -835,3 +835,40 @@ fn root_discovery_accepts_an_explicit_path_and_rejects_a_non_root() {
     let not_a_root = playbook::load::find_root(Some(Path::new("/")));
     assert!(not_a_root.is_err());
 }
+
+#[test]
+fn a_project_is_discovered_from_the_directory_it_claims() {
+    let fixture = Fixture::new("claiming-project");
+    let repo = fixture.root.join("checkout");
+    fs::create_dir_all(repo.join("crates/cli")).expect("create repo");
+    fixture.write(
+        "projects/demo/project.conf",
+        &format!(
+            "project: demo\norg: acme\nlanguages: rust\npath: {}\n",
+            repo.display()
+        ),
+    );
+
+    // From the repository root and from below it: the same claim either way, and what comes back
+    // is the repository root rather than the directory the caller happened to be standing in.
+    for dir in [repo.clone(), repo.join("crates"), repo.join("crates/cli")] {
+        let (project, claimed) = playbook::load::claiming_project(&fixture.root, &dir)
+            .expect("read the tree")
+            .expect("a project claims this checkout");
+        assert_eq!(project.name, "demo");
+        assert_eq!(claimed, fs::canonicalize(&repo).expect("canonical repo"));
+    }
+}
+
+#[test]
+fn a_directory_no_project_claims_is_not_discovered() {
+    let fixture = Fixture::new("unclaimed-project");
+    let elsewhere = fixture.root.join("somewhere-else");
+    fs::create_dir_all(&elsewhere).expect("create dir");
+
+    // The fixture's `demo` declares no `path:`, so the tree claims nothing at all — and a
+    // directory nobody claims must resolve to nothing rather than to the nearest project.
+    assert!(playbook::load::claiming_project(&fixture.root, &elsewhere)
+        .expect("read the tree")
+        .is_none());
+}

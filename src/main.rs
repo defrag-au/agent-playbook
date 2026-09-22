@@ -6,8 +6,8 @@ use std::process::ExitCode;
 
 use playbook::install::{self, Outcome};
 use playbook::load::{
-    census, find_root, find_root_with_source, included_by_some_target, list_projects, list_targets,
-    load_project, load_target, RootSource,
+    census, claiming_project, expand_tilde, find_root, find_root_with_source,
+    included_by_some_target, list_projects, list_targets, load_project, load_target, RootSource,
 };
 use playbook::model::{Activation, Diagnostic};
 use playbook::render;
@@ -28,9 +28,9 @@ commands
   rules      list every rule, and which projects activate it
 
 options
-  --project <name>   project under projects/
+  --project <name>   project under projects/ (install, check: inferred from the repository)
   --target <name>    target under models/ (default: the project's default_target)
-  --repo <path>      repository root (install, check)
+  --repo <path>      repository root (install, check; default: the working directory)
   --file <name>      filename within the repo (default: the target's default_file)
   --out <file>       write to a file instead of stdout (compose)
   --root <dir>       playbook root (default: found from the working directory, then
@@ -42,6 +42,7 @@ examples
   playbook compose --project shared-crates --target claude-code
   playbook install --project shared-crates --repo ~/code/defrag/shared-crates
   playbook check --project archivist --repo ~/code/hodlcroft/archivist
+  playbook check                     # from inside the repository: neither is needed
   playbook root
 ";
 
@@ -152,17 +153,6 @@ fn note_root(root: &Path, source: RootSource) {
     }
 }
 
-/// `~/x` to `$HOME/x`. The playbook stores repo paths with a tilde because that is how a
-/// person writes them.
-fn expand_tilde(path: &str) -> PathBuf {
-    if let Some(rest) = path.strip_prefix("~/") {
-        if let Some(home) = std::env::var_os("HOME") {
-            return PathBuf::from(home).join(rest);
-        }
-    }
-    PathBuf::from(path)
-}
-
 fn report(diagnostics: &[Diagnostic]) {
     for d in diagnostics {
         eprintln!("{d}");
@@ -170,9 +160,12 @@ fn report(diagnostics: &[Diagnostic]) {
 }
 
 /// Resolve, report, and stop if anything was fatal.
-fn resolved_or_exit(root: &Path, opts: &Opts) -> Result<Option<resolve::Resolved>, String> {
-    let project = opts.project.clone().ok_or("`--project` is required")?;
-    let resolved = resolve::resolve(root, &project, opts.target.as_deref())?;
+fn resolved_or_exit(
+    root: &Path,
+    project: &str,
+    target: Option<&str>,
+) -> Result<Option<resolve::Resolved>, String> {
+    let resolved = resolve::resolve(root, project, target)?;
     report(&resolved.diagnostics);
     if resolved.has_errors() {
         return Ok(None);
@@ -180,9 +173,59 @@ fn resolved_or_exit(root: &Path, opts: &Opts) -> Result<Option<resolve::Resolved
     Ok(Some(resolved))
 }
 
+/// The project a rule-only command is about, which it has to be told: `compose` and `list` ask
+/// what a project would render, and the answer is not a property of the directory you are in.
+fn named_project(opts: &Opts) -> Result<&str, String> {
+    opts.project
+        .as_deref()
+        .ok_or_else(|| "`--project` is required".to_string())
+}
+
+/// The repository a repository-scoped command is about, and the project that claims it.
+///
+/// `--repo` defaults to the working directory and `--project` to the project whose `path:` names
+/// that directory, so from inside a tracked checkout neither has to be given. An explicit `--repo`
+/// is never walked away from — it is the repository the caller named — while discovery from the
+/// working directory returns the claimed ancestor, so a command run from a subdirectory writes the
+/// block at the root rather than beside the source file the caller happened to be reading.
+fn repo_and_project(root: &Path, opts: &Opts) -> Result<(PathBuf, String), String> {
+    let named = opts.repo.as_deref().map(expand_tilde);
+    let anchor = match &named {
+        Some(path) => path.clone(),
+        None => std::env::current_dir()
+            .map_err(|e| format!("cannot read the working directory: {e}"))?,
+    };
+    if !anchor.is_dir() {
+        return Err(format!("no such directory: {}", anchor.display()));
+    }
+
+    let claimed = claiming_project(root, &anchor)?;
+    let repo = match (&named, &claimed) {
+        (Some(path), _) => path.clone(),
+        (None, Some((_, dir))) => dir.clone(),
+        (None, None) => anchor,
+    };
+
+    let project = match &opts.project {
+        Some(name) => name.clone(),
+        None => match claimed {
+            Some((project, _)) => project.name,
+            None => {
+                return Err(format!(
+                "no project claims {} — pass `--project <name>`; `playbook projects` lists them",
+                repo.display()
+            ))
+            }
+        },
+    };
+
+    Ok((repo, project))
+}
+
 fn cmd_compose(opts: &Opts) -> Result<ExitCode, String> {
     let root = root_of(opts)?;
-    let Some(resolved) = resolved_or_exit(&root, opts)? else {
+    let Some(resolved) = resolved_or_exit(&root, named_project(opts)?, opts.target.as_deref())?
+    else {
         return Ok(ExitCode::from(1));
     };
     let block = render::render(&resolved);
@@ -200,7 +243,8 @@ fn cmd_compose(opts: &Opts) -> Result<ExitCode, String> {
 
 fn cmd_list(opts: &Opts) -> Result<ExitCode, String> {
     let root = root_of(opts)?;
-    let Some(resolved) = resolved_or_exit(&root, opts)? else {
+    let Some(resolved) = resolved_or_exit(&root, named_project(opts)?, opts.target.as_deref())?
+    else {
         return Ok(ExitCode::from(1));
     };
 
@@ -285,12 +329,9 @@ fn or_dash(list: &[String]) -> String {
 fn cmd_install(opts: &Opts, check: bool) -> Result<ExitCode, String> {
     let (root, source) = root_of_with_source(opts)?;
     note_root(&root, source);
-    let repo = expand_tilde(opts.repo.as_deref().ok_or("`--repo` is required")?);
-    if !repo.is_dir() {
-        return Err(format!("no such directory: {}", repo.display()));
-    }
+    let (repo, project) = repo_and_project(&root, opts)?;
 
-    let Some(resolved) = resolved_or_exit(&root, opts)? else {
+    let Some(resolved) = resolved_or_exit(&root, &project, opts.target.as_deref())? else {
         return Ok(ExitCode::from(1));
     };
 

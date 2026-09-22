@@ -194,6 +194,49 @@ pub fn load_project(root: &Path, name: &str) -> Result<Project, String> {
     })
 }
 
+/// `~/x` to `$HOME/x`. A project names its checkout the way a person writes it, which is with a
+/// tilde.
+pub fn expand_tilde(path: &str) -> PathBuf {
+    if let Some(rest) = path.strip_prefix("~/") {
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home).join(rest);
+        }
+    }
+    PathBuf::from(path)
+}
+
+/// The project that claims `dir` — or the nearest ancestor of it that a project claims — with the
+/// directory it claimed.
+///
+/// Discovery runs from the repository rather than from a list of names: the caller is standing in
+/// the checkout, and `path:` is the one thing linking a project to it. Walking upwards is what makes
+/// a command run from a subdirectory resolve, which matters because a shell is usually in one — and
+/// the directory returned is the repository root, not wherever the command happened to be run.
+pub fn claiming_project(root: &Path, dir: &Path) -> Result<Option<(Project, PathBuf)>, String> {
+    let dir = real(dir);
+    for ancestor in dir.ancestors() {
+        for name in list_projects(root) {
+            let project = load_project(root, &name)?;
+            if project.path.is_empty() {
+                continue;
+            }
+            if real(&expand_tilde(&project.path)) == ancestor {
+                return Ok(Some((project, ancestor.to_path_buf())));
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Canonical where the path exists, verbatim where it does not.
+///
+/// A project whose checkout is not on this machine — or whose `path:` points at a directory the
+/// caller has not created yet — must not make the others unfindable, and comparing a symlinked
+/// path against the real one would do exactly that.
+fn real(path: &Path) -> PathBuf {
+    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
 pub fn load_target(root: &Path, name: &str) -> Result<Target, String> {
     let path = root.join("models").join(name).join("overlay.conf");
     if !path.is_file() {
