@@ -12,6 +12,14 @@ pub enum Activation {
     Language(String),
     /// Only when the project declares the org.
     Org(String),
+    /// Only when the project declares the ecosystem.
+    ///
+    /// The difference from [`Activation::Org`] is the one that produced this variant: an org is
+    /// where a repository lives and who operates it; an ecosystem is the conventions and tooling
+    /// it is built with. `~/code/hodlcroft/compositor` is operated by hodlcroft and built like a
+    /// defrag repo — same devshell, same toolkit — so the rules that are true of it because of
+    /// that are ecosystem rules, not org rules.
+    Ecosystem(String),
     /// Exactly one project.
     Project(String),
     /// Never automatic — a target must name the rule in its `include:`.
@@ -31,12 +39,15 @@ impl Activation {
                 if let Some(rest) = raw.strip_prefix("org:") {
                     return non_empty(rest, raw).map(Activation::Org);
                 }
+                if let Some(rest) = raw.strip_prefix("ecosystem:") {
+                    return non_empty(rest, raw).map(Activation::Ecosystem);
+                }
                 if let Some(rest) = raw.strip_prefix("project:") {
                     return non_empty(rest, raw).map(Activation::Project);
                 }
                 Err(format!(
                     "unknown activation `{raw}` — expected always, manual, \
-                     language:<name>, org:<name> or project:<name>"
+                     language:<name>, org:<name>, ecosystem:<name> or project:<name>"
                 ))
             }
         }
@@ -49,6 +60,7 @@ impl Activation {
             Activation::Manual => false,
             Activation::Language(lang) => project.languages.iter().any(|l| l == lang),
             Activation::Org(org) => project.org.as_deref() == Some(org.as_str()),
+            Activation::Ecosystem(ecosystem) => project.ecosystems.iter().any(|e| e == ecosystem),
             Activation::Project(name) => &project.name == name,
         }
     }
@@ -59,6 +71,7 @@ impl Activation {
             Activation::Manual => "manual".into(),
             Activation::Language(l) => format!("language:{l}"),
             Activation::Org(o) => format!("org:{o}"),
+            Activation::Ecosystem(e) => format!("ecosystem:{e}"),
             Activation::Project(p) => format!("project:{p}"),
         }
     }
@@ -265,6 +278,9 @@ pub struct Project {
     pub name: String,
     pub path: String,
     pub org: Option<String>,
+    /// The conventions and tooling this repository is built with, which is not always the org it
+    /// lives under. See [`Activation::Ecosystem`].
+    pub ecosystems: Vec<String>,
     pub languages: Vec<String>,
     pub default_target: Option<String>,
 }
@@ -364,6 +380,7 @@ mod tests {
             name: "shared-crates".into(),
             path: "~/code/defrag/shared-crates".into(),
             org: Some("defrag".into()),
+            ecosystems: vec!["defrag".into()],
             languages: vec!["rust".into()],
             default_target: Some("claude-code".into()),
         }
@@ -383,6 +400,10 @@ mod tests {
             Activation::Org("defrag".into())
         );
         assert_eq!(
+            Activation::parse("ecosystem:defrag").unwrap(),
+            Activation::Ecosystem("defrag".into())
+        );
+        assert_eq!(
             Activation::parse("project:archivist").unwrap(),
             Activation::Project("archivist".into())
         );
@@ -395,6 +416,7 @@ mod tests {
         assert!(Activation::parse("langauge:rust").is_err());
         assert!(Activation::parse("language:").is_err());
         assert!(Activation::parse("org:").is_err());
+        assert!(Activation::parse("ecosystem:").is_err());
     }
 
     #[test]
@@ -406,8 +428,26 @@ mod tests {
         assert!(!Activation::Language("go".into()).matches(&p));
         assert!(Activation::Org("defrag".into()).matches(&p));
         assert!(!Activation::Org("hodlcroft".into()).matches(&p));
+        assert!(Activation::Ecosystem("defrag".into()).matches(&p));
+        assert!(!Activation::Ecosystem("hodlcroft".into()).matches(&p));
         assert!(Activation::Project("shared-crates".into()).matches(&p));
         assert!(!Activation::Project("archivist".into()).matches(&p));
+    }
+
+    #[test]
+    fn an_org_and_an_ecosystem_are_independent_facts() {
+        // The case that produced the variant: a repository operated by one org and built with
+        // another's conventions. An `org:` rule must not reach it, and an `ecosystem:` rule must.
+        let p = Project {
+            name: "compositor".into(),
+            org: Some("hodlcroft".into()),
+            ecosystems: vec!["defrag".into()],
+            ..project()
+        };
+        assert!(Activation::Org("hodlcroft".into()).matches(&p));
+        assert!(!Activation::Org("defrag".into()).matches(&p));
+        assert!(Activation::Ecosystem("defrag".into()).matches(&p));
+        assert!(!Activation::Ecosystem("hodlcroft".into()).matches(&p));
     }
 
     #[test]

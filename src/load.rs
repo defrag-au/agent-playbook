@@ -7,7 +7,14 @@ use std::path::{Path, PathBuf};
 use crate::frontmatter::{parse_conf, split_document, split_list, Split};
 use crate::model::{split_sections, Diagnostic, Layer, Project, Rule, Section, Severity, Target};
 
-const PROJECT_KEYS: &[&str] = &["project", "path", "org", "languages", "default_target"];
+const PROJECT_KEYS: &[&str] = &[
+    "project",
+    "path",
+    "org",
+    "ecosystems",
+    "languages",
+    "default_target",
+];
 const TARGET_KEYS: &[&str] = &[
     "target",
     "model",
@@ -111,6 +118,10 @@ pub fn load_project(root: &Path, name: &str) -> Result<Project, String> {
         name: name.to_string(),
         path: conf.get("path").cloned().unwrap_or_default(),
         org: conf.get("org").cloned().filter(|s| !s.is_empty()),
+        ecosystems: conf
+            .get("ecosystems")
+            .map(|v| split_list(v))
+            .unwrap_or_default(),
         languages: conf
             .get("languages")
             .map(|v| split_list(v))

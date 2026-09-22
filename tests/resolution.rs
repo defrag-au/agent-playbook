@@ -183,6 +183,60 @@ fn the_personal_target_carries_no_rules_and_the_memory_layer() {
 }
 
 #[test]
+fn an_ecosystem_rule_reaches_a_repo_that_declares_it_and_not_one_that_does_not() {
+    // The distinction the selector exists for: a repository operated by one org and built with
+    // another's conventions. `demo` declares `org: acme` and `ecosystems: defrag`, so the org rule
+    // stays out and the ecosystem rule comes in.
+    let f = Fixture::new("ecosystem");
+    f.write(
+        "projects/demo/project.conf",
+        "project: demo\norg: acme\necosystems: defrag\nlanguages: rust\n",
+    )
+    .rule(
+        "org/defrag/service.md",
+        &rule_fm("service", "org", "org:defrag", ""),
+        "About the services.",
+    )
+    .rule(
+        "org/defrag/toolkit.md",
+        &rule_fm("toolkit", "org", "ecosystem:defrag", ""),
+        "About the toolchain.",
+    );
+
+    let resolved = f.resolve();
+    assert!(!resolved.has_errors(), "{:?}", resolved.diagnostics);
+    assert_eq!(ids(&resolved), vec!["toolkit"]);
+
+    // And the same repo without the declaration gets neither: an ecosystem is a fact a project
+    // states, not one inferred from a directory name.
+    f.write(
+        "projects/demo/project.conf",
+        "project: demo\norg: acme\nlanguages: rust\n",
+    );
+    assert!(ids(&f.resolve()).is_empty());
+}
+
+#[test]
+fn the_zed_target_resolves_for_every_project_in_the_ecosystem() {
+    // The zed overlay emphasises a rule that activates on `ecosystem:defrag`, and the composer
+    // treats an emphasis that resolves to nothing as an error — correctly, since it means the
+    // target is being used with a project it does not fit. This is the pair that caught it: the
+    // emphasis is only satisfiable where the rule is in the set, so every project that declares
+    // the ecosystem must be able to use this target, and `personal` (which does not) must not be
+    // expected to.
+    for project in list_projects(&repo_root()) {
+        let resolved = resolve(&repo_root(), &project, Some("zed")).expect("resolve");
+        let in_ecosystem = !resolved.project.ecosystems.is_empty();
+        assert_eq!(
+            resolved.has_errors(),
+            !in_ecosystem,
+            "{project}: zed resolves with errors exactly when it is outside the ecosystem: {:?}",
+            resolved.diagnostics
+        );
+    }
+}
+
+#[test]
 fn repo_targets_do_not_carry_the_memory_layer() {
     // The two files are complementary: memory is personal and loads everywhere, rules are
     // per-repo. A repo block carrying memory would duplicate it in every project.
@@ -197,12 +251,35 @@ fn repo_targets_do_not_carry_the_memory_layer() {
 
 #[test]
 fn org_rules_do_not_leak_into_another_org() {
-    // archivist is hodlcroft, not defrag. The D1 and widget rules are not true of it, and
-    // a flat rule set would have applied them anyway.
-    let resolved = resolve(&repo_root(), "archivist", None).expect("resolve");
-    assert!(ids(&resolved).iter().all(|id| !id.starts_with("defrag-")));
-    assert!(ids(&resolved).contains(&"rust-devshell-first"));
-    assert!(ids(&resolved).contains(&"archivist-devshell-commands"));
+    // archivist and compositor are hodlcroft, not defrag. The D1 and widget rules are not true of
+    // them, and a flat rule set would have applied them anyway.
+    //
+    // The check is on the **activation**, not on the id, and that distinction is the point of the
+    // ecosystem selector: `defrag-agent-tools` is named for the ecosystem it is shared across,
+    // not for the org that operates the repository, so an id prefix is not a test of anything.
+    // What must not leak is anything scoped to `org:defrag`.
+    for project in ["archivist", "compositor"] {
+        let resolved = resolve(&repo_root(), project, None).expect("resolve");
+        let leaked: Vec<&str> = resolved
+            .rules
+            .iter()
+            .filter(|rule| rule.activation == Activation::Org("defrag".into()))
+            .map(|rule| rule.id.as_str())
+            .collect();
+        assert!(
+            leaked.is_empty(),
+            "org:defrag rules reached {project}: {leaked:?}"
+        );
+        assert!(ids(&resolved).contains(&"rust-devshell-first"));
+        // And a rule that is true of it because of the *toolchain* does arrive — same shell, so
+        // the same instruction about what to reach for.
+        assert!(
+            ids(&resolved).contains(&"defrag-agent-tools"),
+            "{project} is on a defrag devshell and should carry the toolkit rule"
+        );
+    }
+    let archivist = resolve(&repo_root(), "archivist", None).expect("resolve");
+    assert!(ids(&archivist).contains(&"archivist-devshell-commands"));
 }
 
 #[test]

@@ -14,6 +14,15 @@ whose frontmatter does not parse is skipped with a warning, so `--list` is the c
 | `org/defrag/` | Is it true across the defrag ecosystem but not of my work generally? | D1 reads are cheap and writes are expensive |
 | `projects/<repo>/` | Is it true of exactly one repository? | archivist's redb cache is single-process |
 
+A rule in `org/defrag/` activates on one of two facts, and the difference matters:
+
+- **`org:defrag`** — the repository is operated by defrag. Use it for rules about our services.
+- **`ecosystem:defrag`** — the repository is *built* the defrag way, wherever it lives: the same
+devshell, the same toolkit, the conventions that follow. `~/code/hodlcroft/compositor` is this
+case.
+
+See the activation table in [`../docs/rule-format.md`](../docs/rule-format.md).
+
 Move a rule **up** the moment a second consumer needs it. Move it **down** the moment only
 one consumer needs it. A rule at the wrong layer is how the duplication this repo exists to
 fix got started.
