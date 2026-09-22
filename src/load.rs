@@ -5,18 +5,22 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::frontmatter::{parse_conf, split_document, split_list, Split};
-use crate::model::{Addendum, Diagnostic, Layer, Project, Rule, Severity, Target};
+use crate::model::{split_sections, Diagnostic, Layer, Project, Rule, Section, Severity, Target};
 
 const PROJECT_KEYS: &[&str] = &["project", "path", "org", "languages", "default_target"];
 const TARGET_KEYS: &[&str] = &[
     "target",
     "model",
     "harness",
+    "title",
     "include",
     "exclude",
+    "exclude_activation",
     "emphasis",
     "addenda",
+    "memory",
     "default_file",
+    "instruction_files",
 ];
 const RULE_KEYS: &[&str] = &[
     "id",
@@ -136,15 +140,23 @@ pub fn load_target(root: &Path, name: &str) -> Result<Target, String> {
         name: name.to_string(),
         model: conf.get("model").cloned().unwrap_or_default(),
         harness: conf.get("harness").cloned().unwrap_or_default(),
+        title: conf
+            .get("title")
+            .cloned()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "Agent rules".to_string()),
         include: list("include"),
         exclude: list("exclude"),
+        exclude_activation: list("exclude_activation"),
         emphasis: list("emphasis"),
         addenda: list("addenda"),
+        memory: list("memory"),
         default_file: conf
             .get("default_file")
             .cloned()
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "AGENTS.md".to_string()),
+        instruction_files: list("instruction_files"),
     })
 }
 
@@ -299,16 +311,22 @@ fn parse_rule(rel: &str, path: &Path) -> (Option<Rule>, Vec<Diagnostic>) {
         },
     };
 
-    let body = split.body.trim().to_string();
-    if body.is_empty() {
+    let sections = split_sections(split.body);
+    if sections.directive.is_empty() {
         diagnostics.push(Diagnostic::error(format!(
-            "{rel}: rule has no body — a heading with no text cannot constrain anything"
+            "{rel}: rule has no directive — a heading with no text cannot constrain anything"
         )));
     }
 
+    // A missing `## Directive` is *not* reported here. Format conformance is a test-suite
+    // concern in this repository (see `every_rule_has_a_directive_section`), not a runtime
+    // one: emitting one warning per unmigrated rule on every invocation buries the warnings
+    // that are actually about this run, and a wall of warnings is how you teach someone to
+    // ignore them.
+
     match (id, title, layer, activation, priority) {
         (Some(id), Some(title), Some(layer), Some(activation), Some(priority))
-            if !body.is_empty() =>
+            if !sections.directive.is_empty() =>
         {
             (
                 Some(Rule {
@@ -320,7 +338,8 @@ fn parse_rule(rel: &str, path: &Path) -> (Option<Rule>, Vec<Diagnostic>) {
                     overrides: split.list("overrides"),
                     targets: split.list("targets"),
                     rel: rel.to_string(),
-                    body,
+                    directive: sections.directive,
+                    rationale: sections.rationale,
                 }),
                 diagnostics,
             )
@@ -329,10 +348,20 @@ fn parse_rule(rel: &str, path: &Path) -> (Option<Rule>, Vec<Diagnostic>) {
     }
 }
 
-pub fn load_addendum(root: &Path, target: &str, name: &str) -> Result<Addendum, String> {
+pub fn load_addendum(root: &Path, target: &str, name: &str) -> Result<Section, String> {
     let path = root.join("models").join(target).join("addenda").join(name);
     let body = read(&path)?;
-    Ok(Addendum {
+    Ok(Section {
+        name: name.to_string(),
+        body,
+    })
+}
+
+/// Read a file from the `memory/` layer.
+pub fn load_memory(root: &Path, name: &str) -> Result<Section, String> {
+    let path = root.join("memory").join(name);
+    let body = read(&path)?;
+    Ok(Section {
         name: name.to_string(),
         body,
     })

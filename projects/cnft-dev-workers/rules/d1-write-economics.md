@@ -8,25 +8,25 @@ overrides:
 targets:
 ---
 
-Optimise Cloudflare D1 access for billing: reads are cheap, writes are expensive.
+## Directive
 
-- **Check existence before writing**, so a write that would be a no-op never happens. This
-  also avoids paying for CONFLICT handling.
-- **Avoid triggers** — they turn one write into several.
-- **Avoid foreign keys** where they can be avoided; they add write complexity.
-- **Batch deliberately.** Many small writes cost more than one larger write.
-- **Always use the `query!` macro** for D1 operations. Never use manual parameter binding —
-  D1 has strict JavaScript type requirements and the macro is what enforces them.
+D1 billing: reads are cheap, writes are expensive. Optimise Cloudflare D1 access for that.
 
-## Why it is worth stating
+- Check existence before writing → a write that would be a no-op never happens, and CONFLICT
+  handling is not paid for.
+- Avoid triggers (they turn one write into several) · avoid foreign keys (they add write
+  complexity) · batch deliberately (many small writes cost more than one larger write).
+- Always use the `query!` macro for D1 operations — never manual parameter binding (D1 has
+  strict JavaScript type requirements, and the macro is what enforces them).
 
-The cost model is not the one most engineers assume. "Write the row and let the database
+## Rationale
+
+**The cost model is not the one most engineers assume.** "Write the row and let the database
 deduplicate" is the natural instinct from Postgres, and it is the expensive choice here. A
 rule that is counter-intuitive is a rule that needs writing down, because the intuitive
 answer will be reached independently by every agent that touches this code.
 
-## Why this is a project rule and not an org rule
-
-D1 is used here. It is not used in `shared-crates`, so as an org rule it would have been a
-false positive on every non-worker repo in the ecosystem. When a second repo starts using D1,
-move this up to `rules/org/defrag/` and change `activation:` to `org:defrag`.
+**Why this is a project rule and not an org rule.** D1 is used here. It is not used in
+`shared-crates`, so as an org rule it would have been a false positive on every non-worker
+repo in the ecosystem. When a second repo starts using D1, move this up to `rules/org/defrag/`
+and change `activation:` to `org:defrag`.

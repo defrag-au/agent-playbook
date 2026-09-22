@@ -8,33 +8,34 @@ overrides:
 targets:
 ---
 
-Never fabricate values to make a function, a fixture or a screen look functional.
+## Directive
 
-If an interface needs data, **find out where that data actually comes from before writing a
-placeholder.** The source almost always exists — a config file, a table, an API response, a
-sibling implementation, an environment variable. Look for it. If a genuine search turns up
-nothing, ask where it should come from rather than inventing it.
+- Never fabricate a value to make a function, fixture or screen look functional. Before
+  writing a placeholder, find where the data actually comes from — a config file, a table, an
+  API response, a sibling implementation, an env var. A real search turning up nothing → ask,
+  do not invent.
+- Same rule for: a plausible address, hash or timestamp invented for a fixture (it hides real
+  parsing bugs, because invented data is already in the format the code expects) ·
+  `unwrap_or(0)`, `Default::default()` or a hard-coded fallback on a value that should have
+  been sourced · a struct written from memory of what an API "should" return (cite the actual
+  response or the docs) · a test asserting what the code currently does · a confident
+  explanation of a failure you have not verified.
+- Choosing a sensible default and **stating it** is fine. Inventing a value and presenting it
+  as data is not. Test: if someone asks "where does this number come from?", is there an
+  answer? "Nowhere yet" → say so and ask.
 
-This applies to more than literals:
+## Rationale
 
-- **Sample data in a fixture** — a realistic-looking address, hash or timestamp that was
-  invented rather than captured. It hides real parsing bugs, because invented data is
-  already in the format the code expects. The interesting inputs are the ones an external
-  source actually sends.
-- **A default that looks like a decision** — `unwrap_or(0)`, `Default::default()`, a
-  hard-coded fallback. A silent default on a value that should have been sourced is
-  fabricated data wearing a type.
-- **A plausible API shape** — writing a struct from memory of what an API "should" return,
-  then deriving the parser from it. Cite the actual response or the actual docs.
-- **A test that asserts what the code currently does** — that is inventing a specification
-  to match an implementation.
-- **An explanation of why something is broken** — a confident mechanism you have not
-  verified. "It's probably a caching issue" is a made-up value in prose form.
+Invented data is worse than missing data, because it is already in the format the code
+expects. A plausible fixture hides real parsing bugs — the interesting inputs are the ones an
+external source actually sends, and a made-up one cannot be wrong in the way that matters.
 
-## The distinction that matters
+A silent default is fabricated data wearing a type. `unwrap_or(0)` on a value that should
+have been read from somewhere looks like a decision, and it is read as one by whoever finds
+it later.
 
-Making things up is not the same as *choosing*. Choosing a sensible default and stating it
-is fine. Inventing a value and presenting it as data is not. The test: if someone later asks
-"where does this number come from?", is there an answer?
+"A plausible API shape" is the version of this that survives longest: a struct written from
+memory, then a parser derived from it, then a bug that only appears against the real service.
 
-If the answer is "nowhere yet", say so plainly and ask.
+In prose the same failure is a confident mechanism you have not checked — "it's probably a
+caching issue" is a made-up value in sentence form.

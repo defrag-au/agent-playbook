@@ -24,6 +24,40 @@ fn ids(resolved: &playbook::resolve::Resolved) -> Vec<&str> {
 
 // --- against the real tree -------------------------------------------------
 
+/// Every rule must declare its directive explicitly.
+///
+/// The compiler is not a linter — it compiles whatever it is handed, and a rule with no
+/// `## Directive` is emitted whole. That is the right behaviour at compose time (never lose a
+/// rule's text) and the wrong thing to leave unnoticed, so the contract lives here, where a
+/// failure names every offender at once instead of printing a warning on every command.
+///
+/// This counted down from 34 as a ratchet while the migration was in progress. The migration
+/// is complete, so it is a plain gate. A future change that needs a migration budget again
+/// should reintroduce the ratchet shape — with a non-zero budget, or the comparisons that make
+/// a ratchet a ratchet become degenerate and clippy says so.
+#[test]
+fn every_rule_declares_a_directive() {
+    let (rules, _) = load_rules(&repo_root());
+    let offenders: Vec<&str> = rules
+        .iter()
+        .filter(|rule| {
+            let source = fs::read_to_string(repo_root().join(&rule.rel)).expect("read rule");
+            !playbook::model::split_sections(playbook::frontmatter::split_document(&source).body)
+                .has_directive
+        })
+        .map(|rule| rule.rel.as_str())
+        .collect();
+
+    assert!(
+        offenders.is_empty(),
+        "{} rule(s) have no `## Directive` section, so their whole body is compiled. Split \
+         each into `## Directive` (the terse direction, emitted) and `## Rationale` (the \
+         incident, kept at source) — see docs/rule-format.md.\n  {}",
+        offenders.len(),
+        offenders.join("\n  ")
+    );
+}
+
 #[test]
 fn every_rule_in_the_tree_parses_and_has_a_body() {
     let (rules, diagnostics) = load_rules(&repo_root());
@@ -74,10 +108,14 @@ fn every_known_project_resolves_without_errors() {
             "{project} resolved with errors:\n{}",
             messages.join("\n")
         );
-        assert!(
-            !resolved.rules.is_empty(),
-            "{project} resolved to zero rules"
-        );
+        // `personal` is the one project that legitimately carries no rules — see
+        // `the_personal_target_carries_no_rules_and_the_memory_layer`.
+        if project != "personal" {
+            assert!(
+                !resolved.rules.is_empty(),
+                "{project} resolved to zero rules"
+            );
+        }
     }
 }
 
@@ -115,6 +153,46 @@ fn layer_order_is_core_then_language_then_org_then_project() {
             .all(|r| r.layer.rank() < Layer::Project.rank()),
         "a lower layer sorted after the project layer"
     );
+}
+
+#[test]
+fn the_personal_target_carries_no_rules_and_the_memory_layer() {
+    // Zed's personal instructions file loads for every project the user opens, and an agent
+    // reads it *alongside* the project's own file. So it must carry no rules at all: the
+    // universal rules ship in each repository's block, because a repo is bootstrapped with
+    // them and its `AGENTS.md` is committed and shared. Repeating them here would be
+    // duplication with no reader.
+    //
+    // What it carries is the `memory/` layer — facts about the person and the machine that
+    // are true regardless of repository, and that no repo's block should hold.
+    let resolved = resolve(&repo_root(), "personal", Some("zed-personal")).expect("resolve");
+    assert!(!resolved.has_errors(), "{:?}", resolved.diagnostics);
+    assert!(
+        resolved.rules.is_empty(),
+        "the personal file must carry no rules, but resolved: {:?}",
+        resolved
+            .rules
+            .iter()
+            .map(|rule| rule.rel.as_str())
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !resolved.memory.is_empty(),
+        "the personal instructions file would be empty"
+    );
+}
+
+#[test]
+fn repo_targets_do_not_carry_the_memory_layer() {
+    // The two files are complementary: memory is personal and loads everywhere, rules are
+    // per-repo. A repo block carrying memory would duplicate it in every project.
+    for project in ["shared-crates", "cnft-dev-workers", "archivist"] {
+        let resolved = resolve(&repo_root(), project, None).expect("resolve");
+        assert!(
+            resolved.memory.is_empty(),
+            "{project} carries the memory layer"
+        );
+    }
 }
 
 #[test]
@@ -426,7 +504,7 @@ fn an_unknown_activation_is_fatal() {
 }
 
 #[test]
-fn a_missing_body_is_fatal() {
+fn a_rule_with_no_directive_is_fatal() {
     let f = Fixture::new("empty-body");
     f.write(
         "rules/core/a.md",
@@ -439,8 +517,30 @@ fn a_missing_body_is_fatal() {
         resolved
             .diagnostics
             .iter()
-            .any(|d| d.message.contains("no body")),
-        "expected a body error, got {:?}",
+            .any(|d| d.message.contains("no directive")),
+        "expected a directive error, got {:?}",
+        resolved.diagnostics
+    );
+}
+
+#[test]
+fn a_rule_whose_directive_section_is_empty_is_fatal() {
+    // The heading is present but carries no text. That is the same failure as no body at all:
+    // a heading that constrains nothing.
+    let f = Fixture::new("empty-directive");
+    f.write(
+        "rules/core/a.md",
+        "---\nid: a\ntitle: a\nlayer: core\nactivation: always\n---\n\n## Directive\n\n## Rationale\n\nWhy it matters.\n",
+    );
+
+    let resolved = f.resolve();
+    assert!(resolved.has_errors());
+    assert!(
+        resolved
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("no directive")),
+        "expected a directive error, got {:?}",
         resolved.diagnostics
     );
 }

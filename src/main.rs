@@ -195,10 +195,16 @@ fn cmd_list(opts: &Opts) -> Result<ExitCode, String> {
         resolved.target.name, resolved.target.model, resolved.target.harness
     );
     println!(
-        "include: {}   exclude: {}   emphasis: {}",
+        "include: {}   exclude: {}   exclude_activation: {}   emphasis: {}",
         or_dash(&resolved.target.include),
         or_dash(&resolved.target.exclude),
+        or_dash(&resolved.target.exclude_activation),
         or_dash(&resolved.target.emphasis)
+    );
+    println!(
+        "memory: {}   addenda: {}",
+        or_dash(&resolved.target.memory),
+        or_dash(&resolved.target.addenda)
     );
 
     let width = resolved
@@ -225,6 +231,9 @@ fn cmd_list(opts: &Opts) -> Result<ExitCode, String> {
         );
     }
     println!("\n{} rules", resolved.rules.len());
+    if !resolved.memory.is_empty() {
+        println!("memory sections: {}", resolved.memory.len());
+    }
 
     if !resolved.superseded.is_empty() {
         println!("superseded by a higher layer:");
@@ -264,6 +273,17 @@ fn cmd_install(opts: &Opts, check: bool) -> Result<ExitCode, String> {
         .file
         .clone()
         .unwrap_or_else(|| resolved.target.default_file.clone());
+
+    // A harness that reads only the first matching instruction file will silently ignore the
+    // one we write if something outranks it. Say so before writing anything.
+    for shadow in install::shadowing_files(&repo, &file, &resolved.target.instruction_files) {
+        eprintln!(
+            "warning: {} outranks {} in {}'s instruction-file order — the managed block will \
+             NOT be read. Remove it, or install into it instead with `--file {shadow}`.",
+            shadow, file, resolved.target.name
+        );
+    }
+
     let block = render::render(&resolved);
 
     match install::write(&repo, &file, &block, check)? {

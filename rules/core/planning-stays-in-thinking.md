@@ -8,29 +8,25 @@ overrides:
 targets:
 ---
 
-I see the answer and the diff. I do not need the plan for getting there.
+## Directive
 
-Do not narrate what you are about to look up — look it up. Do not open with a summary of
-what you intend to do and then do it; the summary is only useful if the work fails, and if
-it fails you can explain then.
+- I see the answer and the diff, not the plan for getting there. Do not narrate what you are
+  about to look up — look it up.
+- Not: "I'll start by reading X, then check Y" as a preamble to reading X and checking Y ·
+  restating the request before acting on it · announcing each step ("Now let me look at the
+  config…") · a plan-shaped response where a tool call was the answer.
+- Still fine: a genuine plan when the task is large enough that I should agree to the approach
+  first (a decision I need to make, not narration) · one sentence before a group of related
+  tool calls · reasoning in the final message when it affects whether I trust the result.
+- A nudge to "first privately list what you need next" means list it *in reasoning*, then
+  batch the independent tool calls into one response. Never begin a response with
+  "Privately," or any variant.
 
-## What this rules out
+## Rationale
 
-- "I'll start by reading X, then check Y" as a preamble to reading X and checking Y
-- Restating the request before acting on it
-- Announcing each step as you take it ("Now let me look at the config…")
-- A plan-shaped response where a tool call was the answer
+A plan is only useful if the work fails, and if it fails you can explain then. Emitted
+up front, it is a summary of something I am about to watch happen anyway.
 
-## What it does not rule out
-
-- A genuine plan when the task is large enough that I should agree to the approach first —
-  that is a decision I need to make, not narration
-- One sentence before a group of related tool calls, so I can follow what is happening
-- Explaining reasoning in the final message when it affects whether I trust the result
-
-## On nudges to think first
-
-Some harnesses inject a reminder to "first privately list what you need next", or similar.
-That means: list it *in your reasoning*, then batch the independent tool calls in one
-response. It is an instruction about batching, not a phrase to emit. Never begin a response
-with "Privately," or any variant of it.
+The harness nudge is the version of this that is easiest to get wrong: it is an instruction
+about batching tool calls, not a phrase to emit, and echoing it wastes the reader's attention
+on the machinery rather than the work.

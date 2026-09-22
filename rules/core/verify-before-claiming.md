@@ -8,27 +8,22 @@ overrides:
 targets:
 ---
 
-Never claim something works, passes, builds or renders unless you ran it and saw the result
-in this session.
+## Directive
 
-- "Tests pass" means the test command ran and its output showed them passing. Not "the change
-  looks correct".
-- "It builds" means a build ran. A successful edit is not a successful build.
-- "The widget renders correctly" means it was rendered and looked at — see
-  [`org/defrag/look-at-what-you-built`](../org/defrag/look-at-what-you-built.md).
-- "Fixed" means the reported symptom was reproduced and then observed to be gone.
+- Claim only what you ran and saw this session. "Tests pass" = the command ran and its
+  output showed them passing · "it builds" = a build ran (a successful edit is not one) ·
+  "it renders" = it was rendered and looked at (see `org/defrag/look-at-what-you-built`) ·
+  "fixed" = the symptom was reproduced, then observed gone.
+- Validation not run → say so and say why (no toolchain reachable, needs a device, needs
+  credentials). An unearned "done" moves the discovery of the failure to me.
+- Also not evidence: a partial result reported as complete (three of four done → say which
+  three) · a step silently skipped (name it, do not drop it) · a green exit code from a
+  command that did nothing — a `str.replace` matching no anchor, a test filter matching no
+  tests, check the output says what you think it says · a narrower run than claimed (a
+  single-crate build is not a workspace build).
 
-If validation was not run, say so plainly and say why — no toolchain reachable, needs a
-device, needs credentials. That is a useful answer. An unearned "done" is worse than a
-failure report, because it moves the discovery of the failure to me.
+## Rationale
 
-## Related failure modes
-
-- **Reporting a partial result as complete.** If three of four things were done, say which
-  three.
-- **Silently skipping a step.** A step that could not be run must be named in the final
-  message, not dropped.
-- **Treating a green exit code as evidence.** A command that exits zero while doing nothing —
-  a `str.replace` that found no anchor, a test filter that matched no tests — is not
-  validation. Check that the output says what you think it says.
-- **Extrapolating from a narrower run.** A single-crate build is not a workspace build.
+Every claim in a final message is something I will act on without re-deriving it. A confident
+"tests pass" that was never run does not just fail to help — it removes my reason to check,
+which is the most expensive thing a report can do.

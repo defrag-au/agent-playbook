@@ -8,8 +8,10 @@ overrides:
 targets:
 ---
 
-Always use inline format arguments. Clippy warns on the alternative, and the lint is baked
-into the lint command as an error.
+## Directive
+
+Inline format arguments everywhere — clippy warns on the alternative and the lint command
+treats warnings as errors.
 
 ```rust
 // no
@@ -21,17 +23,19 @@ format!("Hello {name}")
 println!("wrote {count} rows to {path}")
 ```
 
-Applies to every formatting macro: `format!`, `println!`, `eprintln!`, `write!`,
-`writeln!`, `panic!`, `assert!`, `assert_eq!`, `debug_assert!`, `tracing` macros.
+- Every formatting macro: `format!`, `println!`, `eprintln!`, `write!`, `writeln!`, `panic!`,
+  `assert!`, `assert_eq!`, `debug_assert!`, `tracing` macros.
+- New code → inline args from the first draft.
+- Editing existing code → convert the lines you are already touching · do not sweep the file.
+  Broadly non-compliant file → `clippy --fix` as its own change — see
+  [`rust-tooling-handles-grunt-work`](tooling-handles-grunt-work.md).
 
-## When writing new code
+## Rationale
 
-Use inline args from the first draft. Do not write `{}` and expect a later pass to catch it —
-that pass is the one that costs a round trip.
+The lint is baked into the lint command as an error, so a `{}` is a build failure rather than a
+style note — which is why this is stated as a rule rather than left to review.
 
-## When editing existing code
-
-Convert to inline args in the lines you are already touching. Do not sweep the file: an
-unrelated formatting change buries the diff I asked for. If a file is broadly non-compliant,
-let `clippy --fix` handle it as its own change — see
-[`rust-tooling-handles-grunt-work`](tooling-handles-grunt-work.md).
+Writing `{}` and expecting a later pass to catch it costs a round trip through the compiler to
+fix something that was free to get right the first time. Sweeping a file to fix it costs the
+reviewer the diff they asked for, which is why the conversion is scoped to the lines already
+being touched.

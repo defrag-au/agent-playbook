@@ -8,7 +8,9 @@ overrides:
 targets:
 ---
 
-**Always use `wasm-safe-serde` for `u64`/`i64` fields.** It handles both the string and the
+## Directive
+
+**Always use `wasm-safe-serde` for `u64`/`i64` fields** — it handles both the string and the
 integer representation, which external APIs send inconsistently.
 
 ```rust
@@ -19,10 +21,10 @@ pub amount: u64,
 pub fee: Option<u64>,
 ```
 
-**Never write a custom deserializer for number/string handling** — `wasm-safe-serde` already
-handles it, and a hand-rolled one will handle fewer cases than it does.
+Never write a custom deserializer for number/string handling — a hand-rolled one handles fewer
+cases than the crate does.
 
-## Why
+## Rationale
 
 JavaScript numbers cannot represent all `u64` values, so JSON APIs written in JS send them as
 strings; APIs written in Rust send them as numbers. The same field can arrive either way
@@ -31,7 +33,6 @@ this, which means the failure mode of not using it is an intermittent deserializ
 on large values only — the kind that passes every test with small fixtures and breaks in
 production.
 
-## Why this is a project rule and not an org rule
-
-It is here because this is the repo that consumes those external APIs. Move it up to
-`rules/org/defrag/` if a second repo starts deserializing third-party JSON.
+**Why this is a project rule and not an org rule.** It is here because this is the repo that
+consumes those external APIs. Move it up to `rules/org/defrag/` if a second repo starts
+deserializing third-party JSON.

@@ -42,9 +42,9 @@ delivery mechanism.
 | `models/` | Per-model and per-harness tweaks | Changes per model release | Overlay applied at compose time |
 
 The distinction that matters most: **a rule constrains every response, a skill runs a
-procedure, a reference is looked up.** The eight mis-filed skills move into `rules/`
-(most of them) or `skills/` (the two that are genuinely procedural — crate research and
-the widget screenshot loop).
+procedure, a reference is looked up.** The eight mis-filed skills went six into `rules/`, one
+into `skills/crate-research`, and one — `rust-environment-verification` — to the bin, because
+its advice had been made wrong by the devshell. See [`docs/inventory.md`](docs/inventory.md).
 
 ## Precedence
 
@@ -55,9 +55,13 @@ explicitly with an `overrides:` field naming the rule it replaces.
 1. rules/core/                 universal — every model, every language, every repo
 2. rules/<language>/           rust/, and whatever else appears
 3. rules/org/<org>/            defrag/ — ecosystem-wide conventions
-4. projects/<repo>/            this repository only
-5. <repo>/AGENTS.md            hand-written, outside the managed block — the user's own file, always wins
+4. projects/<repo>/rules/      this repository only
 ```
+
+A repository's own `<repo>/AGENTS.md` is **not in the chain**, because the composer only ever
+writes between its own markers. Hand-written content in that file cannot conflict with a
+rule, because the two never occupy the same bytes — which is a stronger guarantee than
+winning an argument about precedence.
 
 `models/<target>/` is not a precedence layer. It is a *filter and amplifier* over the
 result: it can exclude rules, emphasise them, and append harness-specific addenda. A model
@@ -139,7 +143,7 @@ could run on a machine before its devshell existed. It was replaced after it pro
    match". The exclusion feature never worked.
 
 Neither failed loudly, and neither was the kind of thing a script could be tested for
-cheaply. The Rust version has 61 tests, an exhaustive `match` on activation, and a rule that
+cheaply. The Rust version has 63 tests, an exhaustive `match` on activation, and a rule that
 will not compile if a variant is unhandled. The dependency-free property survives — the
 crate has no dependencies at all, so it still builds with no network and no registry cache.
 

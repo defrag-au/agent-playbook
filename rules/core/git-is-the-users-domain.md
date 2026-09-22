@@ -8,23 +8,24 @@ overrides:
 targets:
 ---
 
-Do not run `git commit`, `git push`, `git merge`, `git rebase`, `git tag`, or any other
-command that mutates history or a remote, unless I specifically ask for it.
+## Directive
 
-Making file edits is the job. **Committing is not** — leave changes staged or unstaged for
-me to review and commit myself. I want to see the diff before it becomes history, and I
-usually want to write the message.
+- Do not run `git commit`, `push`, `merge`, `rebase`, `tag` or anything else that mutates
+  history or a remote unless I specifically ask. Leave changes staged or unstaged for me to
+  review and commit myself.
+- Read-only git is always fine: `status`, `diff`, `log`, `show`, `blame`. Use `--no-pager` on
+  all of them.
+- Branching for work is fine when it helps. Creating a branch rewrites nothing I have to
+  unpick.
+- Also: no `[skip ci]`, `--no-verify` or bypassing hooks without asking · no amend,
+  force-push or reset · do not commit artefacts `.gitignore` excludes, even when they are up
+  to date · do not write a commit message and leave it staged in a way that suggests it was
+  committed.
 
-Read-only git is always fine: `git status`, `git diff`, `git log`, `git show`, `git blame`.
-Use `--no-pager` on all of them.
+## Rationale
 
-Branching for work is fine when it helps. Creating a branch is not rewriting anything I
-have to unpick.
+I want to see the diff before it becomes history, and I usually want to write the message.
 
-## Also
-
-- Do not add `[skip ci]`, `--no-verify`, or bypass hooks without asking
-- Do not amend, force-push, or reset anything
-- Do not commit generated artefacts that `.gitignore` excludes — if `dist/` is ignored, it
-  stays uncommitted even when it is up to date
-- Do not write a commit message and leave it staged in a way that suggests it was committed
+The sub-rules are the same principle at smaller scale: `--no-verify` and `[skip ci]` both
+bypass a check I put there deliberately, and a `dist/` that is gitignored but committed anyway
+means the ignore rule is now decorative.
