@@ -2,7 +2,7 @@
 id: defrag-agent-tools
 title: Read code and history with the agent tools, not with the shell
 layer: org
-activation: org:defrag
+activation: ecosystem:defrag
 priority: 60
 overrides:
 targets:
@@ -68,3 +68,12 @@ The tool exists and is on `PATH` in every defrag devshell, which is not enough o
 agent reaches for the command it knows, and only looks for an alternative when that one is
 unavailable. So the rule is keyed on the substitution — `rg` → `at-peek search`, `git status` →
 `at-recall state` — because that is the form the thought takes at the moment of the reach.
+
+**Why `ecosystem:defrag` and not `org:defrag`.** The rule is true of a repository because of the
+toolchain it is built with, not because of who operates it: `~/code/hodlcroft/compositor` lives
+under a hodlcroft directory and takes its devshell — and so its `at-*` binaries — from
+`defrag-nix`'s `rust-worker-stack`, so it is a repository this rule is true of. An org-scoped
+activation said only "the repos whose directory happens to be called defrag", which was a proxy
+that went wrong the first time a repo outside that directory used the same shell. The layer stays
+`org` because that is where it sorts; the activation is the precise statement of what it depends
+on. See the activation table in `docs/rule-format.md`.

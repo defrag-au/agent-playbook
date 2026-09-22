@@ -101,6 +101,17 @@ rule, then deleted: `archivist` agrees with `rules/rust/devshell-first` and need
 only an addition. Shipping an override to demonstrate the mechanism would have been a second
 copy of a rule that was already correct. No rule in the tree overrides another today.
 
+**5. An org-scoped rule that was really an ecosystem rule.** `defrag-agent-tools` activated on
+`org:defrag`, which said *the repositories whose directory is called defrag*. What made it true was
+the toolchain: every `defrag-nix` devshell carries the `at-*` binaries, and
+`~/code/hodlcroft/compositor` is built with that shell while being operated by hodlcroft. The
+difference never showed until a block was installed there, where it failed loudly — the `zed`
+overlay's `emphasis:` names a rule that was not in the set. Resolved by adding **`ecosystem:defrag`**
+as an activation (the project declares `ecosystems: defrag`), which separates *who operates the
+repository* from *what it is built with*. The rule's `layer` is unchanged, because `layer` is a rank
+and `activation` is the precise statement of what the rule depends on; this is the first rule where
+the two say different things.
+
 ## Not migrated
 
 - **Black Flag dark-mode rules.** `/Users/damo/code/defrag/blackflag/CLAUDE.md` is not in this

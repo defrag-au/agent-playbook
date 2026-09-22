@@ -7,7 +7,14 @@ use std::path::{Path, PathBuf};
 use crate::frontmatter::{parse_conf, split_document, split_list, Split};
 use crate::model::{split_sections, Diagnostic, Layer, Project, Rule, Section, Severity, Target};
 
-const PROJECT_KEYS: &[&str] = &["project", "path", "org", "languages", "default_target"];
+const PROJECT_KEYS: &[&str] = &[
+    "project",
+    "path",
+    "org",
+    "ecosystems",
+    "languages",
+    "default_target",
+];
 const TARGET_KEYS: &[&str] = &[
     "target",
     "model",
@@ -32,27 +39,88 @@ const RULE_KEYS: &[&str] = &[
     "targets",
 ];
 
-/// Locate the playbook root.
+/// How the root was found, so a caller can say which tree it resolved against.
 ///
-/// Order: an explicit `--root`, `PLAYBOOK_ROOT`, the nearest ancestor of the working
-/// directory that looks like the playbook, then the directory this binary was built from.
-/// The last of those is a fallback for an installed binary invoked from somewhere else
-/// entirely; it is last because it is the only one that can go stale.
-pub fn find_root(explicit: Option<&Path>) -> Result<PathBuf, String> {
+/// It matters because a verdict reads the same either way: `check` against the packaged copy and
+/// `check` against the checkout you are editing both print `ok`, and only one of them is about the
+/// rules you just changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootSource {
+    /// `--root <path>`
+    Named,
+    /// `PLAYBOOK_ROOT`
+    Environment,
+    /// An ancestor of the working directory: the checkout the caller is standing in.
+    WorkingDirectory,
+    /// Beside the installed binary, in `share/playbook` — the copy this binary was packaged with.
+    Installed,
+    /// The directory this binary was compiled in, which is a checkout under `cargo run`.
+    BuildDirectory,
+}
+
+impl RootSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RootSource::Named => "--root",
+            RootSource::Environment => "PLAYBOOK_ROOT",
+            RootSource::WorkingDirectory => "the working directory",
+            RootSource::Installed => "the packaged copy",
+            RootSource::BuildDirectory => "the build directory",
+        }
+    }
+
+    /// Whether this is the copy that shipped with the binary rather than a tree the caller is
+    /// standing in or named.
+    pub fn is_packaged(&self) -> bool {
+        matches!(self, RootSource::Installed)
+    }
+}
+
+/// Locate the playbook root, and say how.
+///
+/// Order: an explicit `--root`, `PLAYBOOK_ROOT`, the nearest ancestor of the working directory
+/// that looks like the playbook, then the data an installed binary carries beside itself, then the
+/// directory this binary was built in. The last two are for a binary invoked from somewhere else
+/// entirely; the build directory is last because in a packaged build it is a directory that no
+/// longer exists, so naming it is the honest failure.
+pub fn find_root_with_source(explicit: Option<&Path>) -> Result<(PathBuf, RootSource), String> {
     if let Some(dir) = explicit {
-        return validate_root(dir);
+        return validate_root(dir).map(|dir| (dir, RootSource::Named));
     }
     if let Some(dir) = std::env::var_os("PLAYBOOK_ROOT") {
-        return validate_root(Path::new(&dir));
+        return validate_root(Path::new(&dir)).map(|dir| (dir, RootSource::Environment));
     }
     if let Ok(cwd) = std::env::current_dir() {
         for candidate in cwd.ancestors() {
             if looks_like_root(candidate) {
-                return Ok(candidate.to_path_buf());
+                return Ok((candidate.to_path_buf(), RootSource::WorkingDirectory));
             }
         }
     }
+    if let Some(dir) = packaged_root() {
+        return Ok((dir, RootSource::Installed));
+    }
     validate_root(Path::new(env!("CARGO_MANIFEST_DIR")))
+        .map(|dir| (dir, RootSource::BuildDirectory))
+}
+
+/// The same, without the provenance.
+pub fn find_root(explicit: Option<&Path>) -> Result<PathBuf, String> {
+    find_root_with_source(explicit).map(|(dir, _)| dir)
+}
+
+/// The data tree an installed binary carries beside itself: `<exe dir>/../share/playbook`.
+///
+/// The compile-time manifest directory is not this — it is the build directory, which `nix build`
+/// deletes — so without this a packaged composer cannot answer at all, and `playbook check` from a
+/// devshell would be a command that only ever errors. Canonicalised so the path it prints names the
+/// store generation rather than a `bin/..` that depends on which symlink you came through.
+fn packaged_root() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let candidate = exe.parent()?.join("../share/playbook");
+    looks_like_root(&candidate)
+        .then(|| std::fs::canonicalize(&candidate).ok())
+        .flatten()
 }
 
 fn looks_like_root(dir: &Path) -> bool {
@@ -111,6 +179,10 @@ pub fn load_project(root: &Path, name: &str) -> Result<Project, String> {
         name: name.to_string(),
         path: conf.get("path").cloned().unwrap_or_default(),
         org: conf.get("org").cloned().filter(|s| !s.is_empty()),
+        ecosystems: conf
+            .get("ecosystems")
+            .map(|v| split_list(v))
+            .unwrap_or_default(),
         languages: conf
             .get("languages")
             .map(|v| split_list(v))

@@ -110,8 +110,26 @@ session.
 | `always` | Always. Use for rules that hold for every model, language and org |
 | `language:rust` | The project declares `languages: rust` |
 | `org:defrag` | The project declares `org: defrag` |
+| `ecosystem:defrag` | The project declares `ecosystems: defrag` |
 | `project:shared-crates` | The project is `shared-crates` |
 | `manual` | Never automatically. A target must name the rule's id in its `include:` |
+
+`org` and `ecosystem` answer different questions, and a rule belongs to whichever one it is
+actually true of:
+
+- **`org` is who operates the repository** — our services, a client's codebase.
+- **`ecosystem` is what the repository is built with** — its devshell, its toolchain, and the
+  conventions that follow from them.
+
+They coincide for most repositories, and where they do, `org` is the shorter thing to write. They
+diverge where a repository lives under one directory and is built with another's conventions:
+`~/code/hodlcroft/compositor` is operated by hodlcroft and takes its shell — and so its `at-*`
+toolkit — from `defrag-nix`. A rule about the toolkit is true of it and activates on
+`ecosystem:defrag`; a rule about the cnft services is not true of it and activates on `org:defrag`.
+
+The field is independent of `layer`, which decides **where a rule sorts**, not where it applies.
+The two usually agree; where they do not, the activation is the precise statement and the layer is
+just a rank.
 
 ## Writing the body
 

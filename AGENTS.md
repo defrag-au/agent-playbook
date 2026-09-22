@@ -55,6 +55,19 @@ Clippy is clean at `-D warnings` and should stay that way.
 `flake.nix` pins the same fenix channel `defrag-nix` does, and exports `playbook`, `agent-tools`
 (`at-peek`, `at-recall`, `at-describe`), a devshell, and a `checks` entry that runs the suite.
 
+`playbook` carries its own data tree in `share/playbook` — `rules/`, `models/`, `projects/`,
+`memory/`, `templates/` — because an installed binary has nothing else to read: the compile-time
+manifest directory is a build directory that `nix build` deletes. So the binary is self-locating,
+and `playbook root` prints which tree it resolved against and how it found it. `defrag-nix` wires
+both packages into every org devshell, which is what makes `playbook check --project <name> --repo
+<path>` a command any repo can run.
+
+A consequence worth knowing: the composer in a shell is the copy pinned by `defrag-nix`, so a rule
+change here only reaches a consumer after it is committed, pushed, and re-locked there — while
+`--root ~/code/defrag/agent-playbook` (or working in this repo) resolves against the working tree.
+A block renders identically either way, deliberately: it names the project, the target and each
+rule's own file, and never a path.
+
 **It cannot consume `defrag-nix`, and does not need to.** That input already points the other way:
 `defrag-nix` takes *this* repository as an input, for `packages.agent-tools`, and wires the binaries
 into the org's shells. An input back would be a cycle, and flake inputs are a DAG — Nix refuses to
