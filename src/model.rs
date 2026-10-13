@@ -20,6 +20,15 @@ pub enum Activation {
     /// defrag repo — same devshell, same toolkit — so the rules that are true of it because of
     /// that are ecosystem rules, not org rules.
     Ecosystem(String),
+    /// Only when the project declares that it renders this.
+    ///
+    /// The third of the three questions, and the one that produced this variant: an org is who
+    /// operates a repository, an ecosystem is what it is built with, and neither says whether it
+    /// **draws anything**. `mitos` is a defrag repository built with the defrag toolchain that
+    /// renders no widgets at all — it publishes the wire formats and artifacts an egui frontend
+    /// then reads — so the widget catalogue, the theme ramp and the layout traps are not rules
+    /// that can be followed there, they are rules that cannot apply.
+    Renders(String),
     /// Exactly one project.
     Project(String),
     /// Never automatic — a target must name the rule in its `include:`.
@@ -42,12 +51,16 @@ impl Activation {
                 if let Some(rest) = raw.strip_prefix("ecosystem:") {
                     return non_empty(rest, raw).map(Activation::Ecosystem);
                 }
+                if let Some(rest) = raw.strip_prefix("renders:") {
+                    return non_empty(rest, raw).map(Activation::Renders);
+                }
                 if let Some(rest) = raw.strip_prefix("project:") {
                     return non_empty(rest, raw).map(Activation::Project);
                 }
                 Err(format!(
                     "unknown activation `{raw}` — expected always, manual, \
-                     language:<name>, org:<name>, ecosystem:<name> or project:<name>"
+                     language:<name>, org:<name>, ecosystem:<name>, renders:<name> or \
+                     project:<name>"
                 ))
             }
         }
@@ -61,6 +74,7 @@ impl Activation {
             Activation::Language(lang) => project.languages.iter().any(|l| l == lang),
             Activation::Org(org) => project.org.as_deref() == Some(org.as_str()),
             Activation::Ecosystem(ecosystem) => project.ecosystems.iter().any(|e| e == ecosystem),
+            Activation::Renders(renders) => project.renders.iter().any(|r| r == renders),
             Activation::Project(name) => &project.name == name,
         }
     }
@@ -72,6 +86,7 @@ impl Activation {
             Activation::Language(l) => format!("language:{l}"),
             Activation::Org(o) => format!("org:{o}"),
             Activation::Ecosystem(e) => format!("ecosystem:{e}"),
+            Activation::Renders(r) => format!("renders:{r}"),
             Activation::Project(p) => format!("project:{p}"),
         }
     }
@@ -281,6 +296,9 @@ pub struct Project {
     /// The conventions and tooling this repository is built with, which is not always the org it
     /// lives under. See [`Activation::Ecosystem`].
     pub ecosystems: Vec<String>,
+    /// What this repository **renders** — `egui` for a repo with widgets in it, empty for one
+    /// that only produces what a renderer reads. See [`Activation::Renders`].
+    pub renders: Vec<String>,
     pub languages: Vec<String>,
     pub default_target: Option<String>,
 }
@@ -381,6 +399,9 @@ mod tests {
             path: "~/code/defrag/shared-crates".into(),
             org: Some("defrag".into()),
             ecosystems: vec!["defrag".into()],
+            // Empty on purpose: the fixture is the repo that produces artifacts, not one that
+            // draws them, so a rule about widgets must not resolve into its set.
+            renders: Vec::new(),
             languages: vec!["rust".into()],
             default_target: Some("claude-code".into()),
         }
@@ -404,6 +425,10 @@ mod tests {
             Activation::Ecosystem("defrag".into())
         );
         assert_eq!(
+            Activation::parse("renders:egui").unwrap(),
+            Activation::Renders("egui".into())
+        );
+        assert_eq!(
             Activation::parse("project:archivist").unwrap(),
             Activation::Project("archivist".into())
         );
@@ -417,6 +442,7 @@ mod tests {
         assert!(Activation::parse("language:").is_err());
         assert!(Activation::parse("org:").is_err());
         assert!(Activation::parse("ecosystem:").is_err());
+        assert!(Activation::parse("renders:").is_err());
     }
 
     #[test]
@@ -448,6 +474,29 @@ mod tests {
         assert!(!Activation::Org("defrag".into()).matches(&p));
         assert!(Activation::Ecosystem("defrag".into()).matches(&p));
         assert!(!Activation::Ecosystem("hodlcroft".into()).matches(&p));
+    }
+
+    #[test]
+    fn a_renderer_is_independent_of_the_org_and_the_ecosystem() {
+        // The case that produced the variant: the defrag repository that draws nothing.
+        // `mitos` produces the artifacts an egui frontend reads, so an `org:` rule still
+        // reaches it and a `renders:` rule must not — which was the whole point of moving
+        // the widget rules off `org:defrag`.
+        let producer = Project {
+            name: "mitos".into(),
+            renders: Vec::new(),
+            ..project()
+        };
+        assert!(Activation::Org("defrag".into()).matches(&producer));
+        assert!(Activation::Ecosystem("defrag".into()).matches(&producer));
+        assert!(!Activation::Renders("egui".into()).matches(&producer));
+
+        let widget_lib = Project {
+            renders: vec!["egui".into()],
+            ..project()
+        };
+        assert!(Activation::Renders("egui".into()).matches(&widget_lib));
+        assert!(!Activation::Renders("macroquad".into()).matches(&widget_lib));
     }
 
     #[test]

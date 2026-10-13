@@ -141,15 +141,14 @@ fn root_of_with_source(opts: &Opts) -> Result<(PathBuf, RootSource), String> {
 /// Say which tree a verdict came from, when it is not the one the caller is standing in.
 ///
 /// `check` against the packaged copy and `check` against the checkout you just edited print the
-/// same `ok`, and only one of them is about your change. Silence when the root came from
-/// `--root`, `PLAYBOOK_ROOT` or the working directory: the caller named it or is in it.
+/// same `ok`, and only one of them is about your change. Said as a fact and not as an instruction:
+/// the packaged copy is the right tree for every repository that is not the playbook itself, so a
+/// line telling that case to go and find a checkout reads as a complaint about a verdict that was
+/// correct. Silence when the root came from `--root`, `PLAYBOOK_ROOT` or the working directory:
+/// the caller named it or is in it. `playbook root` answers the same question on demand, at length.
 fn note_root(root: &Path, source: RootSource) {
     if source.is_packaged() {
-        println!(
-            "# root: {} · {} — pass `--root <checkout>` to resolve against a working tree",
-            root.display(),
-            source.as_str()
-        );
+        println!("# rules: {} · {}", root.display(), source.as_str());
     }
 }
 

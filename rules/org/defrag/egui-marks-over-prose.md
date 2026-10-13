@@ -2,7 +2,7 @@
 id: defrag-egui-marks-over-prose
 title: Let the marks carry it — egui is weak at prose
 layer: org
-activation: org:defrag
+activation: renders:egui
 priority: 42
 overrides:
 targets:

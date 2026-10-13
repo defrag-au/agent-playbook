@@ -111,6 +111,7 @@ session.
 | `language:rust` | The project declares `languages: rust` |
 | `org:defrag` | The project declares `org: defrag` |
 | `ecosystem:defrag` | The project declares `ecosystems: defrag` |
+| `renders:egui` | The project declares `renders: egui` |
 | `project:shared-crates` | The project is `shared-crates` |
 | `manual` | Never automatically. A target must name the rule's id in its `include:` |
 
@@ -126,6 +127,15 @@ diverge where a repository lives under one directory and is built with another's
 `~/code/hodlcroft/compositor` is operated by hodlcroft and takes its shell — and so its `at-*`
 toolkit — from `defrag-nix`. A rule about the toolkit is true of it and activates on
 `ecosystem:defrag`; a rule about the cnft services is not true of it and activates on `org:defrag`.
+
+**`renders` is the third question, and it is not implied by either of the other two.** A
+repository can be operated by us and built with our toolchain and still draw nothing: `mitos`
+publishes the wire formats, artifacts and index layouts that an egui frontend then reads, and
+the widget catalogue, the theme ramp, the icons and the layout traps are rules that cannot be
+followed there because there is no widget to follow them with. Before this axis existed those
+six rules activated on `org:defrag`, which was doing double duty as "is one of ours" and "has a
+UI" — so a defrag repository without a UI either carried rules it could not obey, or had to go
+without the org rules it could.
 
 The field is independent of `layer`, which decides **where a rule sorts**, not where it applies.
 The two usually agree; where they do not, the activation is the precise statement and the layer is

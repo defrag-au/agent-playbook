@@ -2,7 +2,7 @@
 id: defrag-egui-icons-only
 title: Never use raw Unicode symbols in egui
 layer: org
-activation: org:defrag
+activation: renders:egui
 priority: 44
 overrides:
 targets:
