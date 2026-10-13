@@ -2,7 +2,7 @@
 id: defrag-look-at-what-you-built
 title: Render it and look at it before reporting it done
 layer: org
-activation: org:defrag
+activation: renders:egui
 priority: 46
 overrides:
 targets:

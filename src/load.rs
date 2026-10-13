@@ -12,6 +12,7 @@ const PROJECT_KEYS: &[&str] = &[
     "path",
     "org",
     "ecosystems",
+    "renders",
     "languages",
     "default_target",
 ];
@@ -181,6 +182,10 @@ pub fn load_project(root: &Path, name: &str) -> Result<Project, String> {
         org: conf.get("org").cloned().filter(|s| !s.is_empty()),
         ecosystems: conf
             .get("ecosystems")
+            .map(|v| split_list(v))
+            .unwrap_or_default(),
+        renders: conf
+            .get("renders")
             .map(|v| split_list(v))
             .unwrap_or_default(),
         languages: conf

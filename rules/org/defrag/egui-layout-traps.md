@@ -2,7 +2,7 @@
 id: defrag-egui-layout-traps
 title: egui layout traps that cost an afternoon
 layer: org
-activation: org:defrag
+activation: renders:egui
 priority: 45
 overrides:
 targets:

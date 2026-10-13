@@ -2,7 +2,7 @@
 id: defrag-widget-catalogue-first
 title: Read the widget catalogue before building any UI
 layer: org
-activation: org:defrag
+activation: renders:egui
 priority: 62
 overrides:
 targets:

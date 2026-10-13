@@ -2,7 +2,7 @@
 id: defrag-theme-tokens-only
 title: Sizes, spacing and colour come from the theme
 layer: org
-activation: org:defrag
+activation: renders:egui
 priority: 58
 overrides:
 targets:

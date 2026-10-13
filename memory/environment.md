@@ -13,7 +13,7 @@ loads for all of them.
 | `~/code/defrag/cnft.dev-workers` | Cloudflare Workers ecosystem; D1, WASM |
 | `~/code/defrag/mitos` | — |
 | `~/code/hodlcroft/archivist` | Native binaries, libp2p + axum. Not a worker project |
-| `~/code/defrag/ecosystem-docs` | Canonical cross-service contracts |
+| `~/code/defrag/docs-and-strategy` | Design books + strategy hub; published to docs.augmint.bot |
 | `~/code/defrag/agent-playbook` | The rule set these instructions are generated from |
 
 Repositories are laid out as `~/code/<org>/<repo>`.
@@ -23,6 +23,20 @@ Repositories are laid out as `~/code/<org>/<repo>`.
 `nix` and `direnv` are installed, and `direnv` is at `~/.nix-profile/bin/direnv`. Repositories
 that pin a toolchain do it through a `flake.nix` devshell — what that means in practice is the
 `rust-devshell-first` rule, not a fact about the machine.
+
+## The Workers edge stack
+
+Measured 2026-10-10 on the `worker` crate with `worker-build` 0.7.4 over js-sys 0.3.106:
+**~90+ completed subrequests in one invocation is unreliable** (breakage observed at 90-137;
+everything measured below ~45 has been fine). At that count — on the R2 binding and on CDN
+`fetch()` alike, so it is the wasm executor rather than a transport — js-sys panics (`RefCell
+already borrowed` in `Task::run`), and the worker-build shim cannot reinitialise the Wasm app,
+so the isolate answers `error code: 1101` to every later request until a fresh `wrangler
+deploy`; a fully sequential variant of the same workload stalled silently instead. Found on the
+asset metadata index's read path, walking a 137-candidate policy; the write-up is
+`cnft.dev-workers/docs/design/ASSET_METADATA_INDEX.md`, and its probe caps a batch at 64. So a
+request's subrequest fan-out has a practical ceiling near 100 on this stack, and a sudden 1101
+after a heavy request is a poisoned isolate, not a code error.
 
 ## The agent toolkit
 

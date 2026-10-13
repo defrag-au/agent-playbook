@@ -136,3 +136,13 @@ the two say different things.
   source material for `projects/*/project.conf` and are now redundant with it.
 - **The `deepseek-flash` overlay is provisional.** It was written from the shape of the rule
   set, not from observed failures. See `models/deepseek-flash/overlay.conf`.
+
+## Added since the consolidation
+
+| Date | Rule | Incident |
+| --- | --- | --- |
+| 2026-09-29 | `rules/core/ownership-over-shared-state` | Building `crates/fetch-driver` in `mitos`, a compile-time tie between a request and the queue that issued it was not achievable without a lifetime that made the driver loop uncomputable. `Rc<RefCell<Queue>>` was offered, and declined — *“I feel like I've been bitten by Rc<RefCell<T>> implementations in the past.”* The design kept ownership and took a documented `Result` instead. |
+
+The sections above are the consolidation's own account. This one is for rules added since,
+which start as preferences stated mid-session and are only rules once they are written down —
+the reason `skills/capture-rule` exists.
