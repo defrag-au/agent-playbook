@@ -221,6 +221,18 @@ The verbs above are built. `tree`, `find`, `outline` and `scope` in `at-peek`; `
 written — [`docs/inspection-tools.md`](docs/inspection-tools.md) is the design record, and
 `at-describe` answers with what exists rather than what was planned.
 
+## The Zed thread tools
+
+`tools/zed-thread-tools/` is deliberately outside the `at-` namespace. `zed-thread-audit`
+reports size, message and tool-call counts, tool-output bytes and compaction state for Zed's
+agent thread store; `zed-thread-recover` appends a `Compaction(Summary)` message so a thread
+that has hit its context limit can continue; `zed-thread-tui` is the unified library over
+`sidebar_threads` and `threads.db`, driving archive, single-thread delete, bundle export/import
+and recovery from a selected row. The audit binary opens the store read-only and never prints
+message content; the writers refuse to run while Zed is open, and make a `VACUUM INTO` backup
+before changing either store. None of them is linked into `agent-tools`, so the `at-`
+allowlist keeps its promise.
+
 ## Adding a rule
 
 1. Copy [`templates/rule.md`](templates/rule.md) into the right layer directory.

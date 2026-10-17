@@ -644,6 +644,9 @@ the text format is checked for shape only, so prose can be tuned without a test 
 - **Not harness-specific.** Nothing in the toolkit knows about Zed, Claude Code or this playbook.
   They are CLI tools with a man page's worth of surface, and the playbook is what tells an agent to
   reach for them.
+- **Not the Zed thread tools.** `tools/zed-thread-tools/` sits beside this toolkit, not in it: the
+  audit reads a private store outside the worktree, and the recover command and TUI write to it.
+  None of them can be added to `at-` without weakening the namespace's whole-grammar promise.
 
 ## Decisions to settle before code
 

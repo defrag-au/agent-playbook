@@ -120,6 +120,33 @@
             runHook postInstall
           '';
         };
+
+      # The Zed thread tools. Deliberately separate from `agent-tools`: the audit binary reads a
+      # private store outside the worktree, and the recover binary writes to it. Neither belongs in
+      # a namespace whose promise is that its entire grammar is safe to allowlist.
+      zedThreadToolsFor =
+        rustPlatform:
+        rustPlatform.buildRustPackage {
+          pname = "zed-thread-tools";
+          version = (lib.importTOML ./tools/zed-thread-tools/Cargo.toml).package.version;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [
+            "-p"
+            "zed-thread-tools"
+            "--bins"
+          ];
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            for tool in zed-thread-audit zed-thread-recover zed-thread-tui; do
+              install -m755 \
+                "$(find target -maxdepth 3 -type f -name "$tool" -perm -u+x | head -n1)" \
+                "$out/bin/$tool"
+            done
+            runHook postInstall
+          '';
+        };
     in
     {
       packages = forAllSystems (
@@ -131,6 +158,7 @@
         in
         {
           inherit playbook agent-tools;
+          zed-thread-tools = zedThreadToolsFor rustPlatform;
           # What this repository is *for*; the toolkit is what it also ships.
           default = playbook;
         }
