@@ -142,6 +142,10 @@ the two say different things.
 | Date | Rule | Incident |
 | --- | --- | --- |
 | 2026-09-29 | `rules/core/ownership-over-shared-state` | Building `crates/fetch-driver` in `mitos`, a compile-time tie between a request and the queue that issued it was not achievable without a lifetime that made the driver loop uncomputable. `Rc<RefCell<Queue>>` was offered, and declined — *“I feel like I've been bitten by Rc<RefCell<T>> implementations in the past.”* The design kept ownership and took a documented `Result` instead. |
+| 2026-10-18 | `rules/org/defrag/macroquad-traps` | The `fight-macroquad` card pass in augminted-bots hit ten macroquad behaviours that fail silently with a wrong picture. The worst: the game was upside down in the window while twenty captures and a twenty-seed soak were clean, because all of them drew into render targets. The user found it on first play. |
+| 2026-10-18 | `rules/org/defrag/look-at-the-game` | The same pass was done by capturing exact moments and fixing what they showed: the zoomed card's missing title, the vanished spaces in shrunk names, a sheen that tinted instead of glinting. The text report beside each capture was added afterwards, as a second check on text. |
+| 2026-10-18 | `rules/org/defrag/rules-emit-events` | `deck-fight` feeds three clients. Wrong pile counts were fixed in the engine each time (`PileOp::Stripped`, the killing card's discard), so no client had to guess. |
+| 2026-10-18 | `projects/shared-crates/rules/gamekit-takes-time-as-an-argument` | Exact-moment captures (`--at 1.25`) work only because nothing in the kit reads the clock. Written when the review harness moved into the kit. |
 
 The sections above are the consolidation's own account. This one is for rules added since,
 which start as preferences stated mid-session and are only rules once they are written down —
