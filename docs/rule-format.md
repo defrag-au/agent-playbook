@@ -112,6 +112,7 @@ session.
 | `org:defrag` | The project declares `org: defrag` |
 | `ecosystem:defrag` | The project declares `ecosystems: defrag` |
 | `renders:egui` | The project declares `renders: egui` |
+| `renders:macroquad` | The project declares `renders: macroquad` — its game clients draw with macroquad |
 | `project:shared-crates` | The project is `shared-crates` |
 | `manual` | Never automatically. A target must name the rule's id in its `include:` |
 

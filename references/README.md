@@ -5,8 +5,32 @@ agent reads it when the task needs it.
 
 ```
 crates/       one file per crate@version — API cheat sheets
+  CATALOG.md  the index; read this before any individual reference
 templates/    scaffolds for the above
 ```
+
+## Start here
+
+`crates/CATALOG.md` is the index. It names each file, the version, the purpose and the
+first section to read. Read it first; do not guess a filename or open every crate file.
+
+## How to read one
+
+These files are cheap on disk and expensive in context. Read one reference at a time, and
+read a section rather than the whole file:
+
+```sh
+at-peek stat references/crates/<file>.md
+at-peek slice references/crates/<file>.md:1-25
+at-peek search '<symbol>' references/crates/<file>.md
+```
+
+- Start with `## At a glance` when it exists. Otherwise read `## Cargo.toml` and the
+  section named in the catalogue.
+- Never load several references in one turn.
+- Do not read a whole file over ~120 lines just to find one API; slice or search.
+- Budget: <= 200 lines and <= 8 KB per file. The test suite enforces a 10 KB ceiling and
+  checks that every file has a catalogue row.
 
 ## `crates/`
 
@@ -16,7 +40,8 @@ filename is what makes that visible. A file called `liquid.md` is a claim about 
 `latest` is not a version.
 
 Write one when a crate is adopted, using the `crate-research` skill. Two real examples to
-follow: `crates/liquid-0.26.md` and `crates/rmcp-1.3.md`.
+follow: `crates/liquid-0.26.md` and `crates/rmcp-1.3.md`. Add its row to
+`crates/CATALOG.md` in the same change — an orphan reference is a reference nobody finds.
 
 ### What makes one useful
 

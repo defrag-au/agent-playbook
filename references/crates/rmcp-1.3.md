@@ -2,6 +2,14 @@
 
 Official SDK: https://github.com/modelcontextprotocol/rust-sdk
 
+## At a glance
+
+- `#[tool_router(server_handler)]` generates the router and the `ServerHandler` in one impl block.
+- Tool arguments are a `schemars::JsonSchema` struct wrapped in `Parameters<T>`.
+- Features are opt-in: `server`, `macros`, `transport-io` (plus the transport you actually use).
+- The older separate `#[tool_router]` + `#[tool_handler]` pattern still exists; prefer the combined one.
+- This sheet answers a working stdio MCP server and its tool definitions.
+
 ## Cargo.toml
 
 ```toml

@@ -1,0 +1,36 @@
+[package]
+name = "zed-thread-tools"
+version = "0.1.0"
+edition = "2021"
+description = "Read-only audit, and compaction-based recovery, of Zed agent thread transcripts"
+license = "MIT"
+
+[lib]
+name = "zed_thread_tools"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zed-thread-audit"
+path = "src/bin/zed-thread-audit.rs"
+
+[[bin]]
+name = "zed-thread-recover"
+path = "src/bin/zed-thread-recover.rs"
+
+[[bin]]
+name = "zed-thread-tui"
+path = "src/bin/zed-thread-tui.rs"
+
+# `rusqlite` is the only way to read the thread store without going through an
+# external `sqlite3` binary, and `bundled` avoids depending on the SQLite the
+# host happens to ship. `zstd` decodes the blobs Zed writes. `ratatui` is the
+# TUI, and it re-exports the crossterm backend it was built against. The rest
+# is the usual typed-JSON and CLI scaffolding.
+[dependencies]
+ratatui = "0.29"
+rusqlite = { version = "0.40", features = ["bundled"] }
+zstd = "0.14"
+clap = { version = "4.6", features = ["derive"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["raw_value"] }
