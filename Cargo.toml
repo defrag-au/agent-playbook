@@ -4,6 +4,7 @@ members = [
     "tools/at-describe",
     "tools/at-peek",
     "tools/at-recall",
+    "tools/at-reach",
     "tools/zed-thread-tools",
 ]
 resolver = "2"

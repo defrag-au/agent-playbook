@@ -10,7 +10,7 @@ targets:
 
 ## Directive
 
-**Nothing in `ui/macroquad-gamekit` outside `harness` calls `get_time`, `get_frame_time` or
+**Nothing in `gaming/macroquad-gamekit` outside `harness` calls `get_time`, `get_frame_time` or
 `Instant`.** Time is a parameter (`update(dt)`, `value(t)`, `phase`), owned by the game. The
 harness is the one place that reads the wall clock: `frame_dt` chooses between the fixed capture
 clock and the real one, and `FrameTimer` times a frame for `--frame-log` and caps the native loop.

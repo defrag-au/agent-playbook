@@ -5,3 +5,9 @@ target/
 result
 .DS_Store
 *.swp
+
+# A private fleet inventory lives outside this public repository. These guards catch a
+# local copy before it can be committed; the real tree is named by --fleet-root or
+# AGENT_FLEET_ROOT.
+/fleet/
+/machines/

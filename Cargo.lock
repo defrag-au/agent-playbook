@@ -89,6 +89,7 @@ name = "at-describe"
 version = "0.1.0"
 dependencies = [
  "at-peek",
+ "at-reach",
  "at-recall",
 ]
 
@@ -98,6 +99,13 @@ version = "0.1.0"
 dependencies = [
  "at-core",
  "regex",
+]
+
+[[package]]
+name = "at-reach"
+version = "0.1.0"
+dependencies = [
+ "at-core",
 ]
 
 [[package]]

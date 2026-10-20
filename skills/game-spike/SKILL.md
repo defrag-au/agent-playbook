@@ -44,7 +44,7 @@ See the rules `defrag-runtime-pairs` and `defrag-rules-emit-events`. In short:
 
 ## 3. A thin client on the gamekit and its harness
 
-Read `shared-crates/ui/macroquad-gamekit/CATALOG.md` first, and the rule `defrag-macroquad-traps`.
+Read `shared-crates/gaming/macroquad-gamekit/CATALOG.md` first, and the rule `defrag-macroquad-traps`.
 
 - **Never write the frame loop.** Implement the kit's `app::Game` (`update`, `draw`, `backdrop`,
   and as needed `ready`, `capture_due`, `capture_note`, `shake`) and hand it to `app::run(DESIGN,
@@ -55,7 +55,47 @@ Read `shared-crates/ui/macroquad-gamekit/CATALOG.md` first, and the rule `defrag
 - **Pick the stage.** `app::run` draws in design units at the window's device pixels. A
   pixel-art game runs on `app::run_on(Stage::Pixel { width, height }, game)`: the kit owns the
   canvas, scales it by whole numbers and letterboxes it, and a `--shot` is the canvas at 1:1
-  (`island-funk`). Draw text at `frame.px`, and read the mouse with `frame.pointer()`.
+  (`island-funk`). An arcade game with a fixed play field runs on `Stage::board(SIZE)`: the
+  board is fitted whole and centred, anything drawn past its edge is hidden, and the margins
+  belong to `Game::draw_margin`. Draw text at `frame.px`, and read the mouse with
+  `frame.pointer()`. Taps, drags and touches arrive in stage units as `frame.input.gesture`. Feed
+  it to a `Pointer`, or to `Swipes` for four-way swipes. Never map window points by hand.
+- **Bind input to actions, never poll `KeyCode`s.** Give the game an enum of its verbs, bind
+  each to keys, swipes, taps and pad buttons in an `Actions`, and call `update(frame.input, dt)`
+  once a frame. Act on a press with `take` when the game is ready for it (a hop has landed, a
+  tick is running): the press is buffered, so a tap during a cooldown still lands. `pressed` is
+  this frame only and misses in a tick that skips a frame.
+- **A scored arcade game runs in `arcade-harness`'s shell**, not its own loop. Its rules crate
+  implements `arcade_core::ArcadeGame` and draws randomness only from `arcade_core::Rng`, which
+  is the same on native and wasm32. Never use `rand::rngs::SmallRng`: it changes algorithm with
+  pointer width, so a replay verified natively fails on wasm. The client implements
+  `ArcadeView` (actions, one input per tick, draw) and calls `run_arcade` on a stage. The shell
+  brings sign-in, the server's seed, recording, submission and the title and game-over screens.
+  Give it a real font through `ArcadeView::font`. The built-in font is ASCII only, and draws a
+  tofu box for anything else. `xeno-invaders` in augminted-bots is the reference.
+- **On a phone, use the kit's `Thumbs` for controls**, unless the game needs something else. The
+  first finger held anywhere is a stick centred where it landed, any other tap is an activation (a
+  second finger, or one finger's quick tap), and only a few reserved areas, such as a map button,
+  take their own taps. Nothing covers the game until a thumb is down. Reserve only what is drawn,
+  keep reserved areas off the bottom edge (where the stick starts and the home indicator lives), and
+  make them at least 44 points. Inventory and other choices go in a panel opened by a button, with
+  big tiles that act on lift (`ThumbFrame::lifted`), not a strip of small slots. Fill the screen and follow
+  rotation: run on `Stage::PixelFit` with a function that sizes the canvas as the screen divided by a
+  whole number (Island Funk's `canvas_for`), zoomed closer on a phone than on a desktop, and read the
+  canvas size from `frame.viewport.size` each frame. For fullscreen, stamp the kit's
+  `PageScript::Fullscreen` from `build.rs` (Android and iPad go fullscreen on the first tap); an
+  iPhone cannot, so the bundler's manifest makes Add to Home Screen launch it without browser bars.
+- **Reach mid-game moments with `--keys`, not a bot.** `--keys "5:Up,10:Up,20-40:Right"` presses
+  and holds keys by frame, merged into `frame.input`, so `--shot --at` can capture a moment deep
+  in play. Read a flag with no value (`--play`, `--debug`) with `harness::switch`; `flag` reads
+  the argument after a name and cannot see one.
+- **Step the simulation on a fixed tick** when anything moves fast or must replay: return
+  `Some(hz)` from `Game::tick_rate` and put physics, collisions and spawns in `Game::tick`.
+  Read input in `update`, which runs first each frame, and draw moving things at
+  `prev.lerp(now, frame.alpha)`. Variable `dt` tunnels a fast ball through a brick.
+- **Carry the macroquad `[patch]`** in the root `Cargo.toml` of the game's own workspace. The
+  rule `defrag-macroquad-traps` has the lines, and `mq-bundle` refuses a gamekit build without
+  them. The kit needs rustc 1.88 or newer.
 - A game that reviews itself — bots playing to set moments, a screenshot at each — returns true
   from `Game::scripted` and saves each finished frame in `Game::presented` with
   `harness::write_capture` (`island-funk`'s bot).
@@ -128,6 +168,15 @@ grep -c "__wbindgen" <dist>/<game>.wasm    # must print 0
 - **Sound or pads** come from the kit's `audio` and `gamepads` features. Their JS goes in the page:
   a `build.rs` with `macroquad_gamekit::web::stamp(web_dir, &[Plugin::Audio, Plugin::Gamepads])`,
   and the bundling script's `--web` pointing at that directory. `island-funk` is the shape.
+- **Pixel-art characters** are text in code: rows of characters, a `Palette` mapping each to a
+  colour, baked by the kit's `PixelSprite`. `Grid::outlined`, `silhouette` and `flipped` bake
+  the variants a state needs (an angry red edge, a hit flash, facing left), so a mood is a
+  different texture rather than drawing tricks. Parse every sprite in a test so a ragged row
+  fails `cargo test`. `island-funk`'s `sprites.rs` is the shape.
+- **Sounds placed in a world** use `Panned` and `Voices`. macroquad cannot pan a playing sound,
+  so `Panned` bakes a mono sound at a few stereo positions and `Audio::play_panned` picks the
+  nearest. `Voices` caps how many play at once. Do not reach for kira or another audio crate:
+  they pull in wasm-bindgen, which cannot run under miniquad.
 - **Every import needs a script.** The bundler (`cargo run -p mq-bundle`, shared-crates'
   `macroquad-bundle`; augminted-bots wraps it as `scripts/stage-macroquad-client.sh`) fails a
   bundle whose wasm imports a function no staged script provides. `mq-bundle check <dir> <wasm>`
@@ -139,6 +188,9 @@ grep -c "__wbindgen" <dist>/<game>.wasm    # must print 0
   Chrome or Brave with `--headless=new --remote-debugging-port=<port>`, then read
   `Runtime.consoleAPICalled` and `Runtime.exceptionThrown` and take `Page.captureScreenshot` over
   the DevTools protocol. `--screenshot` with `--virtual-time-budget` hangs on a game's frame loop.
+  On a Linux box with no GPU, Chrome has no WebGL ("WebGL context unavailable") until it is told
+  to render in software: add `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader
+  --ignore-gpu-blocklist`.
 
 ## 6. Write it down
 

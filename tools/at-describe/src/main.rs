@@ -1,14 +1,15 @@
 //! `at-describe` — tier 0 of the agent toolkit.
 //!
-//! It takes no path, opens no file, and reads nothing. Its dependencies are two siblings in this
-//! workspace, linked for their verb tables and nothing else: no member of the toolkit has a write
-//! path, so linking one adds no capability here.
+//! It takes no path, opens no file, and reads nothing. Its dependencies are three siblings in
+//! this workspace, linked for their verb tables and nothing else: no member of the toolkit has a
+//! write path, so linking one adds no capability here.
 //!
 //! This is the safest thing in the toolkit to allow, and it is what makes the other grants
 //! reviewable — an agent that is unsure asks here instead of composing a shell pipeline to find
 //! out, and the answer comes from the same tables the parsers enforce.
 
 use at_peek::catalogue as peek;
+use at_reach::catalogue as reach;
 use at_recall::catalogue as recall;
 
 const TOOL: &str = "at-describe";
@@ -32,9 +33,10 @@ fn run(args: &[String]) -> i32 {
         }
         "--version" => {
             println!(
-                "{TOOL} {VERSION} · at-peek {} · at-recall {}",
+                "{TOOL} {VERSION} · at-peek {} · at-recall {} · at-reach {}",
                 at_peek::VERSION,
-                at_recall::VERSION
+                at_recall::VERSION,
+                at_reach::VERSION
             );
             0
         }
@@ -46,10 +48,15 @@ fn run(args: &[String]) -> i32 {
             print!("{}", recall::help_all());
             0
         }
+        "at-reach" => {
+            print!("{}", reach::help_all());
+            0
+        }
         name => {
             let found = peek::find(name)
                 .map(peek::help_for)
-                .or_else(|| recall::find(name).map(recall::help_for));
+                .or_else(|| recall::find(name).map(recall::help_for))
+                .or_else(|| reach::find(name).map(reach::help_for));
             match found {
                 Some(help) => {
                     print!("{help}");
@@ -57,9 +64,10 @@ fn run(args: &[String]) -> i32 {
                 }
                 None => {
                     eprintln!(
-                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-recall · verbs: {}, {}",
+                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-recall, at-reach · verbs: {}, {}, {}",
                         peek::names(),
-                        recall::names()
+                        recall::names(),
+                        reach::names()
                     );
                     2
                 }
@@ -72,7 +80,7 @@ fn run(args: &[String]) -> i32 {
 /// Bounded to a screen, because its reader is mid-task.
 fn toolkit() -> String {
     let mut out = String::new();
-    out.push_str("# binaries in this build: at-peek, at-recall\n");
+    out.push_str("# binaries in this build: at-peek, at-recall, at-reach\n");
     out.push_str("# every `at-` binary is read-only: no write path, in any flag or any option\n\n");
 
     out.push_str(&format!(
@@ -99,6 +107,16 @@ fn toolkit() -> String {
         out.push('\n');
     }
 
+    out.push_str(&format!(
+        "\nat-reach {} — read-only fleet inspection\n",
+        at_reach::VERSION
+    ));
+    out.push_str("#   Read-only: one sh or ssh probe, no writes, no sudo, no secrets.\n");
+    for line in reach::verb_lines() {
+        out.push_str(&line);
+        out.push('\n');
+    }
+
     out.push_str("\nRecipes\n");
     for line in recall::recipe_lines() {
         out.push_str(&line);
@@ -120,6 +138,6 @@ fn toolkit() -> String {
         "\n# at-describe knows the binaries it is linked with; one installed separately\n",
     );
     out.push_str("# does not appear here. Ask for detail with `at-describe at-peek`,\n");
-    out.push_str("# `at-describe at-recall`, or `at-describe <verb>`.\n");
+    out.push_str("# `at-describe at-recall`, `at-describe at-reach`, or `at-describe <verb>`.\n");
     out
 }

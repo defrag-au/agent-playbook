@@ -2,11 +2,14 @@
 
 **Status:** proposal, 2026-09-22; part built. Built and tested: `tools/at-core` (the shared output
 contract and path containment), `tools/at-peek` (`stat`, `slice`, `search`), `tools/at-recall`
-(`state`, `log`, `diff`, and the `pr` recipe), and `tools/at-describe` (the catalogue). The toolkit
-is packaged by this repository's `flake.nix` and wired into the org's shells by `defrag-nix`.
-Everything else here is still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in
+(`state`, `log`, `diff`, and the `pr` recipe), `tools/at-reach` (fleet inspection), and
+`tools/at-describe` (the catalogue). The toolkit is packaged by this repository's `flake.nix` and
+wired into the org's shells by `defrag-nix`. Everything else here is still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in
 `peek`; `show`, `blame`, `why`, `churn` in `recall`), the other two recipes (`review`, `release`),
 and the rule and skill drafts at the end — which stay drafts until the verbs they name exist.
+
+`at-reach` is a fourth `at-` binary but not an inspection tier: it reads a private fleet tree and
+runs one fixed read-only probe over SSH. Its contract is [`fleet.md`](fleet.md), not this document.
 
 Three things the implementation settled that this document did not anticipate, each of them a test
 rather than a paragraph (`tools/at-recall/tests/contract.rs`):

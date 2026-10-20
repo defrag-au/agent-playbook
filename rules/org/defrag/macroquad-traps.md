@@ -11,7 +11,7 @@ targets:
 ## Directive
 
 Before drawing with macroquad directly, check the pieces of `macroquad-gamekit` that already handle
-these (`shared-crates/ui/macroquad-gamekit/CATALOG.md`). Each trap compiles, runs, and shows a wrong
+these (`shared-crates/gaming/macroquad-gamekit/CATALOG.md`). Each trap compiles, runs, and shows a wrong
 picture with no error.
 
 - **The window is upside down under `Camera2D::from_display_rect`.** It runs y down into a render
@@ -59,8 +59,19 @@ picture with no error.
   `MeasureAt(pixel_scale)`, which measures the glyphs the draw will use, rather than `draw_text_ex`
   with a rounded `font_size`, or words overlap and spaces disappear.
 - **Images decode from PNG and TGA only.** Convert art to PNG at build time, not JPEG.
-- **With `high_dpi`, touches arrive in device pixels and the mouse in points.** Read the mouse
-  (macroquad turns touches into mouse events) and convert once, through `Viewport::to_design`.
+- **With `high_dpi`, touches arrive in device pixels and the mouse in points.** For one pointer,
+  read the mouse (macroquad turns touches into mouse events) and convert once, through
+  `Viewport::to_design`. For several fingers (a stick and a button at once), read
+  `macroquad_widgets::touch_points()`, never `touches()`: it returns them in points. On a 3x phone a
+  raw touch lands three times too far out, so a stick is three times too sensitive and a button
+  cannot be hit where it is drawn, while a desktop browser's device emulation, driven by the mouse,
+  looks fine. Island Funk's first touch controls shipped like that.
+- **A touch has one phase a frame, its last event's.** macroquad stores touches in a map, so a
+  finger that lands and moves before the next frame arrives as `Moved`, never `Started`, and one
+  that lands and lifts arrives only as `Ended`. On a phone a landing thumb nearly always moves a
+  little, so code that waits for `Started` drops touches at random: touch-and-hold works one time in
+  a few. Treat a finger seen for the first time as landing, whatever its phase. The kit's `Thumbs`
+  and the widgets' `Gestures` and `FloatingStick` do.
 - **`get_screen_data` returns black on macOS** when the window is unfocused or not yet composited,
   and works when it is: so it passes at the desk and fails in a background run. Capture through a
   render target: `harness::Capture`, or `harness::save_texture_png` for a game that already
