@@ -2,6 +2,13 @@
 
 Liquid template engine for Rust. Pure Rust, no system deps, WASM-compatible.
 
+## At a glance
+
+- The engine is split: `liquid` is the entry point, `liquid-core` holds the traits, `liquid-lib` the stdlib.
+- `ParserBuilder::with_stdlib()` then `.filter(..)`/`.tag(..)`/`.block(..)`/`.partials(..)`, then `.build()`.
+- Custom filters are a `ParseFilter` + `FilterReflection` pair over an impl type, not a single struct.
+- This sheet answers parser construction and custom filters, tags and blocks.
+
 ## Crates
 
 - `liquid` — main entry point (ParserBuilder, object!/value! macros, to_object/to_value)

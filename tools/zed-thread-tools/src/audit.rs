@@ -48,12 +48,154 @@ pub struct ThreadAudit {
     pub failed_tool_results: Option<usize>,
     pub tool_output_bytes: Option<u64>,
     pub largest_tool_output_bytes: Option<u64>,
+    pub largest_tool_output_tool: Option<String>,
+    pub largest_tool_output_message: Option<usize>,
     pub compactions: Option<usize>,
     pub messages_since_compaction: Option<usize>,
     pub model: Option<String>,
     pub project_paths: Vec<String>,
     pub subagent: bool,
     pub error: Option<String>,
+}
+
+/// One thread's largest tool outputs, attributed to their tool and message.
+/// The request argument is shown; the result body is never read.
+#[derive(Debug, Clone, Serialize)]
+pub struct ThreadExplanation {
+    pub id: String,
+    pub title: String,
+    pub updated_at: String,
+    pub messages: usize,
+    pub tool_results: usize,
+    pub outputs: Vec<ToolOutputDetail>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ToolOutputDetail {
+    pub message: usize,
+    pub tool: String,
+    pub bytes: u64,
+    pub is_error: bool,
+    pub argument: Option<String>,
+}
+
+/// Explain where a thread's bytes went. `thread` is an id from the audit table
+/// or a unique substring of its title.
+///
+/// `limit` truncates the output list; `0` explains every result.
+pub fn explain(db_path: &Path, thread: &str, limit: usize) -> Result<ThreadExplanation, Error> {
+    let connection = db::open_read_only(db_path)?;
+    let headers = db::list_headers(&connection)?;
+
+    let header = if let Some(header) = headers.iter().find(|header| header.id == thread) {
+        header
+    } else {
+        let needle = thread.to_lowercase();
+        let matches: Vec<&ThreadHeader> = headers
+            .iter()
+            .filter(|header| header.summary.to_lowercase().contains(&needle))
+            .collect();
+        match matches.as_slice() {
+            [only] => *only,
+            [] => return Err(Error::ThreadNotFound(thread.to_owned())),
+            _ => {
+                return Err(Error::InvalidThread(format!(
+                    "{thread:?} matches {} threads; pass the id from the audit table",
+                    matches.len()
+                )));
+            }
+        }
+    };
+
+    let record = db::load_record(&connection, &header.id)?;
+    let decoded = db::decode_thread(&record.header.data_type, &record.data)?;
+    let data: ThreadData = serde_json::from_slice(&decoded)?;
+
+    let mut uses: HashMap<&str, &ToolUse> = HashMap::new();
+    for message in &data.messages {
+        if let Message::Agent(agent) = message {
+            for part in &agent.content {
+                if let Some(tool_use) = &part.tool_use {
+                    if let Some(id) = tool_use.id.as_deref() {
+                        uses.insert(id, tool_use);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut outputs = Vec::new();
+    let mut tool_results = 0;
+
+    for (index, message) in data.messages.iter().enumerate() {
+        let Message::Agent(agent) = message else {
+            continue;
+        };
+
+        for (id, result) in &agent.tool_results {
+            tool_results += 1;
+            let bytes = result_bytes(&result.content);
+            let tool_use = uses.get(id.as_str()).copied();
+            let tool = result
+                .tool_name
+                .clone()
+                .or_else(|| tool_use.and_then(|tool_use| tool_use.name.clone()))
+                .unwrap_or_else(|| "?".to_owned());
+            outputs.push(ToolOutputDetail {
+                message: index,
+                tool,
+                bytes,
+                is_error: result.is_error,
+                argument: tool_use.and_then(tool_argument),
+            });
+        }
+    }
+
+    outputs.sort_by(|left, right| {
+        right
+            .bytes
+            .cmp(&left.bytes)
+            .then_with(|| left.message.cmp(&right.message))
+            .then_with(|| left.tool.cmp(&right.tool))
+    });
+    if limit > 0 {
+        outputs.truncate(limit);
+    }
+
+    Ok(ThreadExplanation {
+        id: header.id.clone(),
+        title: data.title.unwrap_or_else(|| header.summary.clone()),
+        updated_at: header.updated_at.clone(),
+        messages: data.messages.len(),
+        tool_results,
+        outputs,
+    })
+}
+
+/// Render the explanation. Like the audit table, this is the only place it
+/// prints, so `--json` and the human view cannot disagree.
+pub fn print_explanation(explanation: &ThreadExplanation) {
+    println!("# zed-thread-audit --explain · {}", explanation.title);
+    println!(
+        "# {} · {} messages · {} tool results · updated {}",
+        explanation.id,
+        explanation.messages,
+        explanation.tool_results,
+        date_part(&explanation.updated_at)
+    );
+    println!("# largest outputs first · request arguments only · result bodies are never printed");
+    println!();
+
+    for output in &explanation.outputs {
+        println!(
+            "{:>10}  message {:<5} {:<14} {}{}",
+            format_bytes(output.bytes),
+            output.message,
+            output.tool,
+            output.argument.as_deref().unwrap_or("-"),
+            if output.is_error { "  [error]" } else { "" },
+        );
+    }
 }
 
 /// Audit every thread that matches the filters, loading one compressed blob at
@@ -176,6 +318,8 @@ impl ThreadAudit {
             failed_tool_results: None,
             tool_output_bytes: None,
             largest_tool_output_bytes: None,
+            largest_tool_output_tool: None,
+            largest_tool_output_message: None,
             compactions: None,
             messages_since_compaction: None,
             model: None,
@@ -208,7 +352,7 @@ fn summarize(data: &ThreadData, row: &mut ThreadAudit) {
     let mut tool_results = 0;
     let mut failed_tool_results = 0;
     let mut tool_output_bytes = 0u64;
-    let mut largest_tool_output_bytes = 0u64;
+    let mut largest_tool_output: Option<ToolOutputCandidate> = None;
     let mut compactions = 0;
     let mut last_compaction = None;
 
@@ -222,23 +366,30 @@ fn summarize(data: &ThreadData, row: &mut ThreadAudit) {
                         tool_calls += 1;
                     }
                 }
-                for result in agent_message.tool_results.values() {
+                for (tool_use_id, result) in &agent_message.tool_results {
                     tool_results += 1;
                     if result.is_error {
                         failed_tool_results += 1;
                     }
-                    let bytes = match &result.content {
-                        ToolResultContent::One(item) => item.text.as_deref().map_or(0, str::len),
-                        ToolResultContent::Many(items) => items
-                            .iter()
-                            .filter_map(|item| item.text.as_deref())
-                            .map(str::len)
-                            .sum(),
-                        ToolResultContent::Text(text) => text.len(),
-                    };
-                    let bytes = bytes as u64;
+                    let bytes = result_bytes(&result.content);
                     tool_output_bytes += bytes;
-                    largest_tool_output_bytes = largest_tool_output_bytes.max(bytes);
+
+                    if bytes > 0 {
+                        let replace = largest_tool_output.as_ref().is_none_or(|current| {
+                            bytes > current.bytes
+                                || (bytes == current.bytes
+                                    && (index, tool_use_id)
+                                        < (current.message, &current.tool_use_id))
+                        });
+                        if replace {
+                            largest_tool_output = Some(ToolOutputCandidate {
+                                bytes,
+                                message: index,
+                                tool_name: result.tool_name.clone().filter(|name| !name.is_empty()),
+                                tool_use_id: tool_use_id.clone(),
+                            });
+                        }
+                    }
                 }
             }
             Message::Compaction(_) => {
@@ -256,7 +407,15 @@ fn summarize(data: &ThreadData, row: &mut ThreadAudit) {
     row.tool_results = Some(tool_results);
     row.failed_tool_results = Some(failed_tool_results);
     row.tool_output_bytes = Some(tool_output_bytes);
-    row.largest_tool_output_bytes = Some(largest_tool_output_bytes);
+    row.largest_tool_output_bytes = Some(
+        largest_tool_output
+            .as_ref()
+            .map_or(0, |output| output.bytes),
+    );
+    row.largest_tool_output_tool = largest_tool_output
+        .as_ref()
+        .and_then(|output| output.tool_name.clone());
+    row.largest_tool_output_message = largest_tool_output.map(|output| output.message);
     row.compactions = Some(compactions);
     row.messages_since_compaction = Some(match last_compaction {
         Some(index) => data.messages.len().saturating_sub(index + 1),
@@ -280,8 +439,18 @@ pub fn print_report(report: &AuditReport) {
     println!();
 
     println!(
-        "{:<19} {:>6} {:>5} {:>6} {:>10} {:>5} {:>5} {:>10} {:<24} Title",
-        "Updated", "Age", "Msgs", "Tools", "Tool bytes", "Comp", "Since", "Decoded", "Model"
+        "{:<19} {:>6} {:>5} {:>6} {:>10} {:>10} {:<18} {:>5} {:>5} {:>10} {:<24} Title",
+        "Updated",
+        "Age",
+        "Msgs",
+        "Tools",
+        "Tool bytes",
+        "Largest",
+        "Top tool",
+        "Comp",
+        "Since",
+        "Decoded",
+        "Model"
     );
 
     for thread in &report.threads {
@@ -296,12 +465,14 @@ pub fn print_report(report: &AuditReport) {
         }
 
         println!(
-            "{:<19} {:>6} {:>5} {:>6} {:>10} {:>5} {:>5} {:>10} {:<24} {}",
+            "{:<19} {:>6} {:>5} {:>6} {:>10} {:>10} {:<18} {:>5} {:>5} {:>10} {:<24} {}",
             date_part(&thread.updated_at),
             age(thread.age_seconds),
             thread.messages.unwrap_or(0),
             thread.tool_calls.unwrap_or(0),
             format_bytes(thread.tool_output_bytes.unwrap_or(0)),
+            format_bytes(thread.largest_tool_output_bytes.unwrap_or(0)),
+            tool_attribution(thread),
             thread.compactions.unwrap_or(0),
             thread.messages_since_compaction.unwrap_or(0),
             format_bytes(thread.decoded_bytes.unwrap_or(0)),
@@ -324,8 +495,116 @@ fn parse_rfc3339(value: &str) -> Option<DateTime<Utc>> {
         .map(|date_time| date_time.with_timezone(&Utc))
 }
 
+fn result_bytes(content: &ToolResultContent) -> u64 {
+    let bytes = match content {
+        ToolResultContent::One(item) => item.text.as_deref().map_or(0, str::len),
+        ToolResultContent::Many(items) => items
+            .iter()
+            .filter_map(|item| item.text.as_deref())
+            .map(str::len)
+            .sum(),
+        ToolResultContent::Text(text) => text.len(),
+    };
+    bytes as u64
+}
+
+/// The request side of a call, parsed from `raw_input` (which is where most
+/// tools put it) and falling back to the structured `input` field.
+fn tool_argument(tool_use: &ToolUse) -> Option<String> {
+    let parsed = tool_use
+        .raw_input
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<ToolInput>(raw).ok())
+        .filter(|input| !input.is_empty())
+        .or_else(|| tool_use.input.clone())
+        .unwrap_or_default();
+
+    let argument = match tool_use.name.as_deref().unwrap_or_default() {
+        "fetch" => parsed.url.clone(),
+        "read_file" => {
+            parsed
+                .path
+                .as_ref()
+                .map(|path| match (parsed.start_line, parsed.end_line) {
+                    (Some(start), Some(end)) => format!("{path}:{start}-{end}"),
+                    (Some(start), None) => format!("{path}:{start}-"),
+                    _ => path.clone(),
+                })
+        }
+        "list_directory" | "find_path" => parsed.path.clone(),
+        "grep" => parsed
+            .pattern
+            .clone()
+            .map(|pattern| match parsed.path.as_deref() {
+                Some(path) => format!("{pattern} in {path}"),
+                None => pattern,
+            }),
+        "terminal" => parsed.command.clone(),
+        "web_search" => parsed.query.clone(),
+        _ => parsed
+            .url
+            .clone()
+            .or_else(|| parsed.path.clone())
+            .or_else(|| parsed.command.clone())
+            .or_else(|| parsed.query.clone()),
+    };
+
+    argument
+        .map(|argument| truncate(&argument, 160))
+        .or_else(|| {
+            tool_use
+                .raw_input
+                .as_deref()
+                .filter(|raw| !raw.is_empty() && *raw != "{}")
+                .map(|raw| truncate(raw, 160))
+        })
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+struct ToolInput {
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default)]
+    path: Option<String>,
+    #[serde(default)]
+    command: Option<String>,
+    #[serde(default)]
+    query: Option<String>,
+    #[serde(default)]
+    pattern: Option<String>,
+    #[serde(default)]
+    start_line: Option<u64>,
+    #[serde(default)]
+    end_line: Option<u64>,
+}
+
+impl ToolInput {
+    fn is_empty(&self) -> bool {
+        self.url.is_none()
+            && self.path.is_none()
+            && self.command.is_none()
+            && self.query.is_none()
+            && self.pattern.is_none()
+            && self.start_line.is_none()
+            && self.end_line.is_none()
+    }
+}
+
 fn date_part(value: &str) -> String {
     value.get(..16).unwrap_or(value).replace('T', " ")
+}
+
+/// Where the largest tool output sits, as `tool@message-index`. The audit never
+/// reads the output itself; the index is what lets a reader open that message.
+fn tool_attribution(thread: &ThreadAudit) -> String {
+    match (
+        thread.largest_tool_output_tool.as_deref(),
+        thread.largest_tool_output_message,
+    ) {
+        (Some(tool), Some(message)) => truncate(&format!("{tool}@{message}"), 18),
+        (None, Some(message)) => truncate(&format!("tool@{message}"), 18),
+        _ => "-".to_owned(),
+    }
 }
 
 pub fn age(seconds: Option<i64>) -> String {
@@ -363,6 +642,15 @@ pub fn truncate(value: &str, max: usize) -> String {
     let mut shortened: String = value.chars().take(max.saturating_sub(3)).collect();
     shortened.push_str("...");
     shortened
+}
+
+/// One tool result, kept only so the largest output can be attributed after the
+/// walk. `tool_use_id` is the deterministic tiebreak when HashMap order is not.
+struct ToolOutputCandidate {
+    bytes: u64,
+    message: usize,
+    tool_name: Option<String>,
+    tool_use_id: String,
 }
 
 #[derive(Deserialize)]
@@ -432,10 +720,19 @@ struct ContentPart {
     _image: Option<IgnoredAny>,
 }
 
-/// The payload is ignored; only its presence matters to the audit. The empty
-/// struct accepts the map and discards its fields.
+/// The payload carries the id and name; the audit only counts the presence, and
+/// `--explain` uses the id to pair a result with its request.
 #[derive(Deserialize)]
-struct ToolUse {}
+struct ToolUse {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    raw_input: Option<String>,
+    #[serde(default)]
+    input: Option<ToolInput>,
+}
 
 #[derive(Deserialize)]
 struct ToolResult {
@@ -443,6 +740,8 @@ struct ToolResult {
     content: ToolResultContent,
     #[serde(default)]
     is_error: bool,
+    #[serde(default)]
+    tool_name: Option<String>,
 }
 
 /// Zed changed this field from a single block to an array. Both shapes are

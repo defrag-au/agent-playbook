@@ -1,7 +1,7 @@
 mod common;
 
 use chrono::NaiveDate;
-use zed_thread_tools::audit::{audit, AuditOptions};
+use zed_thread_tools::audit::{audit, explain, AuditOptions};
 use zed_thread_tools::{AuditReport, ThreadAudit};
 
 use common::{
@@ -71,6 +71,9 @@ fn counts_messages_tools_and_both_content_shapes() {
     assert_eq!(alpha.tool_results, Some(1));
     assert_eq!(alpha.failed_tool_results, Some(0));
     assert_eq!(alpha.tool_output_bytes, Some(10));
+    assert_eq!(alpha.largest_tool_output_bytes, Some(10));
+    assert_eq!(alpha.largest_tool_output_tool.as_deref(), Some("read_file"));
+    assert_eq!(alpha.largest_tool_output_message, Some(1));
     assert_eq!(alpha.compactions, Some(0));
     assert_eq!(alpha.messages_since_compaction, Some(2));
     assert_eq!(alpha.model.as_deref(), Some("test/fake"));
@@ -222,6 +225,94 @@ fn audit_does_not_modify_the_database() {
     let after = std::fs::read(&db_path).expect("read database after audit");
 
     assert_eq!(before, after);
+}
+
+#[test]
+fn attributes_the_largest_tool_output_to_its_tool_and_message() {
+    let temp = TempDir::new("zed-thread-audit-largest");
+    let db_path = temp.path().join("threads.db");
+    let connection = create_db(&db_path);
+
+    let big = "x".repeat(100);
+    let messages = format!(
+        r#"[{{"User":{{"id":"u1","content":[{{"Text":"go"}}]}}}},{},{}]"#,
+        agent_with_tool_result("big", "web_fetch", &big),
+        agent_with_tool_result("small", "read_file", "tiny"),
+    );
+    let thread = thread_json("alpha", "2026-10-17T10:00:00Z", &messages, "");
+    insert_thread(
+        &connection,
+        "alpha",
+        "alpha",
+        "2026-10-17T10:00:00+00:00",
+        None,
+        "zstd",
+        &compress(&thread),
+    );
+    drop(connection);
+
+    let report = audit(
+        &db_path,
+        &AuditOptions {
+            top: 0,
+            older_than: None,
+            project: None,
+        },
+    )
+    .expect("audit succeeds");
+
+    let alpha = find(&report, "alpha");
+    assert_eq!(alpha.largest_tool_output_bytes, Some(100));
+    assert_eq!(alpha.largest_tool_output_tool.as_deref(), Some("web_fetch"));
+    assert_eq!(alpha.largest_tool_output_message, Some(1));
+
+    let explanation = explain(&db_path, "alpha", 10).expect("explain succeeds");
+    assert_eq!(explanation.outputs.len(), 2);
+    assert_eq!(explanation.outputs[0].tool, "web_fetch");
+    assert_eq!(explanation.outputs[0].bytes, 100);
+    assert_eq!(explanation.outputs[0].message, 1);
+    assert_eq!(explanation.outputs[1].tool, "read_file");
+}
+
+#[test]
+fn explains_a_thread_by_id_and_by_title() {
+    let temp = TempDir::new("zed-thread-audit-explain");
+    let db_path = temp.path().join("threads.db");
+    let connection = create_db(&db_path);
+
+    let alpha = thread_json("alpha", "2026-10-16T10:00:00Z", sample_messages(), "");
+    insert_thread(
+        &connection,
+        "alpha",
+        "alpha",
+        "2026-10-16T10:00:00+00:00",
+        None,
+        "zstd",
+        &compress(&alpha),
+    );
+    drop(connection);
+
+    let explanation = explain(&db_path, "alpha", 10).expect("explain by id");
+    assert_eq!(explanation.id, "alpha");
+    assert_eq!(explanation.messages, 2);
+    assert_eq!(explanation.tool_results, 1);
+    assert_eq!(explanation.outputs.len(), 1);
+    assert_eq!(explanation.outputs[0].message, 1);
+    assert_eq!(explanation.outputs[0].tool, "read_file");
+    assert_eq!(explanation.outputs[0].bytes, 10);
+    assert_eq!(
+        explanation.outputs[0].argument.as_deref(),
+        Some("/repo/file.rs")
+    );
+
+    let by_title = explain(&db_path, "alph", 10).expect("explain by title substring");
+    assert_eq!(by_title.id, "alpha");
+}
+
+fn agent_with_tool_result(id: &str, name: &str, text: &str) -> String {
+    format!(
+        r#"{{"Agent":{{"content":[{{"ToolUse":{{"id":"{id}","name":"{name}"}}}}],"tool_results":{{"{id}":{{"tool_use_id":"{id}","tool_name":"{name}","content":[{{"Text":"{text}"}}],"output":null}}}},"reasoning_details":null}}}}"#
+    )
 }
 
 fn find<'a>(report: &'a AuditReport, id: &str) -> &'a ThreadAudit {

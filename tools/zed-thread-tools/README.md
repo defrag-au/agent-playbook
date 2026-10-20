@@ -24,7 +24,27 @@ zed-thread-audit --project compositor
 
 The audit reports compressed and decoded size, message and tool-call counts,
 tool-output bytes, the model, project paths, and how many messages have
-accumulated since the last compaction. It never prints message text.
+accumulated since the last compaction. The largest tool output is attributed to
+the tool that produced it and the message index it sits at (`Largest` and
+`Top tool`), which is what turns "a big output happened" into "this tool caused
+it". It never prints message text.
+
+### Explain one thread
+
+```sh
+zed-thread-audit --explain <thread-id-or-title>
+zed-thread-audit --explain "mithril snapshot" --limit 20
+zed-thread-audit --explain <thread-id> --json
+```
+
+`--explain` lists a thread's tool results largest first, with the message index,
+the tool, the byte count and the **request argument** (the URL, path or
+command). It never reads or prints the result body. The thread can be named by
+id — from the audit table — or by a unique substring of its title; an ambiguous
+substring is an error rather than a guess. `--limit 0` shows every result.
+
+This is the first command after a session has compacted unexpectedly: it names
+the page or file that cost the context, not just the tool that fetched it.
 
 ## TUI
 

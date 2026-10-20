@@ -4,7 +4,20 @@
 Copy this file to references/crates/<crate>-<version>.md and fill it in.
 Written for an agent that was NOT trained on this version — see references/README.md.
 Delete any section that does not apply; do not leave placeholders behind.
+
+Budget: <= 200 lines and <= 8 KB. The file is cheap on disk, expensive in context.
+Front-load the at-a-glance; the agent should read one section, not the whole file.
 -->
+
+## At a glance
+
+<!--
+5-10 lines: what changed from the version the model likely knows, and which task
+this sheet answers. The agent reads this section first; keep it under 15 lines.
+-->
+
+- <old> was renamed to <new>
+- This sheet answers <the task you came here for>
 
 ## Cargo.toml
 
@@ -18,7 +31,7 @@ Delete any section that does not apply; do not leave placeholders behind.
 <!--
 The highest-value section. The model's recollection is some older release, so lead with
 what changed: renames, signature changes, removals. Be concrete — "X was renamed to Y"
-not "the API was reworked".
+not "the API was reworked". Do not paste an API listing; keep it task-shaped.
 -->
 
 - `<old>` was renamed to `<new>`

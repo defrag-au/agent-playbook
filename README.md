@@ -231,7 +231,9 @@ is the design record, and `at-describe` answers with what exists rather than wha
 
 `tools/zed-thread-tools/` is deliberately outside the `at-` namespace. `zed-thread-audit`
 reports size, message and tool-call counts, tool-output bytes and compaction state for Zed's
-agent thread store; `zed-thread-recover` appends a `Compaction(Summary)` message so a thread
+agent thread store, and `--explain` attributes a thread's largest outputs to the tool, message
+and request argument without printing the result body; `zed-thread-recover` appends a
+`Compaction(Summary)` message so a thread
 that has hit its context limit can continue; `zed-thread-tui` is the unified library over
 `sidebar_threads` and `threads.db`, driving archive, single-thread delete, bundle export/import
 and recovery from a selected row. The audit binary opens the store read-only and never prints

@@ -14,7 +14,8 @@ use zed_thread_tools::db;
     about = "Read-only audit of Zed agent thread transcripts",
     long_about = "Read-only audit of Zed agent thread transcripts.\n\n\
                   Reports thread size, message and tool-call counts, tool-output bytes, \
-                  compaction state, model and project paths. It never prints message \
+                  compaction state, model and project paths. Use --explain to attribute \
+                  a thread's largest outputs to a tool and message. It never prints message \
                   content and never opens the database read-write."
 )]
 struct Cli {
@@ -37,6 +38,14 @@ struct Cli {
     /// Emit the typed JSON report instead of the table
     #[arg(long)]
     json: bool,
+
+    /// Explain one thread's largest tool outputs: size, message, tool and request argument
+    #[arg(long, value_name = "THREAD_ID_OR_TITLE")]
+    explain: Option<String>,
+
+    /// Number of outputs shown by --explain (0 = all)
+    #[arg(long, default_value_t = 10)]
+    limit: usize,
 }
 
 fn main() {
@@ -70,6 +79,18 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         older_than,
         project: cli.project,
     };
+
+    if let Some(thread) = cli.explain.as_deref() {
+        let explanation = audit::explain(&db_path, thread, cli.limit)?;
+        if cli.json {
+            serde_json::to_writer_pretty(std::io::stdout(), &explanation)?;
+            println!();
+        } else {
+            audit::print_explanation(&explanation);
+        }
+        return Ok(());
+    }
+
     let report = audit::audit(&db_path, &options)?;
 
     if cli.json {

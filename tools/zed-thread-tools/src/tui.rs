@@ -1266,6 +1266,12 @@ impl App {
                     format_bytes_option(audit.largest_tool_output_bytes)
                 ),
             ));
+            if let (Some(tool), Some(message)) = (
+                audit.largest_tool_output_tool.as_deref(),
+                audit.largest_tool_output_message,
+            ) {
+                lines.push(line_pair("Largest", format!("{tool} at message {message}")));
+            }
             lines.push(line_pair(
                 "Compaction",
                 format!(
@@ -1754,6 +1760,8 @@ mod tests {
             failed_tool_results: Some(0),
             tool_output_bytes: Some(1_000),
             largest_tool_output_bytes: Some(500),
+            largest_tool_output_tool: Some("read_file".to_owned()),
+            largest_tool_output_message: Some(3),
             compactions: Some(0),
             messages_since_compaction: Some(4),
             model: Some("test/model".to_owned()),

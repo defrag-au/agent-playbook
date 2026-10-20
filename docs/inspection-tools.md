@@ -414,6 +414,38 @@ spec, and each one is a test.
     `--summary` in `diff` does not fetch the hunks it would discard, so a survey pays for the frame
     only, and a summary still exits 0 when it found something it did not print.
 
+## Context costs
+
+A tool result is paid for in context, and one call can cost more than an hour of reading.
+Measured from the Zed thread store with `zed-thread-audit --explain`, the largest results were:
+
+| Result | Bytes |
+| --- | ---: |
+| `read_file` of a minified 60-line chain spec | 1.47 MB |
+| `fetch` of `crates.io/api/v1/crates/clap` | 1.34 MB |
+| `list_directory` of a Mithril immutable store | 1.19 MB |
+| `fetch` of `chainid.network/chains_mini.json` | 1.04 MB |
+| `fetch` of a docs page | 235–539 kB |
+| `fetch` of a TTF font | 415 kB |
+
+None of those looked expensive at the call site. The rules that follow from it:
+
+- **A result over ~50 kB is a stop sign.** It is roughly 12k tokens, and most of it is not the
+  fact that was wanted.
+- **`fetch` is whole-page.** An anchor does not reduce the download; docs sites measured
+  235–539 kB. Fetch the raw README or a source file from `raw.githubusercontent.com` instead.
+- **crates.io's JSON API is not a metadata call.** `/api/v1/crates/<name>` returns every version
+  and feature set: 200 kB–1.3 MB. `cargo info <crate>` prints the same facts in ~2 kB.
+- **Line-bounded is not byte-bounded.** 60 lines of minified JSON was 1.47 MB. Stat the file
+  first, and use `jq` or a byte bound for generated data.
+- **A directory is a set, not a list.** `list_directory` on a data directory returned 1.19 MB.
+  Count first (`find … -maxdepth 1 | wc -l`), then list the part you need.
+- **Never fetch a binary.** It arrives as text and pays full price.
+
+`zed-thread-audit --explain <thread-id-or-title>` attributes a thread's largest results to the
+tool, the message index and the request argument, without reading the result body. It is the
+first command after a session has compacted unexpectedly.
+
 ## Security: what an approval actually grants
 
 The useful framing is not "are these tools safe" but **"does the grant widen the agent's read

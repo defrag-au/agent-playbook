@@ -169,7 +169,7 @@ pub fn sample_messages() -> &'static str {
         {"User":{"id":"u1","content":[{"Text":"hello"}]}},
         {"Agent":{"content":[
             {"Text":"hi"},
-            {"ToolUse":{"id":"t1","name":"read_file","raw_input":"{}","input":{},"is_input_complete":true,"thought_signature":null}}
+            {"ToolUse":{"id":"t1","name":"read_file","raw_input":"{}","input":{"path":"/repo/file.rs"},"is_input_complete":true,"thought_signature":null}}
         ],"tool_results":{"t1":{
             "tool_use_id":"t1",
             "tool_name":"read_file",

@@ -22,7 +22,9 @@ mod util;
 use std::fmt;
 use std::path::PathBuf;
 
-pub use audit::{audit, AuditOptions, AuditReport, ThreadAudit};
+pub use audit::{
+    audit, explain, AuditOptions, AuditReport, ThreadAudit, ThreadExplanation, ToolOutputDetail,
+};
 pub use db::{default_db_path, ThreadHeader, ThreadRecord};
 pub use recover::{
     prepare_recovery, write_recovery, PreparedRecovery, RecoverOptions, RecoveryMode, RecoveryPlan,
