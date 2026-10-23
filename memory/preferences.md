@@ -14,6 +14,10 @@ it belongs in `rules/` instead.
 
 - **Write screenshots and scratch files into `.tmp/` inside the repo**, not `/tmp`. They stay
   easy to open and to point someone at, and `.tmp/` is gitignored everywhere.
+- **A PR's body arrives as one copy-paste-ready fenced block, with its title shared above it
+  separately.** The same goes for any artefact I will paste elsewhere — a commit message,
+  release notes, a config snippet, a report for another system. Wrap code inside it in a longer
+  fence (four backticks); keep commentary outside the block, never inside the artefact.
 - Prefer a diff I can read over a summary of a diff.
 - When you cite a path, make it relative to a repo root so it is clickable.
 

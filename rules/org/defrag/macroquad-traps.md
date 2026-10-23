@@ -43,6 +43,14 @@ picture with no error.
   before appears one frame late; large text (over 64 device pixels) warms its digits as a set and
   every other character one at a time, so a title's letters each pop in once. A countdown or a
   banner that must be whole on its first frame belongs in a `Baker` face, scaled through a `Pose`.
+- **A capture can outrun the glyph gate and photograph an empty line.** `capture_due` is asked
+  BEFORE the frame is drawn, so a sentence that first appears on that frame — a live quote's
+  failure reason, a wallet's error — is held back and never recorded: the PNG has an empty panel
+  and the report's Problems list is empty too. Wait until the state has been unchanged for two
+  drawn frames, not just until `--at`. The same gate makes a truncated string at a size above 64
+  device pixels change length while it is measured (letters cache one at a time), so the `fit`
+  that cut it re-cuts differently each frame and never settles; draw a sentence at a body size,
+  where the whole ASCII set warms at once.
 - **macroquad 0.4.16 doubles a glyph atlas at random.** A glyph landing within 2 px of a row's end
   fails the bounds check and doubles the whole atlas instead of wrapping, so one run in twelve
   ended at 8192² (256 MB). Upstream fixed it after 0.4.16 (`8d602d3`), so every workspace
@@ -77,6 +85,10 @@ picture with no error.
   render target: `harness::Capture`, or `harness::save_texture_png` for a game that already
   composes its frame in a target of its own.
 - **`draw_arc` thickness grows outward from the radius**, not centred on it.
+- **miniquad's log macros print a lone literal verbatim.** `macroquad::logging::info!("refused:
+  {why}")` logs the braces, not the reason: with nothing after the string the macro passes it
+  through unformatted, and it still compiles. Pass the value positionally (`"refused: {}", why`)
+  whenever the string is the only argument. The `log` and `tracing` macros do not have this trap.
 
 These pass every native run and capture, and fail only in the browser:
 
