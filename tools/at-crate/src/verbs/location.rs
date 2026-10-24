@@ -89,8 +89,8 @@ pub fn run(args: &[String], opts: &Options) -> Result<verbs::Outcome, Fail> {
             "caveat: {} not searched",
             at_core::contract::plural_of(
                 listing.unreadable,
-                "unreadable registry directory",
-                "unreadable registry directories"
+                "unreadable store entry",
+                "unreadable store entries"
             )
         ));
     }
@@ -110,18 +110,19 @@ pub fn run(args: &[String], opts: &Options) -> Result<verbs::Outcome, Fail> {
                     target.display()
                 ));
             } else {
-                for out in build_dirs.iter().take(opts.limit) {
+                let cap = opts.limit.min(3);
+                for out in build_dirs.iter().take(cap) {
                     report.bound(format!(
                         "build output: {}",
                         out.label(project.root.as_deref())
                     ));
                 }
-                if build_dirs.len() > opts.limit {
+                if build_dirs.len() > cap {
                     report.bound(format!(
-                        "{} of {} build directories shown · --limit {}",
-                        opts.limit,
+                        "{} of {} build directories shown · {} lists them",
+                        cap,
                         build_dirs.len(),
-                        opts.limit
+                        opts.again("out", std::slice::from_ref(&resolved.name), &[])
                     ));
                 }
             }

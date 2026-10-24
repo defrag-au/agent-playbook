@@ -1,9 +1,9 @@
 //! `at-crate out` — what a build script generated, without running one.
 //!
 //! Build output lives under `target/**/build/<crate>-<hash>/out`, and the hash is opaque. This
-//! verb lists those directories and their files, newest first by path, and says how many there
-//! are. It never claims a directory is the current build: a stale `out` from an earlier feature
-//! set is a directory like any other, and `--build-dir` is how a reader chooses.
+//! verb lists those directories and their files in path order, and says how many there are. It
+//! never claims a directory is the current build: a stale `out` from an earlier feature set is a
+//! directory like any other, and `--build-dir` is how a reader chooses.
 
 use std::fs;
 

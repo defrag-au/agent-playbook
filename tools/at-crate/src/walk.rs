@@ -13,6 +13,7 @@ use std::time::SystemTime;
 use at_core::contract::{secret_shaped, Fail};
 
 const SOURCE_SKIPS: &[&str] = &[
+    ".cargo",
     ".direnv",
     ".git",
     ".tmp",
@@ -144,6 +145,7 @@ pub struct Tree {
     pub unreadable: usize,
     pub secret_skipped: usize,
     pub not_descended: usize,
+    pub skipped_dirs: BTreeSet<&'static str>,
 }
 
 /// Entries under `root` down to `depth` levels, in sorted order. A directory at the boundary is
@@ -157,6 +159,7 @@ pub fn tree(root: &Path, depth: usize, limit: usize, include_secret: bool) -> Re
         unreadable: 0,
         secret_skipped: 0,
         not_descended: 0,
+        skipped_dirs: BTreeSet::new(),
     };
 
     let meta = fs::metadata(root)
@@ -214,6 +217,11 @@ fn tree_level(
         }
         let rel = relative(root, &path);
         if meta.is_dir() {
+            let name = file_name(&path);
+            if let Some(skip) = SOURCE_SKIPS.iter().find(|skip| **skip == name) {
+                tree.skipped_dirs.insert(*skip);
+                continue;
+            }
             tree.entries.push(TreeEntry {
                 rel,
                 is_dir: true,

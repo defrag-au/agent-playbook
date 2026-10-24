@@ -6,9 +6,12 @@
 
 mod capture;
 mod collect;
+mod emulation;
 mod input;
+mod keys;
 mod probe;
 mod report;
+mod runner;
 
 use std::ffi::OsStr;
 use std::fs;
@@ -21,8 +24,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{SecondsFormat, Utc};
 use headless_chrome::browser::tab::Tab;
-use headless_chrome::protocol::cdp::types::Method;
-use headless_chrome::protocol::cdp::{Emulation, Network, Page};
+use headless_chrome::protocol::cdp::{Network, Page};
 use headless_chrome::{Browser, LaunchOptions};
 
 use capture::Captured;
@@ -35,23 +37,6 @@ use report::{
 const DEFAULT_BROWSER: &str = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 const SAMPLE_MS: u64 = 250;
 const STABLE_SAMPLES: u32 = 2;
-
-const RENDERER_JS: &str = r#"(() => {
-  const canvases = Array.from(document.querySelectorAll('canvas'));
-  let gl = null;
-  for (const canvas of canvases) {
-    gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-    if (gl) break;
-  }
-  if (!gl) {
-    const canvas = document.createElement('canvas');
-    gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-  }
-  if (!gl) return 'no WebGL context';
-  const extension = gl.getExtension('WEBGL_debug_renderer_info');
-  const renderer = extension ? gl.getParameter(extension.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-  return gl.getParameter(gl.VERSION) + ' (' + renderer + ')';
-})()"#;
 
 struct Options {
     url: String,
@@ -141,16 +126,6 @@ impl Stability {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
-struct SetTouchEmulation {
-    enabled: bool,
-    #[serde(rename = "maxTouchPoints", skip_serializing_if = "Option::is_none")]
-    max_touch_points: Option<u32>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct Empty {}
-
 #[cfg(unix)]
 static CHILD_PID: AtomicU32 = AtomicU32::new(0);
 
@@ -184,14 +159,6 @@ fn install_signal_handlers(pid: u32) {
 #[cfg(not(unix))]
 fn install_signal_handlers(_pid: u32) {}
 
-// `auto_generate_cdp` 0.4.6 swaps the parameters of `Emulation.setTouchEmulationEnabled` and
-// the deprecated `Page.setTouchEmulationEnabled`, so the generated `Emulation` struct carries
-// `configuration` instead of `maxTouchPoints`. Send the correct shape ourselves.
-impl Method for SetTouchEmulation {
-    const NAME: &'static str = "Emulation.setTouchEmulationEnabled";
-    type ReturnObject = Empty;
-}
-
 struct Profile {
     path: PathBuf,
     keep: bool,
@@ -217,6 +184,19 @@ impl Drop for Profile {
 }
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("run") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        let code = match runner::run(args) {
+            Ok(true) => 0,
+            Ok(false) => 2,
+            Err(error) => {
+                eprintln!("browser-shot run: {error:#}");
+                1
+            }
+        };
+        std::process::exit(code);
+    }
+
     let code = match parse_args().and_then(run) {
         Ok(true) => 0,
         Ok(false) => 2,
@@ -435,7 +415,8 @@ fn run(options: Options) -> Result<bool> {
         .map_err(|error| anyhow!("invalid launch options: {error}"))?;
 
     let browser = Browser::new(launch).context("launch the browser")?;
-    if let Some(pid) = browser.get_process_id() {
+    let browser_pid = browser.get_process_id();
+    if let Some(pid) = browser_pid {
         install_signal_handlers(pid);
     }
     let tab = browser.new_tab().context("open a tab")?;
@@ -470,40 +451,20 @@ fn run(options: Options) -> Result<bool> {
         .context("subscribe to console and network events")?;
     }
 
-    tab.call_method(Emulation::SetDeviceMetricsOverride {
-        width: options.width,
-        height: options.height,
-        device_scale_factor: options.dpr,
-        mobile: options.touch,
-        scale: None,
-        screen_width: None,
-        screen_height: None,
-        position_x: None,
-        position_y: None,
-        dont_set_visible_size: None,
-        screen_orientation: None,
-        viewport: None,
-        display_feature: None,
-        device_posture: None,
-    })
-    .context("set the viewport")?;
+    emulation::set_metrics(
+        &tab,
+        options.width,
+        options.height,
+        options.dpr,
+        options.touch,
+    )?;
 
     if options.touch {
-        tab.call_method(SetTouchEmulation {
-            enabled: true,
-            max_touch_points: Some(5),
-        })
-        .context("enable touch emulation")?;
+        emulation::enable_touch(&tab)?;
     }
 
     if let Some(user_agent) = &options.user_agent {
-        tab.call_method(Emulation::SetUserAgentOverride {
-            user_agent: user_agent.clone(),
-            accept_language: None,
-            platform: None,
-            user_agent_metadata: None,
-        })
-        .context("set the user agent")?;
+        emulation::set_user_agent(&tab, user_agent)?;
     }
 
     if let Some(path) = &options.preload {
@@ -606,8 +567,8 @@ fn run(options: Options) -> Result<bool> {
         wait_for_stable(&tab, &grab, options.settle_ms, options.timeout_ms)?
     };
 
-    let renderer_name = probe::evaluate_text(&tab, RENDERER_JS);
-    let software = is_software_renderer(&renderer_name);
+    let renderer_name = probe::renderer(&tab);
+    let software = probe::is_software_renderer(&renderer_name);
 
     predicates.push(Predicate {
         name: "frame.stable".to_owned(),
@@ -736,6 +697,7 @@ fn run(options: Options) -> Result<bool> {
         captured: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
         peer: Peer { index: 0, of: 1 },
         browser: browser_version,
+        pid: browser_pid,
         mode: if options.headed {
             "headed"
         } else {
@@ -766,6 +728,7 @@ fn run(options: Options) -> Result<bool> {
             predicates,
             waited_ms: (readiness_waited + settle.elapsed).as_millis() as u64,
         },
+        frame_rate: None,
         console: Console {
             errors: snapshot.console_errors,
             warnings: snapshot.console_warnings,
@@ -877,13 +840,6 @@ fn round_to(value: f64, places: i32) -> f64 {
     (value * factor).round() / factor
 }
 
-fn is_software_renderer(renderer: &str) -> bool {
-    let renderer = renderer.to_ascii_lowercase();
-    ["swiftshader", "llvmpipe", "softpipe", "software"]
-        .iter()
-        .any(|marker| renderer.contains(marker))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -920,15 +876,6 @@ mod tests {
     #[test]
     fn rejects_a_malformed_point() {
         assert!(parse_point("12").is_err());
-    }
-
-    #[test]
-    fn recognises_software_renderers() {
-        assert!(is_software_renderer(
-            "WebGL 2.0 (Google SwiftShader) — SOFTWARE"
-        ));
-        assert!(is_software_renderer("WebGL 1.0 (Mesa/llvmpipe)"));
-        assert!(!is_software_renderer("WebGL 2.0 (Apple M3 Pro)"));
     }
 
     #[test]

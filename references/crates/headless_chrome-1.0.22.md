@@ -201,6 +201,12 @@ types rather than guessing.
   For an element below the fold, also set `capture_beyond_viewport: Some(true)`.
 - **`Element::call_js_fn` uses `return_by_value: false`.** Return a primitive (a joined string,
   a number) and parse it; an array comes back as an object reference with `value: None`.
+- **Every `call_method` can wait up to 100 ms before it is sent.** The websocket reader holds
+  the connection mutex while blocked in `read()`, and the socket has a 100 ms read timeout
+  (`src/browser/transport/web_socket_connection.rs`), so the next command waits for that read
+  to time out. On a 60 Hz page a round trip is about six frames. For frame-relative input,
+  schedule the hold from a counter read **before** the event so the two round trips cancel;
+  measuring from an event read after the dispatch stacks them and every hold overshoots.
 - **`--headless` is the new headless.** `headless(true)` adds `--headless`; pass
   `--headless=new` yourself only with `headless(false)`. For a headed run set `enable_gpu(true)`
   or the crate adds `--disable-gpu` and the window renders in software.

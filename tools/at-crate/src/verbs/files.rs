@@ -64,6 +64,10 @@ pub fn run(args: &[String], opts: &Options) -> Result<verbs::Outcome, Fail> {
             opts.limit
         ));
     }
+    if !tree.skipped_dirs.is_empty() {
+        let names: Vec<&str> = tree.skipped_dirs.iter().copied().collect();
+        bounds.push(format!("skipped by rule: {}", names.join(", ")));
+    }
     if tree.secret_skipped > 0 {
         bounds.push(format!("{} secret-shaped not listed", tree.secret_skipped));
     }

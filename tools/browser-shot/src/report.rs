@@ -12,11 +12,13 @@ pub struct Report {
     pub captured: String,
     pub peer: Peer,
     pub browser: String,
+    pub pid: Option<u32>,
     pub mode: String,
     pub renderer: Renderer,
     pub viewport: Viewport,
     pub image: Image,
     pub ready: Ready,
+    pub frame_rate: Option<FrameRate>,
     pub console: Console,
     pub requests: Requests,
     pub network: String,
@@ -62,7 +64,7 @@ pub struct Image {
     pub css: Option<CssBox>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct CssBox {
     pub x: f64,
     pub y: f64,
@@ -76,7 +78,15 @@ pub struct Ready {
     pub waited_ms: u64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
+pub struct FrameRate {
+    pub fps: f64,
+    pub first_frame: f64,
+    pub last_frame: f64,
+    pub window_ms: u64,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct Predicate {
     pub name: String,
     pub value: String,
@@ -127,7 +137,7 @@ pub struct Requests {
     pub lines: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Expect {
     pub expression: String,
     pub value: String,
@@ -150,6 +160,13 @@ impl Report {
             ),
         );
         line(&mut out, "browser", &self.browser);
+        line(
+            &mut out,
+            "pid",
+            &self
+                .pid
+                .map_or_else(|| "not exposed".to_owned(), |pid| pid.to_string()),
+        );
         line(&mut out, "mode", &self.mode);
         line(
             &mut out,
@@ -224,6 +241,17 @@ impl Report {
                 self.ready.waited_ms
             ),
         );
+        match &self.frame_rate {
+            Some(rate) => line(
+                &mut out,
+                "frame rate",
+                &format!(
+                    "{:.1} Hz ({:.0} -> {:.0} frames in {} ms)",
+                    rate.fps, rate.first_frame, rate.last_frame, rate.window_ms
+                ),
+            ),
+            None => line(&mut out, "frame rate", "not measured"),
+        }
         line(
             &mut out,
             "console",

@@ -293,6 +293,21 @@ fn files_is_sorted_and_states_the_depth_it_cut() {
 }
 
 #[test]
+fn files_skips_vcs_and_cargo_metadata() {
+    let fixture = Fixture::new("files-skips");
+    let root = "cargo-home/registry/src/index.crates.io-test/headless_chrome-1.0.22";
+    fixture.write(&format!("{root}/.git/HEAD"), "ref: refs/heads/main\n");
+    fixture.write(&format!("{root}/.cargo/config.toml"), "[net]\n");
+    let out = at_crate(&fixture, "files", &["headless_chrome", "--depth", "1"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    assert!(!text.contains(".git/"), "{text}");
+    assert!(!text.contains(".cargo/"), "{text}");
+    assert!(text.contains("skipped by rule: .cargo, .git"), "{text}");
+}
+
+#[test]
 fn slice_numbers_the_lines_and_offers_the_rest() {
     let fixture = Fixture::new("slice");
     let out = at_crate(

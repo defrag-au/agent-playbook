@@ -242,6 +242,14 @@ impl Store {
                          (or cargo fetch) so cargo extracts it"
                     )
                 };
+                let suffix = if listing.unreadable > 0 {
+                    format!(
+                        "{suffix} · {} store entries were unreadable and not searched",
+                        listing.unreadable
+                    )
+                } else {
+                    suffix
+                };
                 Err(Fail::environment(suffix))
             }
             many => {
@@ -366,8 +374,8 @@ pub fn listing_bound(listing: &Listing, total: usize, shown: usize, limit: usize
             " · {} not counted",
             plural_of(
                 listing.unreadable,
-                "unreadable registry directory",
-                "unreadable registry directories"
+                "unreadable store entry",
+                "unreadable store entries"
             )
         ));
     }

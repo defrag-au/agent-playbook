@@ -100,10 +100,11 @@ removed, which is the one thing on this list that a `cat` approval never granted
 a separate binary rather than a verb on `peek`.
 
 `at-crate` is the same distinction for a different store: content that exists, but outside the
-worktree. It reads the extracted registry sources and the project's build-script output, and it
-resolves a version through `Cargo.lock` rather than guessing "latest". It is separate from
-`at-peek` because its root is the cargo home and the target directory, not the worktree — and
-because a path that resolves outside one root has to be a visible token, not an implicit widening.
+worktree. It reads the extracted registry sources, cargo's git checkouts, and the project's
+build-script output, and it resolves a version through `Cargo.lock` rather than guessing "latest".
+It is separate from `at-peek` because its root is the cargo home and the target directory, not the
+worktree — and because a path that resolves outside one root has to be a visible token, not an
+implicit widening.
 
 ## Before and after
 

@@ -96,11 +96,11 @@ pub static VERBS: &[Verb] = &[
         usage: "at-crate where <crate> [--version <ver>] [--project <path>] [--cargo-home <path>] \
                 [--target-dir <path>]",
         notes: "Resolves the crate the project's nearest Cargo.lock names, then the extracted \
-                registry copy of exactly that version. With no lock entry it falls back to the \
-                installed copies only when there is exactly one, and says so; two installed \
-                versions are an error naming both, never a guess. Prints the source directory and \
-                any build-script output directories. It never runs cargo, so it cannot fetch an \
-                uninstalled crate.",
+                registry copy of exactly that version, or the matching git checkout under \
+                $CARGO_HOME/git/checkouts. With no lock entry it falls back to the installed \
+                copies only when there is exactly one, and says so; two installed versions are an \
+                error naming both, never a guess. Prints the source directory and any build-script \
+                output directories. It never runs cargo, so it cannot fetch an uninstalled crate.",
         flags: &[
             LIMIT, CARGO_HOME, PROJECT, VERSION, REGISTRY, TARGET_DIR, HOW,
         ],

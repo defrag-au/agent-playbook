@@ -124,7 +124,7 @@ pub fn exactly_one<'a>(args: &'a [String], verb: &str, what: &str) -> Result<&'a
     match args {
         [one] => Ok(one),
         [] => Err(Fail::usage(format!(
-            "`{verb}` needs {what} · at-crate {verb} {what}"
+            "`{verb}` needs {what} · at-crate help {verb}"
         ))),
         _ => Err(Fail::usage(format!("`{verb}` takes one {what} at a time"))),
     }

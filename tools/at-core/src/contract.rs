@@ -174,12 +174,12 @@ impl Outcome {
         Outcome { report, exit }
     }
 
-    /// For a verb whose answer is its frame, because the body was withheld on request.
-    ///
-    /// A summary prints no content lines by construction, so [`Outcome::from_report`] would call a
-    /// survey that found six changed files "nothing to show" — and the exit code is the cheapest
-    /// reading of a survey there is. Reaching for this is a claim that the frame itself is the
-    /// answer, which is only true for a verb that says so in its own help.
+    /// For a verb whose answer is its frame: a summary whose rows were withheld on request, or a
+    /// resolution whose answer is provenance rather than a row to print. A summary prints no
+    /// content lines by construction, so [`Outcome::from_report`] would call a survey that found
+    /// six changed files "nothing to show" — and the exit code is the cheapest reading of a
+    /// survey there is. Reaching for this is a claim that the frame itself is the answer, which is
+    /// only true for a verb that says so in its own help.
     pub fn from_frame(report: Report) -> Outcome {
         Outcome {
             report,
