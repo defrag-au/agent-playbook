@@ -164,8 +164,8 @@ without leaving the question.
   them to understand, then read the file with the editor tools before changing it.
 - **`path:40-60` is one token, not two arguments**, and ranges are 1-based and inclusive.
 - **`at-peek` never opens `.git`.** "Is this file tracked", "what branch is this" and "who wrote
-  it" are `at-recall` questions — of which only the first two are answered so far. `blame` is
-  designed and not written; ask rather than reaching for `git`.
+  it" are `at-recall` questions — of which only the first two are answered so far. `show` and
+  `blame` are designed and not written; ask rather than reaching for `git`.
 - **A revision is a revision only if it resolves.** `at-recall diff <first>` treats its first
   argument as a revision when it names a commit and as a path otherwise — git's own rule, so
   `diff main` works and `diff src/main.rs` does. A range (`A..B`, `A...B`) that does not resolve
