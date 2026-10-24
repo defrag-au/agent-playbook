@@ -18,6 +18,7 @@ module.exports = grammar({
       $.key,
       $.pointer,
       $.capture,
+      $.burst,
       $.assert,
       $.network,
       $._blank,
@@ -36,6 +37,7 @@ module.exports = grammar({
     key: $ => seq('key', $.name, $.code, $.key_state, repeat($.field), $._line_end),
     pointer: $ => seq('pointer', $.name, $.pointer_kind, repeat($.field), $._line_end),
     capture: $ => seq('capture', $.name, repeat($.field), $._line_end),
+    burst: $ => seq('burst', $.name, repeat($.field), $._line_end),
     assert: $ => seq('assert', $.name, $.expression, repeat($.field), $._line_end),
     network: $ => seq('network', $.name, repeat($.field), $._line_end),
 
@@ -56,6 +58,6 @@ module.exports = grammar({
 
     flag: _ => choice('touch', 'headed', 'await'),
     key_state: _ => choice('down', 'up'),
-    pointer_kind: _ => choice('click', 'hover'),
+    pointer_kind: _ => choice('click', 'hover', 'drag', 'tap', 'swipe'),
   },
 });

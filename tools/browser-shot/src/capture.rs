@@ -127,6 +127,55 @@ pub fn canvas_backing(tab: &Tab, selector: &str, timeout: Duration) -> Option<(u
     Some((values[0], values[1]))
 }
 
+pub fn dimensions_match(actual: u32, expected: f64, tolerance: f64) -> bool {
+    (f64::from(actual) - expected).abs() <= tolerance.max(1.0)
+}
+
+/// The part of the element's box that survives its ancestors' overflow clipping. This is
+/// separate from `overflow`, which only sees whether the element's own content overflows.
+pub fn clipped(tab: &Tab, selector: &str, timeout: Duration) -> Option<(f64, f64, f64, f64)> {
+    let element = tab
+        .wait_for_element_with_custom_timeout(selector, timeout)
+        .ok()?;
+    let selector = serde_json::to_string(selector).ok()?;
+    let source = format!(
+        r#"function () {{
+            const el = document.querySelector({selector});
+            if (!el) return null;
+            const rect = el.getBoundingClientRect();
+            let left = rect.left, top = rect.top, right = rect.right, bottom = rect.bottom;
+            for (let p = el.parentElement; p; p = p.parentElement) {{
+                const style = getComputedStyle(p);
+                if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
+                const box = p.getBoundingClientRect();
+                if (style.overflowX !== 'visible') {{
+                    left = Math.max(left, box.left);
+                    right = Math.min(right, box.right);
+                }}
+                if (style.overflowY !== 'visible') {{
+                    top = Math.max(top, box.top);
+                    bottom = Math.min(bottom, box.bottom);
+                }}
+            }}
+            return JSON.stringify([
+                rect.width,
+                rect.height,
+                Math.max(0, right - left),
+                Math.max(0, bottom - top),
+            ]);
+        }}"#
+    );
+    let object = element.call_js_fn(&source, vec![], false).ok()?;
+    let text = object.value?.as_str()?.to_owned();
+    let values = serde_json::from_str::<Vec<f64>>(&text).ok()?;
+    match values.as_slice() {
+        [width, height, visible_width, visible_height] => {
+            Some((*width, *height, *visible_width, *visible_height))
+        }
+        _ => None,
+    }
+}
+
 pub fn png_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
     if bytes.len() < 24 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" || &bytes[12..16] != b"IHDR" {
         return None;

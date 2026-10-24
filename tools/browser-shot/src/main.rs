@@ -28,7 +28,7 @@ use headless_chrome::browser::tab::Tab;
 use headless_chrome::protocol::cdp::{Network, Page};
 use headless_chrome::{Browser, LaunchOptions};
 
-use capture::Captured;
+use capture::{dimensions_match, Captured};
 use collect::Snapshot;
 use input::{Action, Pointer};
 use report::{
@@ -264,18 +264,44 @@ fn parse_args() -> Result<Options> {
             "--click" => {
                 let value = take(&mut args, "--click")?;
                 let (x, y) = parse_point(&value)?;
-                actions.push(Action::Click { x, y });
+                actions.push(Action::click(
+                    input::Target::Coordinates { x, y },
+                    input::Button::Left,
+                ));
+            }
+            "--rclick" => {
+                let value = take(&mut args, "--rclick")?;
+                let (x, y) = parse_point(&value)?;
+                actions.push(Action::click(
+                    input::Target::Coordinates { x, y },
+                    input::Button::Right,
+                ));
             }
             "--hover" => {
                 let value = take(&mut args, "--hover")?;
                 let (x, y) = parse_point(&value)?;
-                actions.push(Action::Hover { x, y });
+                actions.push(Action::hover(input::Target::Coordinates { x, y }));
+            }
+            "--drag" => {
+                let value = take(&mut args, "--drag")?;
+                let (from, to) = parse_drag(&value)?;
+                actions.push(Action::drag(
+                    input::Target::Coordinates { x: to.0, y: to.1 },
+                    Some(from),
+                    input::Button::Left,
+                ));
             }
             "--click-selector" => {
-                actions.push(Action::ClickSelector(take(&mut args, "--click-selector")?));
+                actions.push(Action::click(
+                    input::Target::Selector(take(&mut args, "--click-selector")?),
+                    input::Button::Left,
+                ));
             }
             "--hover-selector" => {
-                actions.push(Action::HoverSelector(take(&mut args, "--hover-selector")?));
+                actions.push(Action::hover(input::Target::Selector(take(
+                    &mut args,
+                    "--hover-selector",
+                )?)));
             }
             "--steps" => steps = take(&mut args, "--steps")?.parse()?,
             "--dpr" => dpr = take(&mut args, "--dpr")?.parse()?,
@@ -375,6 +401,21 @@ fn parse_point(value: &str) -> Result<(f64, f64)> {
     Ok((x, y))
 }
 
+fn parse_drag(value: &str) -> Result<((f64, f64), (f64, f64))> {
+    let parts = value.split(',').map(str::trim).collect::<Vec<_>>();
+    if parts.len() != 4 {
+        bail!("expected x1,y1,x2,y2, got {value:?}");
+    }
+    let number = |part: &str| -> Result<f64> {
+        part.parse()
+            .with_context(|| format!("coordinate {part:?} in {value:?}"))
+    };
+    Ok((
+        (number(parts[0])?, number(parts[1])?),
+        (number(parts[2])?, number(parts[3])?),
+    ))
+}
+
 fn print_usage() {
     println!(
         "browser-shot <url> <width> <height> <out.png> [options]
@@ -390,6 +431,8 @@ fn print_usage() {
   --preload PATH          run this JS before the document's own scripts
   --expect EXPR           assert this JS expression after readiness
   --click x,y             move there and click (repeatable)
+  --rclick x,y            move there and right-click (repeatable)
+  --drag x1,y1,x2,y2     press, move to x2,y2, release (repeatable)
   --hover x,y             move there without clicking (repeatable)
   --click-selector CSS    click the centre of this element (repeatable)
   --hover-selector CSS    hover the centre of this element (repeatable)
@@ -546,11 +589,12 @@ fn run(options: Options) -> Result<bool> {
     let mut pointer = Pointer::default();
     if !readiness_failed {
         for action in &options.actions {
-            let record = input::dispatch(&tab, action, options.steps, &mut pointer, timeout)?;
+            let record = input::dispatch(&tab, action, options.steps, &mut pointer, 0, timeout)?;
             input_records.push(record);
         }
     }
 
+    let layout = probe::layout(&tab);
     let expect =
         options.expect.as_ref().map(
             |expression| match probe::evaluate_labeled(&tab, expression) {
@@ -626,6 +670,14 @@ fn run(options: Options) -> Result<bool> {
     });
 
     let mut warnings = Vec::new();
+    if let Some(layout) = &layout {
+        if layout.width != options.width || layout.height != options.height {
+            warnings.push(format!(
+                "layout viewport is {}x{}, not requested {}x{}; a page without a viewport meta tag lays out at its own width",
+                layout.width, layout.height, options.width, options.height
+            ));
+        }
+    }
     for predicate in predicates.iter().filter(|predicate| !predicate.passed) {
         warnings.push(format!(
             "readiness failed: {} = {}",
@@ -731,6 +783,7 @@ fn run(options: Options) -> Result<bool> {
             "headless (new)"
         }
         .to_owned(),
+        args: Vec::new(),
         renderer: Renderer {
             name: renderer_name,
             software,
@@ -742,6 +795,7 @@ fn run(options: Options) -> Result<bool> {
             touch: options.touch,
             user_agent: options.user_agent.clone(),
         },
+        layout,
         image: Image {
             width: captured.width,
             height: captured.height,
@@ -773,6 +827,7 @@ fn run(options: Options) -> Result<bool> {
             .iter()
             .map(|record| record.description.clone())
             .collect(),
+        bursts: Vec::new(),
         focus: last_input.map_or_else(|| "none".to_owned(), |record| record.focus.clone()),
         scroll: last_input.map_or_else(|| "none".to_owned(), |record| record.scroll.clone()),
         locator: last_input.map_or_else(|| "none".to_owned(), |record| record.locator.clone()),
@@ -856,10 +911,6 @@ where
         };
         return Ok((current, current_clip, settle));
     }
-}
-
-fn dimensions_match(actual: u32, expected: f64, tolerance: f64) -> bool {
-    (f64::from(actual) - expected).abs() <= tolerance.max(1.0)
 }
 
 fn round_to(value: f64, places: i32) -> f64 {

@@ -9,6 +9,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine as _;
 use chrono::{SecondsFormat, Utc};
 use headless_chrome::browser::tab::Tab;
 use headless_chrome::protocol::cdp::{Network, Page};
@@ -22,8 +24,8 @@ use crate::input::{self, Action, Pointer};
 use crate::keys;
 use crate::probe;
 use crate::report::{
-    Console, CssBox, Expect, FrameRate, Image, Peer, Predicate, Ready, Renderer, Report, Requests,
-    Viewport,
+    BurstInfo, Console, CssBox, Expect, FrameRate, Image, Peer, Predicate, Ready, Renderer, Report,
+    Requests, Viewport,
 };
 use crate::scenario::{
     parse_viewport, KeyState, LossHookSpec, PeerSpec, Scenario, Step, DEFAULT_SEED, MAX_PEERS,
@@ -86,6 +88,31 @@ struct CaptureInfo {
     sidecar: PathBuf,
 }
 
+struct ScreencastFrame {
+    data: String,
+    session_id: u32,
+}
+
+struct BurstFrame {
+    path: PathBuf,
+    width: u32,
+    height: u32,
+    start_ms: u64,
+    interval_ms: u64,
+    capture_ms: u64,
+    write_ms: u64,
+}
+
+#[derive(Clone, Copy)]
+struct BurstRequest<'a> {
+    out: &'a str,
+    frames: u32,
+    interval_ms: Option<u64>,
+    mode: &'a str,
+    select: Option<&'a str>,
+    timeout: Duration,
+}
+
 #[derive(Clone, Serialize)]
 struct AssertResult {
     peer: String,
@@ -128,10 +155,13 @@ struct PeerState {
     pointer: Pointer,
     modifiers: u32,
     inputs: Vec<String>,
+    bursts: Vec<BurstInfo>,
     focus: String,
     scroll: String,
     locator: String,
     predicates: Vec<Predicate>,
+    user_waited: bool,
+    warned_readiness: bool,
     ready_waited: Duration,
     frame_latency: f64,
     frame_rate: Option<FrameRate>,
@@ -140,6 +170,7 @@ struct PeerState {
     warns: Vec<String>,
     asserts: Vec<AssertResult>,
     network: String,
+    capture_ok: bool,
 }
 
 pub fn run(args: Vec<String>) -> Result<bool> {
@@ -279,14 +310,25 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                 expression,
                 await_promise,
                 capture,
+                timeout_ms,
             } => {
                 let index = peer_index(peer, &names)?;
                 let expression = substitute(expression, &captures);
-                let object = peers[index]
-                    .tab
-                    .evaluate(&expression, *await_promise)
-                    .with_context(|| format!("evaluate on {}", peer))?;
-                let value = collect::remote_text(&object);
+                let value = if *await_promise {
+                    let limit = timeout_ms.map_or(timeout, Duration::from_millis);
+                    probe::evaluate_settled(&peers[index].tab, &expression, limit)
+                        .with_context(|| format!("evaluate on {peer}"))?
+                        .1
+                } else {
+                    let object = peers[index]
+                        .tab
+                        .evaluate(&expression, false)
+                        .with_context(|| format!("evaluate on {peer}"))?;
+                    if let Some(error) = probe::error_of(&object) {
+                        bail!("evaluate on {peer}: {error}");
+                    }
+                    collect::remote_text(&object)
+                };
                 if let Some(name) = capture {
                     captures.insert(name.clone(), value);
                 }
@@ -359,21 +401,43 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                 y,
                 selector,
                 steps,
+                button,
+                from_x,
+                from_y,
             } => {
                 let index = peer_index(peer, &names)?;
                 let peer_state = &mut peers[index];
-                let action = match (kind.as_str(), selector, x, y) {
-                    ("click", Some(selector), _, _) => Action::ClickSelector(selector.clone()),
-                    ("hover", Some(selector), _, _) => Action::HoverSelector(selector.clone()),
-                    ("click", None, Some(x), Some(y)) => Action::Click { x: *x, y: *y },
-                    ("hover", None, Some(x), Some(y)) => Action::Hover { x: *x, y: *y },
-                    _ => bail!("pointer needs click|hover with x,y or a selector"),
+                let kind = input::Kind::parse(kind).ok_or_else(|| {
+                    anyhow!("pointer kind {kind:?} is not one of click, hover, drag, tap or swipe")
+                })?;
+                let target = match selector {
+                    Some(selector) => input::Target::Selector(selector.clone()),
+                    None => match (x, y) {
+                        (Some(x), Some(y)) => input::Target::Coordinates { x: *x, y: *y },
+                        _ => {
+                            bail!("pointer needs click|hover|drag|tap|swipe with x,y or a selector")
+                        }
+                    },
                 };
+                let button = button
+                    .as_deref()
+                    .and_then(input::Button::parse)
+                    .unwrap_or(input::Button::Left);
+                let from = from_x.zip(*from_y);
+                let action = match kind {
+                    input::Kind::Click => Action::click(target, button),
+                    input::Kind::Hover => Action::hover(target),
+                    input::Kind::Drag => Action::drag(target, from, button),
+                    input::Kind::Tap => Action::tap(target),
+                    input::Kind::Swipe => Action::swipe(target, from),
+                };
+                let modifiers = peer_state.modifiers;
                 let record = input::dispatch(
                     &peer_state.tab,
                     &action,
                     steps.unwrap_or(1),
                     &mut peer_state.pointer,
+                    modifiers,
                     timeout,
                 )?;
                 peer_state.inputs.push(record.description);
@@ -386,6 +450,30 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                 let peer_state = &mut peers[index];
                 let info = peer_state.capture(&artifacts, out, select.as_deref(), timeout)?;
                 peer_state.last_capture = Some(info);
+            }
+            Step::Burst {
+                peer,
+                out,
+                frames,
+                interval_ms,
+                mode,
+                select,
+            } => {
+                let index = peer_index(peer, &names)?;
+                let peer_state = &mut peers[index];
+                let mode = mode.as_deref().unwrap_or("capture");
+                let info = peer_state.burst(
+                    &artifacts,
+                    &BurstRequest {
+                        out,
+                        frames: *frames,
+                        interval_ms: *interval_ms,
+                        mode,
+                        select: select.as_deref(),
+                        timeout,
+                    },
+                )?;
+                peer_state.bursts.push(info);
             }
             Step::Assert {
                 peer,
@@ -529,6 +617,9 @@ impl PeerState {
             args.push(std::ffi::OsStr::new("--use-gl=swiftshader"));
             args.push(std::ffi::OsStr::new("--enable-unsafe-swiftshader"));
         }
+        if let Some(extra) = &spec.args {
+            args.extend(extra.iter().map(std::ffi::OsStr::new));
+        }
 
         let launch = LaunchOptions::default_builder()
             .path(Some(
@@ -602,7 +693,7 @@ impl PeerState {
             "not emulated".to_owned()
         };
 
-        let mut source = key_log_script(&spec.frame_counter());
+        let mut source = input_log_script(&spec.frame_counter());
         if let Some(path) = &spec.preload {
             source.push_str(
                 &fs::read_to_string(path)
@@ -631,12 +722,20 @@ impl PeerState {
         let ready_waited = Duration::from_millis(fonts.waited_ms);
         let frame_latency = probe::eval_latency_frames(&tab, &spec.frame_counter()).unwrap_or(0.0);
         let frame_rate = probe::measure_frame_rate(&tab, &spec.frame_counter());
+        let touch_ok = if spec.touch.unwrap_or(false) {
+            probe::number(&tab, "navigator.maxTouchPoints").unwrap_or(0.0) > 0.0
+        } else {
+            true
+        };
         let mut warns = Vec::new();
         if !fonts.passed {
             warns.push(format!(
                 "readiness failed: {} = {}",
                 fonts.name, fonts.value
             ));
+        }
+        if !touch_ok {
+            warns.push("touch emulation did not take: navigator.maxTouchPoints = 0".to_owned());
         }
 
         Ok(Self {
@@ -652,10 +751,13 @@ impl PeerState {
             pointer: Pointer::default(),
             modifiers: 0,
             inputs: Vec::new(),
+            bursts: Vec::new(),
             focus: "none".to_owned(),
             scroll: "none".to_owned(),
             locator: "none".to_owned(),
             predicates: vec![fonts],
+            user_waited: false,
+            warned_readiness: false,
             ready_waited,
             frame_latency,
             frame_rate,
@@ -664,6 +766,7 @@ impl PeerState {
             warns,
             asserts: Vec::new(),
             network,
+            capture_ok: touch_ok,
         })
     }
 
@@ -697,6 +800,9 @@ impl PeerState {
     }
 
     fn add_predicates(&mut self, predicates: Vec<Predicate>) {
+        if !predicates.is_empty() {
+            self.user_waited = true;
+        }
         self.ready_waited += predicates
             .iter()
             .map(|predicate| Duration::from_millis(predicate.waited_ms))
@@ -713,7 +819,8 @@ impl PeerState {
     }
 
     fn passed(&self) -> bool {
-        self.predicates.iter().all(|predicate| predicate.passed)
+        self.capture_ok
+            && self.predicates.iter().all(|predicate| predicate.passed)
             && self.asserts.iter().all(|assert| assert.passed)
             && self
                 .collector
@@ -723,12 +830,19 @@ impl PeerState {
     }
 
     fn capture(
-        &self,
+        &mut self,
         artifacts: &Path,
         out: &str,
         select: Option<&str>,
         timeout: Duration,
     ) -> Result<CaptureInfo> {
+        if !self.user_waited && !self.warned_readiness {
+            self.warned_readiness = true;
+            self.warns.push(
+                "captured without a scenario wait (predicate, frames or network_idle); the page may still have been settling"
+                    .to_owned(),
+            );
+        }
         let (captured, css, scope) = if let Some(selector) = select {
             let (captured, viewport) = capture::element(&self.tab, selector, timeout)?;
             let css = CssBox {
@@ -741,6 +855,8 @@ impl PeerState {
         } else {
             (capture::viewport(&self.tab)?, None, "viewport".to_owned())
         };
+
+        self.audit_capture(select, &captured, css.as_ref(), timeout)?;
 
         let screenshot = resolve_path(artifacts, out);
         if let Some(parent) = screenshot.parent() {
@@ -764,6 +880,291 @@ impl PeerState {
         Ok(info)
     }
 
+    fn audit_capture(
+        &mut self,
+        selector: Option<&str>,
+        captured: &capture::Captured,
+        css: Option<&CssBox>,
+        timeout: Duration,
+    ) -> Result<()> {
+        let dpr = self.spec.dpr.unwrap_or(1.0);
+        let (expected_width, expected_height) = match css {
+            Some(css) => (css.width * dpr, css.height * dpr),
+            None => {
+                let (width, height) = parse_viewport(&self.spec.viewport)?;
+                (f64::from(width) * dpr, f64::from(height) * dpr)
+            }
+        };
+        if !capture::dimensions_match(captured.width, expected_width, dpr)
+            || !capture::dimensions_match(captured.height, expected_height, dpr)
+        {
+            self.capture_ok = false;
+            self.warns.push(format!(
+                "DPR mismatch: asked {:.0}x{:.0} px, got {}x{}",
+                expected_width.round(),
+                expected_height.round(),
+                captured.width,
+                captured.height
+            ));
+        }
+
+        if let (Some(selector), Some(css)) = (selector, css) {
+            if let Some((backing_width, backing_height)) =
+                capture::canvas_backing(&self.tab, selector, timeout)
+            {
+                let expected_width = (css.width * dpr).round() as u32;
+                let expected_height = (css.height * dpr).round() as u32;
+                if backing_width < expected_width || backing_height < expected_height {
+                    self.warns.push(format!(
+                        "canvas backing store {backing_width}x{backing_height} is smaller than {expected_width}x{expected_height}; the captured pixels are an upscale"
+                    ));
+                }
+            }
+            if let Some((scroll_width, client_width, scroll_height, client_height)) =
+                capture::overflow(&self.tab, selector, timeout)
+            {
+                if scroll_width > client_width + 1 || scroll_height > client_height + 1 {
+                    self.warns.push(format!(
+                        "{selector} overflows its box: scroll {scroll_width}x{scroll_height} > client {client_width}x{client_height}"
+                    ));
+                }
+            }
+            if let Some((width, height, visible_width, visible_height)) =
+                capture::clipped(&self.tab, selector, timeout)
+            {
+                if visible_width + 1.0 < width || visible_height + 1.0 < height {
+                    self.warns.push(format!(
+                        "{selector} is clipped by an ancestor: visible {visible_width:.0}x{visible_height:.0} of {width:.0}x{height:.0}"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn burst(&mut self, artifacts: &Path, request: &BurstRequest<'_>) -> Result<BurstInfo> {
+        let BurstRequest {
+            out,
+            frames: requested_frames,
+            interval_ms,
+            mode,
+            select,
+            timeout,
+        } = *request;
+        if mode == "screencast" {
+            return self.burst_screencast(artifacts, request);
+        }
+        let prefix = resolve_path(artifacts, out);
+        if let Some(parent) = prefix.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let summary = prefix.with_extension("txt");
+        let started = Instant::now();
+        let mut frames = Vec::new();
+        let mut last_start = None;
+
+        for index in 0..requested_frames {
+            if index > 0 && started.elapsed() >= timeout {
+                self.capture_ok = false;
+                self.warns.push(format!(
+                    "burst stopped after {} of {requested_frames} frames at the {} ms timeout",
+                    frames.len(),
+                    timeout.as_millis()
+                ));
+                break;
+            }
+
+            let frame_started = Instant::now();
+            let (captured, css) = if let Some(selector) = select {
+                let (captured, viewport) = capture::element(&self.tab, selector, timeout)?;
+                let css = CssBox {
+                    x: round_to(viewport.x, 2),
+                    y: round_to(viewport.y, 2),
+                    width: round_to(viewport.width, 2),
+                    height: round_to(viewport.height, 2),
+                };
+                (captured, Some(css))
+            } else {
+                (capture::viewport(&self.tab)?, None)
+            };
+            let capture_ms = frame_started.elapsed().as_millis() as u64;
+            if index == 0 {
+                self.audit_capture(select, &captured, css.as_ref(), timeout)?;
+            }
+
+            let path = frame_path(&prefix, index);
+            let write_started = Instant::now();
+            fs::write(&path, &captured.bytes)
+                .with_context(|| format!("write {}", path.display()))?;
+            let write_ms = write_started.elapsed().as_millis() as u64;
+            let start_ms = frame_started.duration_since(started).as_millis() as u64;
+            let interval = last_start
+                .map(|last: Instant| frame_started.duration_since(last).as_millis() as u64)
+                .unwrap_or(0);
+            last_start = Some(frame_started);
+
+            frames.push(BurstFrame {
+                path,
+                width: captured.width,
+                height: captured.height,
+                start_ms,
+                interval_ms: interval,
+                capture_ms,
+                write_ms,
+            });
+
+            if let Some(interval) = interval_ms {
+                let elapsed = frame_started.elapsed();
+                let target = Duration::from_millis(interval);
+                if elapsed < target {
+                    std::thread::sleep(target - elapsed);
+                }
+            }
+        }
+
+        finish_burst(
+            "capture",
+            prefix,
+            summary,
+            requested_frames,
+            frames,
+            started,
+        )
+    }
+
+    fn burst_screencast(
+        &mut self,
+        artifacts: &Path,
+        request: &BurstRequest<'_>,
+    ) -> Result<BurstInfo> {
+        let BurstRequest {
+            out,
+            frames: requested_frames,
+            mode: _,
+            select,
+            timeout,
+            ..
+        } = *request;
+        if select.is_some() {
+            bail!("screencast captures the viewport; remove select");
+        }
+        let prefix = resolve_path(artifacts, out);
+        if let Some(parent) = prefix.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let summary = prefix.with_extension("txt");
+        let (frames_tx, frames_rx) = std::sync::mpsc::channel::<ScreencastFrame>();
+        let listener = Arc::new(
+            move |event: &headless_chrome::protocol::cdp::types::Event| {
+                if let headless_chrome::protocol::cdp::types::Event::PageScreencastFrame(event) =
+                    event
+                {
+                    let _ = frames_tx.send(ScreencastFrame {
+                        data: event.params.data.clone(),
+                        session_id: event.params.session_id,
+                    });
+                }
+            },
+        );
+        let weak_listener = self.tab.add_event_listener(listener)?;
+        let (width, height) = parse_viewport(&self.spec.viewport)?;
+        let dpr = self.spec.dpr.unwrap_or(1.0);
+        let _ = self.tab.call_method(Page::Enable {
+            enable_file_chooser_opened_event: None,
+        });
+        emulation::set_visible_size(
+            &self.tab,
+            (f64::from(width) * dpr).round() as u32,
+            (f64::from(height) * dpr).round() as u32,
+        )?;
+        self.tab.call_method(Page::StartScreencast {
+            format: Some(Page::StartScreencastFormatOption::Png),
+            quality: None,
+            max_width: Some((f64::from(width) * dpr).round() as u32),
+            max_height: Some((f64::from(height) * dpr).round() as u32),
+            every_nth_frame: Some(1),
+        })?;
+
+        let started = Instant::now();
+        let mut frames = Vec::new();
+        let mut last_start = None;
+        while frames.len() < requested_frames as usize {
+            let remaining = timeout.saturating_sub(started.elapsed());
+            if remaining.is_zero() {
+                self.capture_ok = false;
+                self.warns.push(format!(
+                    "screencast stopped after {} of {requested_frames} frames at the {} ms timeout",
+                    frames.len(),
+                    timeout.as_millis()
+                ));
+                break;
+            }
+            match frames_rx.recv_timeout(remaining) {
+                Ok(frame) => {
+                    let received = Instant::now();
+                    let start_ms = received.duration_since(started).as_millis() as u64;
+                    let interval = last_start
+                        .map(|last: Instant| received.duration_since(last).as_millis() as u64)
+                        .unwrap_or(0);
+                    last_start = Some(received);
+
+                    let decode_started = Instant::now();
+                    let bytes = BASE64
+                        .decode(&frame.data)
+                        .context("decode a screencast frame")?;
+                    let (frame_width, frame_height) = capture::png_dimensions(&bytes)
+                        .ok_or_else(|| anyhow!("screencast frame was not a PNG"))?;
+                    let capture_ms = decode_started.elapsed().as_millis() as u64;
+                    let path = frame_path(&prefix, frames.len() as u32);
+                    let write_started = Instant::now();
+                    fs::write(&path, &bytes)
+                        .with_context(|| format!("write {}", path.display()))?;
+                    let write_ms = write_started.elapsed().as_millis() as u64;
+                    let _ = self.tab.call_method(Page::ScreencastFrameAck {
+                        session_id: frame.session_id,
+                    });
+
+                    frames.push(BurstFrame {
+                        path,
+                        width: frame_width,
+                        height: frame_height,
+                        start_ms,
+                        interval_ms: interval,
+                        capture_ms,
+                        write_ms,
+                    });
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    self.capture_ok = false;
+                    self.warns.push(format!(
+                        "screencast stopped after {} of {requested_frames} frames at the {} ms timeout",
+                        frames.len(),
+                        timeout.as_millis()
+                    ));
+                    break;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    self.capture_ok = false;
+                    self.warns.push(
+                        "screencast listener disconnected before all frames arrived".to_owned(),
+                    );
+                    break;
+                }
+            }
+        }
+
+        let _ = self.tab.call_method(Page::StopScreencast(None));
+        let _ = self.tab.remove_event_listener(&weak_listener);
+        finish_burst(
+            "screencast",
+            prefix,
+            summary,
+            requested_frames,
+            frames,
+            started,
+        )
+    }
+
     fn report(&self, capture: &CaptureInfo, passed: bool) -> Report {
         let snapshot = self
             .collector
@@ -772,6 +1173,7 @@ impl PeerState {
             .unwrap_or_default();
         let renderer = probe::renderer(&self.tab);
         let software = probe::is_software_renderer(&renderer);
+        let layout = probe::layout(&self.tab);
         let (width, height) = parse_viewport(&self.spec.viewport).unwrap_or((0, 0));
         let overlay = match (&self.spec.loss_hook, loss_snapshot(&self.tab)) {
             (Some(hook), Some((rate, 0, 0))) => format!(
@@ -792,6 +1194,14 @@ impl PeerState {
         };
 
         let mut warnings = self.warns.clone();
+        if let Some(layout) = &layout {
+            if layout.width != width || layout.height != height {
+                warnings.push(format!(
+                    "layout viewport is {}x{}, not requested {}x{}; a page without a viewport meta tag lays out at its own width",
+                    layout.width, layout.height, width, height
+                ));
+            }
+        }
         if software {
             warnings.push(format!("renderer is software: {renderer}"));
         }
@@ -826,6 +1236,7 @@ impl PeerState {
                 "headless (new)"
             }
             .to_owned(),
+            args: self.spec.args.clone().unwrap_or_default(),
             renderer: Renderer {
                 name: renderer,
                 software,
@@ -837,6 +1248,7 @@ impl PeerState {
                 touch: self.spec.touch.unwrap_or(false),
                 user_agent: self.spec.user_agent.clone(),
             },
+            layout,
             image: Image {
                 width: capture.width,
                 height: capture.height,
@@ -862,6 +1274,7 @@ impl PeerState {
             network: self.network.clone(),
             overlay,
             input: self.inputs.clone(),
+            bursts: self.bursts.clone(),
             focus: self.focus.clone(),
             scroll: self.scroll.clone(),
             locator: self.locator.clone(),
@@ -875,28 +1288,41 @@ impl PeerState {
     }
 }
 
-fn key_log_script(counter: &str) -> String {
+fn input_log_script(counter: &str) -> String {
     format!(
         r#"(() => {{
   const counter = () => {{ try {{ return Number({counter}); }} catch (error) {{ return null; }} }};
   const log = [];
   window.__inputLog = log;
-  const record = (type) => (event) => {{
+  const keep = () => {{ if (log.length > 2000) log.shift(); }};
+  const record = (type, detail = () => ({{}})) => (event) => {{
     const active = document.activeElement;
     const entry = {{
       type,
-      code: event.code,
-      key: event.key,
+      ...detail(event),
       frame: counter(),
       focus: active ? (active.id || active.tagName) : 'none',
       scrollY: window.scrollY,
       afterScrollY: null,
     }};
     log.push(entry);
+    keep();
     requestAnimationFrame(() => {{ entry.afterScrollY = window.scrollY; }});
   }};
-  window.addEventListener('keydown', record('keydown'), true);
-  window.addEventListener('keyup', record('keyup'), true);
+  const key = (event) => ({{ code: event.code, key: event.key }});
+  const pointer = (event) => ({{ x: event.clientX, y: event.clientY, button: event.button }});
+  window.addEventListener('keydown', record('keydown', key), true);
+  window.addEventListener('keyup', record('keyup', key), true);
+  window.addEventListener('mousedown', record('mousedown', pointer), true);
+  window.addEventListener('mouseup', record('mouseup', pointer), true);
+  window.addEventListener('mousemove', record('mousemove', pointer), true);
+  const touch = (event) => {{
+    const point = event.changedTouches && event.changedTouches[0];
+    return point ? {{ x: point.clientX, y: point.clientY }} : {{}};
+  }};
+  window.addEventListener('touchstart', record('touchstart', touch), {{ capture: true, passive: true }});
+  window.addEventListener('touchmove', record('touchmove', touch), {{ capture: true, passive: true }});
+  window.addEventListener('touchend', record('touchend', touch), {{ capture: true, passive: true }});
 }})();"#
     )
 }
@@ -996,6 +1422,142 @@ fn substitute(expression: &str, captures: &HashMap<String, String>) -> String {
     result
 }
 
+fn frame_path(prefix: &Path, index: u32) -> PathBuf {
+    let parent = prefix.parent().unwrap_or_else(|| Path::new(""));
+    let stem = prefix
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|stem| !stem.is_empty())
+        .unwrap_or("frame");
+    let extension = prefix
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("png");
+    parent.join(format!("{stem}-{index:03}.{extension}"))
+}
+
+fn min(values: &[u64]) -> u64 {
+    values.iter().copied().min().unwrap_or(0)
+}
+
+fn max(values: &[u64]) -> u64 {
+    values.iter().copied().max().unwrap_or(0)
+}
+
+fn median(values: &[u64]) -> u64 {
+    if values.is_empty() {
+        return 0;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_unstable();
+    sorted[sorted.len() / 2]
+}
+
+fn finish_burst(
+    mode: &str,
+    prefix: PathBuf,
+    summary: PathBuf,
+    requested_frames: u32,
+    frames: Vec<BurstFrame>,
+    started: Instant,
+) -> Result<BurstInfo> {
+    let count = frames.len();
+    let width = frames.first().map_or(0, |frame| frame.width);
+    let height = frames.first().map_or(0, |frame| frame.height);
+    let intervals = frames
+        .iter()
+        .skip(1)
+        .map(|frame| frame.interval_ms)
+        .collect::<Vec<_>>();
+    let captures = frames
+        .iter()
+        .map(|frame| frame.capture_ms)
+        .collect::<Vec<_>>();
+    let writes = frames
+        .iter()
+        .map(|frame| frame.write_ms)
+        .collect::<Vec<_>>();
+    let span_ms = match (frames.first(), frames.last()) {
+        (Some(first), Some(last)) if count > 1 && last.start_ms > first.start_ms => {
+            last.start_ms - first.start_ms
+        }
+        _ => started.elapsed().as_millis() as u64,
+    };
+    let fps = if count > 1 && span_ms > 0 {
+        (count - 1) as f64 * 1000.0 / span_ms as f64
+    } else {
+        0.0
+    };
+
+    let info = BurstInfo {
+        mode: mode.to_owned(),
+        prefix: prefix.display().to_string(),
+        summary: summary.display().to_string(),
+        frames: count,
+        requested_frames: requested_frames as usize,
+        width,
+        height,
+        fps,
+        min_interval_ms: min(&intervals),
+        median_interval_ms: median(&intervals),
+        max_interval_ms: max(&intervals),
+        min_capture_ms: min(&captures),
+        median_capture_ms: median(&captures),
+        max_capture_ms: max(&captures),
+        min_write_ms: min(&writes),
+        median_write_ms: median(&writes),
+        max_write_ms: max(&writes),
+    };
+
+    let mut text = String::new();
+    use std::fmt::Write as _;
+    let _ = writeln!(text, "mode      {mode}");
+    let _ = writeln!(text, "prefix    {}", info.prefix);
+    let _ = writeln!(
+        text,
+        "frames    {}/{} in {} ms",
+        count,
+        requested_frames,
+        started.elapsed().as_millis()
+    );
+    let _ = writeln!(text, "size      {}x{}", width, height);
+    let _ = writeln!(text, "rate      {fps:.2} fps (from frame starts)");
+    let _ = writeln!(
+        text,
+        "interval  {} / {} / {} ms (min/median/max)",
+        info.min_interval_ms, info.median_interval_ms, info.max_interval_ms
+    );
+    let _ = writeln!(
+        text,
+        "capture   {} / {} / {} ms (min/median/max)",
+        info.min_capture_ms, info.median_capture_ms, info.max_capture_ms
+    );
+    let _ = writeln!(
+        text,
+        "write     {} / {} / {} ms (min/median/max)",
+        info.min_write_ms, info.median_write_ms, info.max_write_ms
+    );
+    let _ = writeln!(
+        text,
+        "index start_ms interval_ms capture_ms write_ms size file"
+    );
+    for (index, frame) in frames.iter().enumerate() {
+        let _ = writeln!(
+            text,
+            "{index:>5} {:>8} {:>11} {:>10} {:>8} {}x{} {}",
+            frame.start_ms,
+            frame.interval_ms,
+            frame.capture_ms,
+            frame.write_ms,
+            frame.width,
+            frame.height,
+            frame.path.display()
+        );
+    }
+    fs::write(&summary, text).with_context(|| format!("write {}", summary.display()))?;
+    Ok(info)
+}
+
 fn resolve_path(artifacts: &Path, out: &str) -> PathBuf {
     let path = PathBuf::from(out);
     if path.is_absolute() {
@@ -1033,6 +1595,9 @@ fn render_run_text(report: &RunReport) -> String {
             rate,
             peer.screenshot
         );
+        for burst in &peer.bursts {
+            let _ = writeln!(out, "burst {}  {}", peer.peer.index, burst.summary_line());
+        }
     }
     for check in &report.checks {
         let _ = writeln!(

@@ -14,8 +14,10 @@ pub struct Report {
     pub browser: String,
     pub pid: Option<u32>,
     pub mode: String,
+    pub args: Vec<String>,
     pub renderer: Renderer,
     pub viewport: Viewport,
+    pub layout: Option<Layout>,
     pub image: Image,
     pub ready: Ready,
     pub frame_rate: Option<FrameRate>,
@@ -24,6 +26,7 @@ pub struct Report {
     pub network: String,
     pub overlay: String,
     pub input: Vec<String>,
+    pub bursts: Vec<BurstInfo>,
     pub focus: String,
     pub scroll: String,
     pub locator: String,
@@ -54,6 +57,12 @@ pub struct Viewport {
     pub dpr: f64,
     pub touch: bool,
     pub user_agent: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct Layout {
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Debug, Serialize)]
@@ -138,6 +147,50 @@ pub struct Requests {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct BurstInfo {
+    pub mode: String,
+    pub prefix: String,
+    pub summary: String,
+    pub frames: usize,
+    pub requested_frames: usize,
+    pub width: u32,
+    pub height: u32,
+    pub fps: f64,
+    pub min_interval_ms: u64,
+    pub median_interval_ms: u64,
+    pub max_interval_ms: u64,
+    pub min_capture_ms: u64,
+    pub median_capture_ms: u64,
+    pub max_capture_ms: u64,
+    pub min_write_ms: u64,
+    pub median_write_ms: u64,
+    pub max_write_ms: u64,
+}
+
+impl BurstInfo {
+    pub fn summary_line(&self) -> String {
+        format!(
+            "{} {} — {}/{} frames, {:.1} fps, interval {}/{}/{} ms, capture {}/{}/{} ms, write {}/{}/{} ms (min/median/max) — {}",
+            self.mode,
+            self.prefix,
+            self.frames,
+            self.requested_frames,
+            self.fps,
+            self.min_interval_ms,
+            self.median_interval_ms,
+            self.max_interval_ms,
+            self.min_capture_ms,
+            self.median_capture_ms,
+            self.max_capture_ms,
+            self.min_write_ms,
+            self.median_write_ms,
+            self.max_write_ms,
+            self.summary
+        )
+    }
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct Expect {
     pub expression: String,
     pub value: String,
@@ -168,6 +221,9 @@ impl Report {
                 .map_or_else(|| "not exposed".to_owned(), |pid| pid.to_string()),
         );
         line(&mut out, "mode", &self.mode);
+        if !self.args.is_empty() {
+            line(&mut out, "args", &self.args.join(" "));
+        }
         line(
             &mut out,
             "renderer",
@@ -188,6 +244,14 @@ impl Report {
                 if self.viewport.touch { " touch" } else { "" }
             ),
         );
+        match &self.layout {
+            Some(layout) => line(
+                &mut out,
+                "layout",
+                &format!("{}x{}", layout.width, layout.height),
+            ),
+            None => line(&mut out, "layout", "not measured"),
+        }
         line(
             &mut out,
             "image",
@@ -289,6 +353,9 @@ impl Report {
                 self.input.join("; ")
             },
         );
+        for burst in &self.bursts {
+            line(&mut out, "burst", &burst.summary_line());
+        }
         line(&mut out, "focus", &self.focus);
         line(&mut out, "scroll", &self.scroll);
         line(&mut out, "locator", &self.locator);

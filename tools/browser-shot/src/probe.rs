@@ -9,7 +9,7 @@ use headless_chrome::browser::tab::Tab;
 use serde_json::Value;
 
 use crate::collect::{remote_text, Collector};
-use crate::report::{FrameRate, Predicate};
+use crate::report::{FrameRate, Layout, Predicate};
 
 const POLL: Duration = Duration::from_millis(50);
 
@@ -39,6 +39,21 @@ pub fn is_software_renderer(renderer: &str) -> bool {
     ["swiftshader", "llvmpipe", "softpipe", "software"]
         .iter()
         .any(|marker| renderer.contains(marker))
+}
+
+pub fn layout(tab: &Tab) -> Option<Layout> {
+    let text = evaluate_text(
+        tab,
+        "JSON.stringify([window.innerWidth, window.innerHeight])",
+    );
+    let values: Vec<f64> = serde_json::from_str(&text).ok()?;
+    match values.as_slice() {
+        [width, height] if width.is_finite() && height.is_finite() => Some(Layout {
+            width: width.round().max(0.0) as u32,
+            height: height.round().max(0.0) as u32,
+        }),
+        _ => None,
+    }
 }
 
 pub fn number(tab: &Tab, expression: &str) -> Option<f64> {
@@ -91,6 +106,45 @@ pub fn evaluate_labeled(tab: &Tab, expression: &str) -> Result<(Value, String)> 
         object.value.clone().unwrap_or(Value::Null),
         remote_text(&object),
     ))
+}
+
+/// Evaluate an expression that returns a promise, and fail if it has not settled in time.
+///
+/// The timeout is a page-side `Promise.race`, not a deadline around the CDP call: blocking the
+/// call is what an unsettled promise already does, so the page has to be the one that gives up.
+pub fn evaluate_settled(tab: &Tab, expression: &str, timeout: Duration) -> Result<(Value, String)> {
+    let script = format!(
+        "Promise.race([(async () => await ({expression}))(), \
+         new Promise((_, reject) => setTimeout(() => reject(new Error('browser-shot eval timeout')), {ms}))])",
+        ms = timeout.as_millis()
+    );
+    let object = tab.evaluate(&script, true).map_err(|error| {
+        if error.to_string().contains("browser-shot eval timeout") {
+            anyhow::anyhow!("eval did not settle within {} ms", timeout.as_millis())
+        } else {
+            anyhow::anyhow!("{error}")
+        }
+    })?;
+    if let Some(error) = error_of(&object) {
+        if error.contains("browser-shot eval timeout") {
+            anyhow::bail!("eval did not settle within {} ms", timeout.as_millis());
+        }
+        anyhow::bail!("{error}");
+    }
+    Ok((
+        object.value.clone().unwrap_or(Value::Null),
+        remote_text(&object),
+    ))
+}
+
+/// A rejected promise or a thrown exception is returned as a successful `Runtime.evaluate`
+/// response carrying an error object. Treat it as the failure it is.
+pub fn error_of(object: &headless_chrome::protocol::cdp::Runtime::RemoteObject) -> Option<String> {
+    matches!(
+        object.subtype,
+        Some(headless_chrome::protocol::cdp::Runtime::RemoteObjectSubtype::Error)
+    )
+    .then(|| remote_text(object))
 }
 
 pub fn evaluate_text(tab: &Tab, expression: &str) -> String {

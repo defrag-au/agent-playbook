@@ -82,6 +82,12 @@ pub fn set_metrics(tab: &Tab, width: u32, height: u32, dpr: f64, mobile: bool) -
     Ok(())
 }
 
+pub fn set_visible_size(tab: &Tab, width: u32, height: u32) -> Result<()> {
+    tab.call_method(Emulation::SetVisibleSize { width, height })
+        .context("set the visible size")?;
+    Ok(())
+}
+
 pub fn enable_touch(tab: &Tab) -> Result<()> {
     tab.call_method(SetTouchEmulation {
         enabled: true,

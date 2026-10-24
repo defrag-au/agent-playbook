@@ -11,6 +11,7 @@ src/parser.c                generated; checked in
 src/node-types.json         generated; checked in
 queries/highlights.scm      capture names for editors
 test/corpus/scenario.txt    corpus test
+tree-sitter.json            grammar manifest (name, scope, .dsl file type)
 ```
 
 The parser is generated with ABI 15 by tree-sitter 0.27.1. Regenerate after editing `grammar.js`:
@@ -39,9 +40,9 @@ assert a "window.__keys[0].focus === 'game'" message="the canvas held focus"
 capture a out=a.png
 ```
 
-`run`, `peer`, `wait`, `eval`, `key`, `pointer`, `capture`, `assert` and `network` are the actions;
-fields are `key=value`, and `touch`, `headed` and `await` are flags. See `SCENARIO.md` for the full
-field tables.
+`run`, `peer`, `wait`, `eval`, `key`, `pointer`, `capture`, `burst`, `assert` and `network` are
+the actions; fields are `key=value`, and `touch`, `headed` and `await` are flags. Pointer kinds are
+`click`, `hover`, `drag`, `tap` and `swipe`. See `SCENARIO.md` for the full field tables.
 
 Two constraints keep the grammar unambiguous:
 
@@ -64,7 +65,7 @@ outline, structural selection and local parse errors.
 | quoted values, bare values | `@string` |
 | peer names | `@variable` |
 | key codes | `@constant` |
-| `down`/`up`, `click`/`hover` | `@constant.builtin` |
+| `down`/`up`, `click`/`hover`/`drag`/`tap`/`swipe` | `@constant.builtin` |
 | `touch`/`headed`/`await` | `@keyword` |
 | expressions | `@string.special` |
 | comments | `@comment` |
@@ -77,11 +78,19 @@ bunx tree-sitter-cli query queries/highlights.scm ../../../.tmp/ts-sample.dsl --
 
 ## Zed
 
-This directory is a grammar source, not an installed Zed extension. Zed loads grammars from an
-extension that declares a `grammars` entry and points at a grammar repository or a local path. The
-next step is to package this as a small extension (or move it into an `agent-toolbox` grammar repo)
-with this same `grammar.js`, `src/`, `queries/` and a `tree-sitter.json`/`package.json` describing
-the `source.browser_shot_scenario` scope and the `.dsl` file type.
+This directory is a grammar source, not an installed Zed extension. `tree-sitter.json` declares the
+name (`scenario`), scope (`source.browser_shot_scenario`) and the `.dsl` file type, so a tool that
+reads the manifest can load it directly; `browser-shot` itself does not need it.
 
-Until that packaging exists, the useful local checks are `browser-shot fmt`, `browser-shot check`,
-and `tree-sitter parse` in this directory.
+Zed loads a grammar through an installed extension. Packaging it as one is three files:
+
+```text
+extension.toml                    id, name, version, and a [grammars.scenario] entry
+languages/scenario/config.toml    name, grammar = "scenario", path_suffixes = ["dsl"]
+grammars/ or a repository/rev pair grammar.js, src/, queries/
+```
+
+That extension belongs beside this grammar in `agent-toolbox`, not in this repository: a Zed
+extension needs its own repository (or a subdirectory with a published revision) and a version
+bump for every grammar change. Until then the useful local checks are `browser-shot fmt`,
+`browser-shot check`, and `tree-sitter parse` in this directory.

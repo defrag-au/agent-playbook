@@ -23,6 +23,25 @@
     }
   },
   {
+    "type": "burst",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "field",
+          "named": true
+        },
+        {
+          "type": "name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "capture",
     "named": true,
     "fields": {},
@@ -283,6 +302,10 @@
           "named": true
         },
         {
+          "type": "burst",
+          "named": true
+        },
+        {
           "type": "capture",
           "named": true
         },
@@ -389,6 +412,10 @@
     "named": true
   },
   {
+    "type": "burst",
+    "named": false
+  },
+  {
     "type": "capture",
     "named": false
   },
@@ -407,6 +434,10 @@
   },
   {
     "type": "down",
+    "named": false
+  },
+  {
+    "type": "drag",
     "named": false
   },
   {
@@ -443,6 +474,14 @@
   },
   {
     "type": "run",
+    "named": false
+  },
+  {
+    "type": "swipe",
+    "named": false
+  },
+  {
+    "type": "tap",
     "named": false
   },
   {

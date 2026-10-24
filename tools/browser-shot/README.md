@@ -31,6 +31,8 @@ browser-shot <url> <width> <height> <out.png> [options]
   --preload PATH          run this JS before the document's own scripts
   --expect EXPR           assert this JS expression after readiness
   --click x,y             move there and click (repeatable)
+  --rclick x,y            move there and right-click (repeatable)
+  --drag x1,y1,x2,y2     press, move to x2,y2, release (repeatable)
   --hover x,y             move there without clicking (repeatable)
   --click-selector CSS    click the centre of this element (repeatable)
   --hover-selector CSS    hover the centre of this element (repeatable)
@@ -143,16 +145,23 @@ Steps (TOML field names; the DSL names are in `SCENARIO.md`):
 | `action` | Fields |
 | --- | --- |
 | `wait` | `peer` or `peers`, and one or more of `predicate`, `frames`, `network_idle`; `timeout_ms` |
-| `eval` | `peer`, `expression`, `await_promise`, `capture` (stores the result for `${name}` substitution) |
+| `eval` | `peer`, `expression`, `await_promise`, `capture` (stores the result for `${name}` substitution), optional `timeout_ms` on an awaited expression |
 | `key` | `peer`, `code`, `state` (`down`/`up`), optional `hold_frames` on a down step |
-| `pointer` | `peer`, `kind` (`click`/`hover`), `x`+`y` or `selector`, `steps` |
+| `pointer` | `peer`, `kind` (`click`/`hover`/`drag`/`tap`/`swipe`), `x`+`y` or `selector`, `steps`, optional `button`, `from_x`+`from_y` |
 | `capture` | `peer`, `out`, optional `select` |
+| `burst` | `peer`, `out`, `frames`, optional `interval_ms`, `mode` (`capture`/`screencast`), `select` |
 | `assert` | `peer`, `expression`, optional `message` |
 | `network` | `peer`, and at least one of `latency_ms`, `download_kbps`, `upload_kbps`, `loss_percent` |
 
 A key step with `hold_frames` sends down, waits on the page's counter, then sends up, all in one
 step. Modifiers persist across steps until released. A failed `assert` sets exit 2 and names the
-expression and its value.
+expression and its value. An awaited `eval` is bounded by its step timeout (or the run timeout) and
+fails on a rejected promise or a thrown exception, instead of capturing the error as a value.
+
+A peer may carry extra browser flags with `args` (`args="--use-fake-ui-for-media-stream"` in the
+DSL, `args = ["--use-fake-ui-for-media-stream"]` in TOML). The run sets `--user-data-dir`,
+`--remote-debugging-port` and the headless mode itself; an override is a validation error. The
+sidecar repeats the extra flags, so a capture can be diffed against the process it came from.
 
 ## Scenario DSL
 
@@ -188,6 +197,52 @@ the line and column, and a semantic error names the line and step. `check` exits
 The tree-sitter grammar and highlight query live in
 [`tree-sitter-scenario/`](tree-sitter-scenario/README.md). Generated files are checked in; run
 `bunx tree-sitter-cli generate --js-runtime native` there after changing `grammar.js`.
+
+## Pointer, modifiers and touch
+
+```text
+peer p url="file:///tmp/game.html" viewport=390x844
+
+wait p frames=5
+pointer p drag from=60,200 at=200,320 button=left steps=4
+key p ShiftLeft down
+pointer p click at=120,100
+key p ShiftLeft up
+
+peer t url="file:///tmp/game.html" viewport=390x844 touch
+pointer t tap at=150,150
+pointer t swipe from=100,400 at=200,500 steps=5
+```
+
+Buttons are `left` (the default), `right` and `middle`. Modifiers are the ones held by `key` steps,
+not a separate pointer field, so a shift-click is a `key ShiftLeft down`, the pointer step, then
+`key ShiftLeft up`. `tap` and `swipe` require `touch` on the peer; without it the scenario fails
+validation rather than dispatching a touch event the page never bound.
+
+The sidecar stamps each pointer event against the page's own frame counter, for example
+`drag (coordinates) 60,200 -> 200,320 · 4 steps · mousedown @ frame 150, mouseup @ frame 190`.
+
+## Animation review: bursts
+
+One image cannot show whether an animation is smooth. A `burst` step takes a sequence of frames and
+writes `<out>-000.png`, `<out>-001.png`, … plus a report of the timing. `mode=screencast` asks the
+browser for every frame it paints and holds ~59 fps; `mode=capture` is a sequence of
+`Page.captureScreenshot` calls and is precise but limited to ~7.5 fps by the CDP round trip.
+
+```text
+peer anim url="file:///tmp/animation.html" viewport=390x844
+wait anim frames=10
+burst anim out=frames/pulse frames=120 mode=screencast
+```
+
+```sh
+./target/debug/browser-shot run --scenario .tmp/screencast.dsl --artifacts .tmp/screencast-run
+```
+
+`frames/pulse.txt` lists every frame with its interval, capture time, write time and size, and
+summarises each as min/median/max; `run.txt` carries one `burst` line per burst and `run.json` has
+the same data typed. Review the frames as a sequence — the report says what the browser did, the
+images say what it looked like.
 
 ## What the sidecar looks like
 
@@ -236,11 +291,11 @@ with it.
 | 6. Console, exceptions and failed requests | **Covered**, per peer, timestamped relative to the run. |
 | 7. Network emulation, with honest scope | **Partial.** Latency, bandwidth and loss work for HTTP/WebSocket; the sidecar says `NOT WebRTC`. Jitter has no CDP knob and is rejected with an actionable error rather than silently ignored. |
 | 8. In-page WebRTC loss hook | **Covered.** Wraps `RTCDataChannel.prototype.send` with a seeded PRNG; the rate can be changed at runtime; the sidecar labels it injected and reports drops/sends. |
-| 9. Image + text sidecar | **Covered**, with typed JSON alongside it. |
+| 9. Image + text sidecar | **Covered**, with typed JSON alongside it. A `burst` writes a numbered frame sequence and a per-frame timing report. |
 | 10. Unique handle, PID, cleanup by handle | **Covered.** Profile at `.tmp/browser-run-<pid>/peer-N`, browser PID in the sidecar, signals kill only recorded PIDs. SIGINT leaves the profile directories behind (no browser process). |
 | 11. Machine-readable output and exit codes | **Covered.** `--json`, 0/2/1. |
-| 12. Warnings channel | **Covered** for software rasterisation, DPR mismatch, canvas upscale, clipped/overflowing content, readiness and settle failures, touch not applied, keys landing on `BODY`, uncaught exceptions, and a measured hold that missed its request. |
-| 13. Input | **Partial.** Locators first, coordinates second, interpolated moves, keyboard by `code` with down/up and persistent modifiers, frame-relative holds. **Touch dispatch, right-click and drag are not implemented.** |
+| 12. Warnings channel | **Covered** for software rasterisation, DPR mismatch, canvas upscale, clipped/overflowing content, readiness and settle failures, a capture taken with no scenario wait, touch not applied, keys landing on `BODY`, uncaught exceptions, and a measured hold that missed its request. |
+| 13. Input | **Covered.** Locators first, coordinates second, interpolated moves, `code` keyboard with down/up and persistent modifiers, frame-relative holds. Buttons are explicit (`left`/`right`/`middle`), drags are press-move-release, touch tap and swipe dispatch `Input.dispatchTouchEvent`, and every pointer event is stamped against the page's frame counter. |
 
 Acceptance items 1–11 from `docs/browser-automation.md` were exercised on this machine: the
 two-peer DataChannel exchange with and without injected loss; two peers at 59.3 Hz; a 390x844
@@ -252,6 +307,13 @@ and a coordinate click landing at 200,400.
 
 ## Known limits
 
+- **A right click opens a context menu, and the page's frame counter is throttled while it is
+  open.** On this machine a `wait frames=10` after a right click timed out at three seconds, while
+  the same page with `preventDefault()` on `contextmenu` passed. Put a right click after any
+  frame-timed input, or prevent the menu in the page.
+- **A burst's `screencast` mode captures the viewport, not an element.** It also forces
+  `Emulation.setVisibleSize` to the device-pixel size; without that, the browser delivers frames
+  at the window's backing size (`390x216` for a 390x844 viewport), not the emulated one.
 - **Every CDP call costs about 100 ms on this transport.** `headless_chrome` 1.0.22 holds its
   websocket lock for up to its 100 ms read timeout, so a call can wait a full timeout before it is
   sent. Frame holds are scheduled from a counter read taken *before* the keydown, which cancels two
@@ -268,8 +330,12 @@ and a coordinate click landing at 200,400.
   the review.
 - **`--select` is a CSS selector**, not a frame-aware locator. Cross-origin iframes are not
   traversed.
-- **Touch emulation is not touch input.** The viewport reports touch and `maxTouchPoints`, but
-  pointer steps still dispatch mouse events.
+- **Touch emulation and touch input are separate.** `tap` and `swipe` dispatch
+  `Input.dispatchTouchEvent` and require `touch` on the peer; `click`, `hover` and `drag` still
+  dispatch mouse events.
+- **An `eval` without `await` cannot be timed out.** A `timeout` is a page-side `Promise.race` around
+  an awaited expression; a synchronous infinite loop blocks the renderer and no CDP timeout can
+  interrupt it. Such an eval must be awaited to be bounded.
 - **The browser is not pinned by this crate.** It launches Brave on macOS by default and takes
   `--browser` otherwise; pinning belongs to the flake/packaging decision.
 - **A hard kill bypasses `Drop`.** SIGINT and SIGTERM kill the browser processes through a signal

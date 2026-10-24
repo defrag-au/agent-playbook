@@ -16,12 +16,13 @@ file       = { line } ;
 line       = blank | comment | run | peer | step ;
 run        = "run" { field } ;
 peer       = "peer" name { flag } { field } ;
-step       = wait | eval | key | pointer | capture | assert | network ;
+step       = wait | eval | key | pointer | capture | burst | assert | network ;
 wait       = "wait" peer-list { field } ;
 eval       = "eval" peer expression { flag } { field } ;
 key        = "key" peer code state { field } ;
 pointer    = "pointer" peer kind { field } ;
 capture    = "capture" peer { field } ;
+burst      = "burst" peer { field } ;
 assert     = "assert" peer expression { field } ;
 network    = "network" peer { field } ;
 
@@ -60,6 +61,7 @@ Durations are milliseconds by default; `ms` and `s` suffixes are accepted (`time
 | `browser=/path` | per-peer browser executable |
 | `preload=/path` | script before the document's own scripts |
 | `frame_counter="window.__frames"` | counter used by frames and holds |
+| `args="--use-fake-ui-for-media-stream …"` | extra browser flags for this process, space-separated; `--user-data-dir`, `--remote-debugging-port` and `--headless` are rejected because the run sets them |
 | `network=latency:80,loss:2` | HTTP/WebSocket emulation; accepts `latency`, `download`, `upload`, `loss`, `jitter` (`jitter` is rejected because CDP cannot apply it) |
 | `loss_hook=rate:0.02,seed:1` | in-page `RTCDataChannel.send` drop hook |
 
@@ -78,6 +80,11 @@ Durations are milliseconds by default; `ms` and `s` suffixes are accepted (`time
 | --- | --- |
 | `await` / `await=true` | await the returned promise |
 | `capture=name` | store the result for `${name}` in later expressions |
+| `timeout=5s` | bound an awaited promise; requires `await` |
+
+An awaited expression is bounded by this timeout, or by the run/step timeout when it is omitted. The
+bound is a page-side `Promise.race`, so a promise that never settles fails the step rather than
+hanging the run. A rejected promise or a thrown exception fails the step too, naming the page error.
 
 `key` — `peer`, `code`, `down|up` are positional.
 
@@ -85,13 +92,20 @@ Durations are milliseconds by default; `ms` and `s` suffixes are accepted (`time
 | --- | --- |
 | `hold=12` | on a down step, wait twelve frames before the key-up |
 
-`pointer` — `peer` and `click|hover` are positional.
+`pointer` — `peer` and `kind` are positional. Kinds: `click`, `hover`, `drag`, `tap`, `swipe`.
 
 | Field | Meaning |
 | --- | --- |
 | `selector=canvas` | resolve the target from the DOM |
 | `at=200,400` | use explicit viewport coordinates |
-| `steps=8` | interpolate the move over N steps |
+| `steps=8` | interpolate the move (or drag/swipe) over N steps |
+| `button=left` | `left`, `right` or `middle`; belongs on `click` and `drag` |
+| `from=60,200` | start of a `drag` or `swipe`; defaults to the last pointer position |
+
+A `drag` is press, interpolated moves, release — not a `dragstart`/`drop` pair. `tap` and
+`swipe` dispatch `Input.dispatchTouchEvent` and require `touch` on the peer, because a page binds
+touch handlers only when touch is available. Held modifiers (from `key ShiftLeft down` etc.) are
+applied to pointer events; the sidecar records the frame each pointer event landed on.
 
 `capture`
 
@@ -99,6 +113,22 @@ Durations are milliseconds by default; `ms` and `s` suffixes are accepted (`time
 | --- | --- |
 | `out=a.png` | output image, relative to the artifact directory |
 | `select=canvas` | capture the element instead of the viewport |
+
+`burst` — `out` and `frames` are required. Writes `<out>-000.png`, `<out>-001.png`, … plus a
+`<out>.txt` report; the step's result is the frame count and rate.
+
+| Field | Meaning |
+| --- | --- |
+| `out=frames/pulse` | output prefix, relative to the artifact directory |
+| `frames=120` | number of frames to take |
+| `mode=capture` | sequential `Page.captureScreenshot` — precise, but ~7.5 fps at 390x844 because each CDP call costs up to 100 ms |
+| `mode=screencast` | `Page.startScreencast` — frame-paced, ~59 fps, suited to animation review |
+| `interval=16ms` | in `capture` mode, a minimum gap between frames |
+| `select=canvas` | in `capture` mode, capture the element instead of the viewport |
+
+`screencast` captures the viewport, so combining it with `select` is a validation error. Each
+frame is a real image with its own timestamp; the report gives interval, capture and write times
+as min/median/max and a per-frame table.
 
 `assert`
 
@@ -116,6 +146,47 @@ Durations are milliseconds by default; `ms` and `s` suffixes are accepted (`time
 | `loss=2` | packet loss percentage |
 
 ## Examples
+
+### Pointer, touch and modifiers
+
+```text
+peer p url="file:///tmp/game.html" viewport=390x844
+
+wait p frames=5
+pointer p drag from=60,200 at=200,320 button=left steps=4
+key p ShiftLeft down
+pointer p click at=120,100
+key p ShiftLeft up
+capture p out=pointer.png
+
+peer t url="file:///tmp/game.html" viewport=390x844 touch
+pointer t tap at=150,150
+pointer t swipe from=100,400 at=200,500 steps=5
+```
+
+A right click opens a context menu in the browser, and the page's frame counter is throttled while
+it is open. Put a right click after any frame-timed input, or have the page call
+`preventDefault()` on `contextmenu`.
+
+### Reviewing an animation
+
+`screencast` is the mode for judging motion: it asks the browser for every frame it paints, so the
+interval is the page's frame pacing rather than the CDP round trip. Take a burst, then read the
+frames as a sequence rather than one end state.
+
+```text
+run timeout=20s
+
+peer anim url="file:///tmp/animation.html" viewport=390x844
+
+wait anim frames=10
+burst anim out=frames/pulse frames=120 mode=screencast
+```
+
+Measured on this machine at 390x844: `mode=screencast` gives ~58.8 fps with intervals of 15, 16
+and 22 ms, while `mode=capture` gives ~130 ms per frame (~7.5 fps). Use `capture` when the image
+matters more than the timing, and `screencast` when it is the other way around. A burst's report
+is printed as a `burst` line in the sidecar and summarised in `run.json`.
 
 The keys scenario:
 

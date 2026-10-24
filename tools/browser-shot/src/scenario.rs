@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::input;
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
@@ -56,6 +57,8 @@ pub(crate) struct PeerSpec {
     pub(crate) browser: Option<PathBuf>,
     pub(crate) preload: Option<PathBuf>,
     pub(crate) frame_counter: Option<String>,
+    #[serde(default)]
+    pub(crate) args: Option<Vec<String>>,
     pub(crate) network: Option<NetworkSpec>,
     pub(crate) loss_hook: Option<LossHookSpec>,
 }
@@ -100,6 +103,7 @@ pub(crate) enum Step {
         #[serde(default)]
         await_promise: bool,
         capture: Option<String>,
+        timeout_ms: Option<u64>,
     },
     Key {
         peer: String,
@@ -114,10 +118,21 @@ pub(crate) enum Step {
         y: Option<f64>,
         selector: Option<String>,
         steps: Option<u32>,
+        button: Option<String>,
+        from_x: Option<f64>,
+        from_y: Option<f64>,
     },
     Capture {
         peer: String,
         out: String,
+        select: Option<String>,
+    },
+    Burst {
+        peer: String,
+        out: String,
+        frames: u32,
+        interval_ms: Option<u64>,
+        mode: Option<String>,
         select: Option<String>,
     },
     Assert {
@@ -142,6 +157,7 @@ impl Step {
             Self::Key { .. } => "key",
             Self::Pointer { .. } => "pointer",
             Self::Capture { .. } => "capture",
+            Self::Burst { .. } => "burst",
             Self::Assert { .. } => "assert",
             Self::Network { .. } => "network",
         }
@@ -203,15 +219,42 @@ impl Step {
                 x,
                 y,
                 selector,
+                button,
+                from_x,
+                from_y,
                 ..
             } => {
                 let target = selector.clone().unwrap_or_else(|| match (x, y) {
                     (Some(x), Some(y)) => format!("{x},{y}"),
                     _ => "missing target".to_owned(),
                 });
-                format!("{peer} {kind} {target}")
+                let button = button
+                    .as_ref()
+                    .filter(|button| button.as_str() != "left")
+                    .map_or_else(String::new, |button| format!(" button={button}"));
+                let from = from_x
+                    .zip(*from_y)
+                    .map_or_else(String::new, |(x, y)| format!(" from={x},{y}"));
+                format!("{peer} {kind} {target}{button}{from}")
             }
             Self::Capture { peer, out, .. } => format!("{peer} -> {out}"),
+            Self::Burst {
+                peer,
+                out,
+                frames,
+                interval_ms,
+                mode,
+                select,
+            } => {
+                let interval = interval_ms.map_or_else(String::new, |ms| format!(" interval={ms}"));
+                let mode = mode
+                    .as_ref()
+                    .map_or_else(String::new, |mode| format!(" mode={mode}"));
+                let select = select
+                    .as_ref()
+                    .map_or_else(String::new, |select| format!(" select={select}"));
+                format!("{peer} {out} frames={frames}{interval}{mode}{select}")
+            }
             Self::Assert {
                 peer, expression, ..
             } => format!("{peer} {expression}"),
@@ -315,6 +358,27 @@ impl Scenario {
             if peer.frame_counter.as_deref() == Some("") {
                 bail!("peer {:?}: frame_counter must not be empty", peer.name);
             }
+            if let Some(args) = &peer.args {
+                if args.is_empty() {
+                    bail!("peer {:?}: args must not be empty", peer.name);
+                }
+                for arg in args {
+                    if arg.trim().is_empty() {
+                        bail!("peer {:?}: an arg must not be empty", peer.name);
+                    }
+                    if arg == "--user-data-dir"
+                        || arg.starts_with("--user-data-dir=")
+                        || arg == "--remote-debugging-port"
+                        || arg.starts_with("--remote-debugging-port=")
+                        || arg.starts_with("--headless")
+                    {
+                        bail!(
+                            "peer {:?}: {arg:?} is set by browser-shot; an override would break the run's isolation or transport",
+                            peer.name
+                        );
+                    }
+                }
+            }
         }
 
         for (index, step) in self.step.iter().enumerate() {
@@ -351,11 +415,21 @@ impl Scenario {
                     }
                 }
                 Step::Eval {
-                    peer, expression, ..
+                    peer,
+                    expression,
+                    await_promise,
+                    timeout_ms,
+                    ..
                 } => {
                     check_peer(&names, &at, peer)?;
                     if expression.trim().is_empty() {
                         bail!("{at}: expression must not be empty");
+                    }
+                    if *timeout_ms == Some(0) {
+                        bail!("{at}: timeout must be greater than zero");
+                    }
+                    if timeout_ms.is_some() && !await_promise {
+                        bail!("{at}: timeout belongs on an awaited expression; add await");
                     }
                 }
                 Step::Key {
@@ -379,10 +453,43 @@ impl Scenario {
                     y,
                     selector,
                     steps,
+                    button,
+                    from_x,
+                    from_y,
                 } => {
                     check_peer(&names, &at, peer)?;
-                    if kind != "click" && kind != "hover" {
-                        bail!("{at}: kind must be click or hover");
+                    let Some(kind) = input::Kind::parse(kind) else {
+                        bail!("{at}: kind must be click, hover, drag, tap or swipe");
+                    };
+                    if let Some(button) = button {
+                        if input::Button::parse(button).is_none() {
+                            bail!("{at}: button must be left, right or middle");
+                        }
+                        if !matches!(kind, input::Kind::Click | input::Kind::Drag) {
+                            bail!("{at}: button belongs on click or drag");
+                        }
+                    }
+                    let has_from = from_x.is_some() || from_y.is_some();
+                    if has_from && (!matches!(kind, input::Kind::Drag | input::Kind::Swipe)) {
+                        bail!("{at}: from belongs on drag or swipe");
+                    }
+                    if has_from && (from_x.is_none() || from_y.is_none()) {
+                        bail!("{at}: from needs both coordinates");
+                    }
+                    if let (Some(from_x), Some(from_y)) = (from_x, from_y) {
+                        if !from_x.is_finite() || !from_y.is_finite() {
+                            bail!("{at}: from coordinates must be finite");
+                        }
+                    }
+                    if kind.is_touch() {
+                        let touch = self
+                            .peer
+                            .iter()
+                            .find(|spec| &spec.name == peer)
+                            .is_some_and(|spec| spec.touch == Some(true));
+                        if !touch {
+                            bail!("{at}: {} needs touch on peer {peer:?}", kind.name());
+                        }
                     }
                     let has_point = x.is_some() || y.is_some();
                     if has_point && (x.is_none() || y.is_none()) {
@@ -412,6 +519,33 @@ impl Scenario {
                     check_peer(&names, &at, peer)?;
                     if out.trim().is_empty() {
                         bail!("{at}: out must not be empty");
+                    }
+                    if select.as_deref() == Some("") {
+                        bail!("{at}: select must not be empty");
+                    }
+                }
+                Step::Burst {
+                    peer,
+                    out,
+                    frames,
+                    mode,
+                    select,
+                    ..
+                } => {
+                    check_peer(&names, &at, peer)?;
+                    if out.trim().is_empty() {
+                        bail!("{at}: out must not be empty");
+                    }
+                    if *frames == 0 {
+                        bail!("{at}: frames must be greater than zero");
+                    }
+                    if let Some(mode) = mode {
+                        if mode != "capture" && mode != "screencast" {
+                            bail!("{at}: mode must be capture or screencast");
+                        }
+                        if mode == "screencast" && select.is_some() {
+                            bail!("{at}: screencast captures the viewport; remove select");
+                        }
                     }
                     if select.as_deref() == Some("") {
                         bail!("{at}: select must not be empty");
@@ -640,13 +774,15 @@ const PEER_FIELDS: &[&str] = &[
     "browser",
     "preload",
     "frame_counter",
+    "args",
     "network",
     "loss_hook",
 ];
 const WAIT_FIELDS: &[&str] = &["predicate", "frames", "network_idle", "timeout"];
 const KEY_FIELDS: &[&str] = &["hold"];
-const POINTER_FIELDS: &[&str] = &["selector", "at", "steps"];
+const POINTER_FIELDS: &[&str] = &["selector", "at", "steps", "button", "from"];
 const CAPTURE_FIELDS: &[&str] = &["out", "select"];
+const BURST_FIELDS: &[&str] = &["out", "frames", "interval", "mode", "select"];
 const ASSERT_FIELDS: &[&str] = &["message"];
 const NETWORK_FIELDS: &[&str] = &["latency", "download", "upload", "loss"];
 
@@ -805,7 +941,7 @@ fn format_line(line: &LineTokens) -> Result<String> {
                 await_promise = Some(value);
             }
             push_flag(&mut parts, "await", await_promise, "await=false");
-            push_fields(&mut parts, &mut kvs, &["capture"]);
+            push_fields(&mut parts, &mut kvs, &["capture", "timeout"]);
         }
         "key" => {
             if positionals.len() != 3 {
@@ -818,7 +954,7 @@ fn format_line(line: &LineTokens) -> Result<String> {
         }
         "pointer" => {
             if positionals.len() != 2 {
-                bail_at!(first, "pointer needs a peer and click or hover");
+                bail_at!(first, "pointer needs a peer and a kind");
             }
             parts.push(format_value(&positionals[0].value));
             parts.push(format_value(&positionals[1].value));
@@ -830,6 +966,13 @@ fn format_line(line: &LineTokens) -> Result<String> {
             }
             parts.push(format_value(&positionals[0].value));
             push_fields(&mut parts, &mut kvs, CAPTURE_FIELDS);
+        }
+        "burst" => {
+            if positionals.len() != 1 {
+                bail_at!(first, "burst needs a peer");
+            }
+            parts.push(format_value(&positionals[0].value));
+            push_fields(&mut parts, &mut kvs, BURST_FIELDS);
         }
         "assert" => {
             if positionals.len() != 2 {
@@ -849,7 +992,7 @@ fn format_line(line: &LineTokens) -> Result<String> {
         other => bail_at!(
             first,
             &format!(
-                "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, assert or network"
+                "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, burst, assert or network"
             ),
         ),
     }
@@ -979,6 +1122,10 @@ fn parse_dsl(text: &str) -> Result<Scenario> {
                 steps.push(parse_capture(rest, first)?);
                 step_lines.push(first.line);
             }
+            "burst" => {
+                steps.push(parse_burst(rest, first)?);
+                step_lines.push(first.line);
+            }
             "assert" => {
                 steps.push(parse_assert(rest, first)?);
                 step_lines.push(first.line);
@@ -990,7 +1137,7 @@ fn parse_dsl(text: &str) -> Result<Scenario> {
             other => bail_at!(
                 first,
                 &format!(
-                    "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, assert or network"
+                    "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, burst, assert or network"
                 ),
             ),
         }
@@ -1188,6 +1335,12 @@ fn parse_peer(tokens: &[Token], first: &Token) -> Result<PeerSpec> {
     let browser = take_string(&mut kvs, "browser").map(PathBuf::from);
     let preload = take_string(&mut kvs, "preload").map(PathBuf::from);
     let frame_counter = take_string(&mut kvs, "frame_counter");
+    let args = take_string(&mut kvs, "args").map(|value| {
+        value
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    });
     let network = take_string(&mut kvs, "network")
         .map(|value| parse_network_map(&value, first))
         .transpose()?;
@@ -1213,6 +1366,7 @@ fn parse_peer(tokens: &[Token], first: &Token) -> Result<PeerSpec> {
         browser,
         preload,
         frame_counter,
+        args,
         network,
         loss_hook,
     })
@@ -1301,6 +1455,7 @@ fn parse_eval(tokens: &[Token], first: &Token) -> Result<Step> {
         await_promise = value;
     }
     let capture = take_string(&mut kvs, "capture");
+    let timeout_ms = take_duration(&mut kvs, "timeout")?;
     reject_unknown(&kvs, first, "eval")?;
 
     Ok(Step::Eval {
@@ -1308,6 +1463,7 @@ fn parse_eval(tokens: &[Token], first: &Token) -> Result<Step> {
         expression,
         await_promise,
         capture,
+        timeout_ms,
     })
 }
 
@@ -1355,7 +1511,7 @@ fn parse_pointer(tokens: &[Token], first: &Token) -> Result<Step> {
     let kind = positionals
         .get(1)
         .map(|token| token.value.clone())
-        .ok_or_else(|| anyhow!("line {}: pointer needs click or hover", first.line))?;
+        .ok_or_else(|| anyhow!("line {}: pointer needs a kind", first.line))?;
     if positionals.len() > 2 {
         bail_at!(positionals[2], "pointer takes peer and kind only");
     }
@@ -1364,21 +1520,20 @@ fn parse_pointer(tokens: &[Token], first: &Token) -> Result<Step> {
     let selector = take_string(&mut kvs, "selector");
     let at = take_string(&mut kvs, "at");
     let steps = take_u32(&mut kvs, "steps")?;
+    let button = take_string(&mut kvs, "button");
+    let from = take_string(&mut kvs, "from");
     reject_unknown(&kvs, first, "pointer")?;
 
     let (x, y) = match at {
         Some(at) => {
-            let (x, y) = at
-                .split_once(',')
-                .ok_or_else(|| anyhow!("line {}: at must be x,y", first.line))?;
-            let x = x
-                .trim()
-                .parse::<f64>()
-                .with_context(|| format!("line {}: at x {x:?}", first.line))?;
-            let y = y
-                .trim()
-                .parse::<f64>()
-                .with_context(|| format!("line {}: at y {y:?}", first.line))?;
+            let (x, y) = parse_point(&at, "at", first)?;
+            (Some(x), Some(y))
+        }
+        None => (None, None),
+    };
+    let (from_x, from_y) = match from {
+        Some(from) => {
+            let (x, y) = parse_point(&from, "from", first)?;
             (Some(x), Some(y))
         }
         None => (None, None),
@@ -1391,7 +1546,25 @@ fn parse_pointer(tokens: &[Token], first: &Token) -> Result<Step> {
         y,
         selector,
         steps,
+        button,
+        from_x,
+        from_y,
     })
+}
+
+fn parse_point(value: &str, field: &str, first: &Token) -> Result<(f64, f64)> {
+    let (x, y) = value
+        .split_once(',')
+        .ok_or_else(|| anyhow!("line {}: {field} must be x,y", first.line))?;
+    let x = x
+        .trim()
+        .parse::<f64>()
+        .with_context(|| format!("line {}: {field} x {x:?}", first.line))?;
+    let y = y
+        .trim()
+        .parse::<f64>()
+        .with_context(|| format!("line {}: {field} y {y:?}", first.line))?;
+    Ok((x, y))
 }
 
 fn parse_capture(tokens: &[Token], first: &Token) -> Result<Step> {
@@ -1410,6 +1583,35 @@ fn parse_capture(tokens: &[Token], first: &Token) -> Result<Step> {
     reject_unknown(&kvs, first, "capture")?;
 
     Ok(Step::Capture { peer, out, select })
+}
+
+fn parse_burst(tokens: &[Token], first: &Token) -> Result<Step> {
+    let positionals = positionals(tokens);
+    let peer = positionals
+        .first()
+        .map(|token| token.value.clone())
+        .ok_or_else(|| anyhow!("line {}: burst needs a peer", first.line))?;
+    if positionals.len() > 1 {
+        bail_at!(positionals[1], "burst takes a peer and fields only");
+    }
+
+    let mut kvs = collect_kvs(tokens)?;
+    let out = take_required(&mut kvs, "out", first, "burst")?;
+    let frames = take_u32(&mut kvs, "frames")?
+        .ok_or_else(|| anyhow!("line {}: burst needs frames=...", first.line))?;
+    let interval_ms = take_duration(&mut kvs, "interval")?;
+    let mode = take_string(&mut kvs, "mode");
+    let select = take_string(&mut kvs, "select");
+    reject_unknown(&kvs, first, "burst")?;
+
+    Ok(Step::Burst {
+        peer,
+        out,
+        frames,
+        interval_ms,
+        mode,
+        select,
+    })
 }
 
 fn parse_assert(tokens: &[Token], first: &Token) -> Result<Step> {
@@ -1730,6 +1932,7 @@ assert b "window.__received === 100" message="all messages arrive"
                 expression,
                 await_promise,
                 capture,
+                ..
             } => {
                 assert_eq!(peer, "a");
                 assert_eq!(expression, "window.__createOffer()");
@@ -1895,6 +2098,159 @@ hold_frames = 12
         let scenario: Scenario = toml::from_str(text).unwrap();
         scenario.validate().unwrap();
         assert_eq!(scenario.step.len(), 1);
+    }
+
+    #[test]
+    fn parses_and_formats_a_burst() {
+        let text = "peer a url=x viewport=390x844\nburst a out=frames/pulse frames=120 interval=16ms mode=screencast\n";
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        match &scenario.step[0] {
+            Step::Burst {
+                peer,
+                out,
+                frames,
+                interval_ms,
+                mode,
+                select,
+            } => {
+                assert_eq!(peer, "a");
+                assert_eq!(out, "frames/pulse");
+                assert_eq!(*frames, 120);
+                assert_eq!(*interval_ms, Some(16));
+                assert_eq!(mode.as_deref(), Some("screencast"));
+                assert!(select.is_none());
+            }
+            other => panic!("expected a burst step, got {other:?}"),
+        }
+        assert_eq!(format_dsl(text).unwrap(), text);
+    }
+
+    #[test]
+    fn rejects_a_screencast_burst_with_a_selector() {
+        let text = "peer a url=x viewport=390x844\nburst a out=frames/pulse frames=20 mode=screencast select=canvas\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("remove select"), "{error}");
+    }
+
+    #[test]
+    fn rejects_a_burst_with_no_frames() {
+        let text = "peer a url=x viewport=390x844\nburst a out=frames/pulse frames=0\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("frames must be greater than zero"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn parses_a_right_click() {
+        let text = "peer a url=x viewport=390x844\npointer a click at=200,400 button=right\n";
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        match &scenario.step[0] {
+            Step::Pointer { button, .. } => assert_eq!(button.as_deref(), Some("right")),
+            other => panic!("expected a pointer step, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_and_formats_a_drag() {
+        let text = "peer a url=x viewport=390x844\npointer a drag from=100,120 at=240,320 button=middle steps=8\n";
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        match &scenario.step[0] {
+            Step::Pointer {
+                kind,
+                button,
+                from_x,
+                from_y,
+                ..
+            } => {
+                assert_eq!(kind, "drag");
+                assert_eq!(button.as_deref(), Some("middle"));
+                assert_eq!((*from_x, *from_y), (Some(100.0), Some(120.0)));
+            }
+            other => panic!("expected a pointer step, got {other:?}"),
+        }
+        let formatted = format_dsl(text).unwrap();
+        assert_eq!(
+            formatted,
+            "peer a url=x viewport=390x844\npointer a drag at=240,320 steps=8 button=middle from=100,120\n"
+        );
+        assert_eq!(format_dsl(&formatted).unwrap(), formatted);
+    }
+
+    #[test]
+    fn rejects_a_button_on_hover() {
+        let text = "peer a url=x viewport=390x844\npointer a hover at=10,20 button=right\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("button belongs on click or drag"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn rejects_a_touch_gesture_without_touch() {
+        let text = "peer a url=x viewport=390x844\npointer a tap at=10,20\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("needs touch"), "{error}");
+    }
+
+    #[test]
+    fn parses_an_eval_timeout() {
+        let text = "peer a url=x viewport=390x844\neval a \"window.__late()\" await capture=late timeout=5s\n";
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        match &scenario.step[0] {
+            Step::Eval { timeout_ms, .. } => assert_eq!(*timeout_ms, Some(5000)),
+            other => panic!("expected an eval step, got {other:?}"),
+        }
+        assert!(format_dsl(text)
+            .unwrap()
+            .contains("await capture=late timeout=5s"));
+    }
+
+    #[test]
+    fn rejects_a_timeout_on_a_synchronous_eval() {
+        let text = "peer a url=x viewport=390x844\neval a window.__now() timeout=5s\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(
+            error.to_string().contains("timeout belongs on an awaited"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn parses_peer_args() {
+        let text = "peer a url=x viewport=390x844 args=\"--use-fake-device-for-media-stream --use-fake-ui-for-media-stream\"\n";
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        assert_eq!(
+            scenario.peer[0].args.as_deref(),
+            Some(
+                &[
+                    "--use-fake-device-for-media-stream".to_owned(),
+                    "--use-fake-ui-for-media-stream".to_owned()
+                ][..]
+            )
+        );
+        assert_eq!(format_dsl(text).unwrap(), text);
+    }
+
+    #[test]
+    fn rejects_a_reserved_peer_arg() {
+        let text = "peer a url=x viewport=390x844 args=\"--user-data-dir=/tmp/x\"\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(
+            error.to_string().contains("is set by browser-shot"),
+            "{error}"
+        );
     }
 
     #[test]

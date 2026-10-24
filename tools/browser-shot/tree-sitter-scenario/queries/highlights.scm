@@ -7,6 +7,7 @@
   "key"
   "pointer"
   "capture"
+  "burst"
   "assert"
   "network"
 ] @keyword
