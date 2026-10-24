@@ -1,0 +1,167 @@
+==================
+a scenario with fields, flags, comments and a peer list
+==================
+
+# header
+run timeout=20s
+
+peer a url="file:///tmp/keys.html" viewport=390x844 dpr=3 touch network=latency:80,loss:2
+peer b url=file:///tmp/keys.html viewport=390x844
+
+wait a,b predicate="window.__ready === true" timeout=15s
+eval a window.__createOffer() await capture=offer
+key a KeyW down hold=12
+pointer a click selector="#game" steps=4
+pointer a drag from=60,200 at=200,320 button=right steps=8
+network a latency=80 loss=2
+capture a out=a.png
+burst a out=frames/pulse frames=20 mode=screencast
+assert a "window.__received === 100" message="all arrive"
+
+---
+
+(source_file
+  (comment)
+  (run
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (peer
+    (name
+      (bare_name))
+    (field
+      (key_name)
+      (value
+        (string)))
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (flag)
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (peer
+    (name
+      (bare_name))
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (wait
+    (peer_list
+      (name
+        (bare_name))
+      (name
+        (bare_name)))
+    (field
+      (key_name)
+      (value
+        (string)))
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (eval
+    (name
+      (bare_name))
+    (expression
+      (bare_expression))
+    (flag)
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (key
+    (name
+      (bare_name))
+    (code)
+    (key_state)
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (pointer
+    (name
+      (bare_name))
+    (pointer_kind)
+    (field
+      (key_name)
+      (value
+        (string)))
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (pointer
+    (name
+      (bare_name))
+    (pointer_kind)
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (network
+    (name
+      (bare_name))
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (capture
+    (name
+      (bare_name))
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (burst
+    (name
+      (bare_name))
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (assert
+    (name
+      (bare_name))
+    (expression
+      (string))
+    (field
+      (key_name)
+      (value
+        (string)))))

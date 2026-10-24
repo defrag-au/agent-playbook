@@ -29,7 +29,13 @@ fn the_toolkit_view_lists_every_verb_in_every_binary() {
     for verb in at_peek::catalogue::VERBS {
         assert!(text.contains(verb.name), "{} is not described", verb.name);
     }
+    for verb in at_crate::catalogue::VERBS {
+        assert!(text.contains(verb.name), "{} is not described", verb.name);
+    }
     for verb in at_recall::catalogue::VERBS {
+        assert!(text.contains(verb.name), "{} is not described", verb.name);
+    }
+    for verb in at_reach::catalogue::VERBS {
         assert!(text.contains(verb.name), "{} is not described", verb.name);
     }
     assert!(
@@ -41,21 +47,32 @@ fn the_toolkit_view_lists_every_verb_in_every_binary() {
 
 #[test]
 fn each_binary_states_what_it_does_not_do() {
-    // The two promises differ — one runs nothing, the other runs git — and an allowlist decision
-    // needs the difference rather than a shared slogan.
+    // The promises differ — one runs nothing, one reads a cargo store, one runs git — and an
+    // allowlist decision needs the difference rather than a shared slogan.
     let text = stdout(&describe(&[]));
     assert!(text.contains("No git, no subprocess"), "{text}");
+    assert!(
+        text.contains("No subprocess, no network, no writes"),
+        "{text}"
+    );
     assert!(text.contains("One subprocess, git"), "{text}");
 }
 
 #[test]
-fn both_binaries_can_be_asked_for_their_flags() {
+fn every_binary_can_be_asked_for_its_flags() {
     let peek = stdout(&describe(&["at-peek"]));
     assert!(peek.contains("--limit"), "{peek}");
+
+    let source = stdout(&describe(&["at-crate"]));
+    assert!(source.contains("--cargo-home"), "{source}");
+    assert!(source.contains("--build"), "{source}");
 
     let recall = stdout(&describe(&["at-recall"]));
     assert!(recall.contains("--patch"), "{recall}");
     assert!(recall.contains("diff"), "{recall}");
+
+    let reach = stdout(&describe(&["at-reach"]));
+    assert!(reach.contains("--fleet-root"), "{reach}");
 }
 
 #[test]
@@ -66,6 +83,9 @@ fn a_verb_is_found_whichever_binary_owns_it() {
     let diff = stdout(&describe(&["diff"]));
     assert!(diff.contains("at-recall diff"), "{diff}");
     assert!(diff.contains("revision"), "the notes come with it: {diff}");
+
+    let location = stdout(&describe(&["where"]));
+    assert!(location.contains("at-crate where"), "{location}");
 }
 
 #[test]
@@ -76,6 +96,18 @@ fn one_binary_can_be_asked_for_its_flags() {
     assert_eq!(out.status.code(), Some(0));
     assert!(text.contains("--limit"), "{text}");
     assert!(text.contains("--root"), "{text}");
+}
+
+#[test]
+fn the_crate_binary_can_be_asked_for_its_flags() {
+    // `where` is at-crate's alone, so this is the flag table rather than a summary usage line.
+    let out = describe(&["where"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0));
+    assert!(text.contains("at-crate where"), "{text}");
+    assert!(text.contains("--cargo-home"), "{text}");
+    assert!(text.contains("--version"), "{text}");
 }
 
 #[test]

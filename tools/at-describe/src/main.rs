@@ -8,6 +8,7 @@
 //! reviewable — an agent that is unsure asks here instead of composing a shell pipeline to find
 //! out, and the answer comes from the same tables the parsers enforce.
 
+use at_crate::catalogue as crate_source;
 use at_peek::catalogue as peek;
 use at_reach::catalogue as reach;
 use at_recall::catalogue as recall;
@@ -33,8 +34,9 @@ fn run(args: &[String]) -> i32 {
         }
         "--version" => {
             println!(
-                "{TOOL} {VERSION} · at-peek {} · at-recall {} · at-reach {}",
+                "{TOOL} {VERSION} · at-peek {} · at-crate {} · at-recall {} · at-reach {}",
                 at_peek::VERSION,
+                at_crate::VERSION,
                 at_recall::VERSION,
                 at_reach::VERSION
             );
@@ -42,6 +44,10 @@ fn run(args: &[String]) -> i32 {
         }
         "at-peek" => {
             print!("{}", peek::help_all());
+            0
+        }
+        "at-crate" => {
+            print!("{}", crate_source::help_all());
             0
         }
         "at-recall" => {
@@ -55,6 +61,7 @@ fn run(args: &[String]) -> i32 {
         name => {
             let found = peek::find(name)
                 .map(peek::help_for)
+                .or_else(|| crate_source::find(name).map(crate_source::help_for))
                 .or_else(|| recall::find(name).map(recall::help_for))
                 .or_else(|| reach::find(name).map(reach::help_for));
             match found {
@@ -64,8 +71,9 @@ fn run(args: &[String]) -> i32 {
                 }
                 None => {
                     eprintln!(
-                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-recall, at-reach · verbs: {}, {}, {}",
+                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-crate, at-recall, at-reach · verbs: {}, {}, {}, {}",
                         peek::names(),
+                        crate_source::names(),
                         recall::names(),
                         reach::names()
                     );
@@ -80,7 +88,7 @@ fn run(args: &[String]) -> i32 {
 /// Bounded to a screen, because its reader is mid-task.
 fn toolkit() -> String {
     let mut out = String::new();
-    out.push_str("# binaries in this build: at-peek, at-recall, at-reach\n");
+    out.push_str("# binaries in this build: at-peek, at-crate, at-recall, at-reach\n");
     out.push_str("# every `at-` binary is read-only: no write path, in any flag or any option\n\n");
 
     out.push_str(&format!(
@@ -91,6 +99,18 @@ fn toolkit() -> String {
         "#   No git, no subprocess, no writes, no network, no environment configuration.\n",
     );
     for line in peek::verb_lines() {
+        out.push_str(&line);
+        out.push('\n');
+    }
+
+    out.push_str(&format!(
+        "\nat-crate {} — read-only inspection of installed crate source and build output\n",
+        at_crate::VERSION
+    ));
+    out.push_str(
+        "#   No subprocess, no network, no writes. Reads the cargo home, Cargo.lock and target/.\n",
+    );
+    for line in crate_source::verb_lines() {
         out.push_str(&line);
         out.push('\n');
     }
@@ -138,6 +158,7 @@ fn toolkit() -> String {
         "\n# at-describe knows the binaries it is linked with; one installed separately\n",
     );
     out.push_str("# does not appear here. Ask for detail with `at-describe at-peek`,\n");
-    out.push_str("# `at-describe at-recall`, `at-describe at-reach`, or `at-describe <verb>`.\n");
+    out.push_str("# `at-describe at-crate`, `at-describe at-recall`, `at-describe at-reach`,\n");
+    out.push_str("# or `at-describe <verb>`.\n");
     out
 }

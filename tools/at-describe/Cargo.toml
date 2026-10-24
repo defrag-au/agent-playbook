@@ -6,9 +6,10 @@ description = "Tier 0 of the agent toolkit: the catalogue, and nothing else"
 license = "MIT"
 
 # The toolkit's verb tables, linked so this catalogue cannot describe a grammar the binaries do
-# not enforce. Both are siblings in this workspace rather than crates from a registry. Nothing else
-# is linked.
+# not enforce. They are siblings in this workspace rather than crates from a registry. Nothing
+# else is linked.
 [dependencies]
-at-peek = { path = "../at-peek" }
-at-reach = { path = "../at-reach" }
-at-recall = { path = "../at-recall" }
+at-crate = { workspace = true }
+at-peek = { workspace = true }
+at-reach = { workspace = true }
+at-recall = { workspace = true }

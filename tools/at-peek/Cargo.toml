@@ -10,5 +10,5 @@ license = "MIT"
 # that cannot express what an agent meant is a downgrade rather than a replacement. Neither is a
 # capability: the no-write property is structural, and does not depend on the count.
 [dependencies]
-at-core = { path = "../at-core" }
-regex = "1"
+at-core = { workspace = true }
+regex = { workspace = true }

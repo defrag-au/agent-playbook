@@ -1,7 +1,8 @@
 # Read-only inspection tools for agents
 
 **Status:** proposal, 2026-09-22; part built. Built and tested: `tools/at-core` (the shared output
-contract and path containment), `tools/at-peek` (`stat`, `slice`, `search`), `tools/at-recall`
+contract, path containment and text reading), `tools/at-peek` (`stat`, `slice`, `search`),
+`tools/at-crate` (`where`, `installed`, `files`, `slice`, `search`, `out`), `tools/at-recall`
 (`state`, `log`, `diff`, and the `pr` recipe), `tools/at-reach` (fleet inspection), and
 `tools/at-describe` (the catalogue). The toolkit is packaged by this repository's `flake.nix` and
 wired into the org's shells by `defrag-nix`. Everything else here is still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in
@@ -26,7 +27,8 @@ rather than a paragraph (`tools/at-recall/tests/contract.rs`):
   `no_command_writes` snapshots `.git` as well as the tree.
 
 Output in the sections below is illustrative. The *shapes* are the contract; the values are not.
-In prose, `at-peek` and `at-recall` shorten to `peek` and `recall`; in a command they never do.
+In prose, `at-peek`, `at-crate` and `at-recall` shorten to `peek`, `crate` and `recall`; in a
+command they never do.
 
 ## The problem
 
@@ -51,18 +53,19 @@ rather than hidden in a pipe.
 
 ## The shape
 
-One namespace (`at-` for agent tools), three binaries, because they are three trust tiers and an
-approval should grant the smallest one that answers the question.
+One namespace (`at-` for agent tools), five binaries, because they are separate trust tiers and an
+approval should grant the smallest one that answers the question. Four read the filesystem or a
+private inventory; the fifth, `at-describe`, opens nothing and is the catalogue.
 
-| | `at-describe` | `at-peek` | `at-recall` |
-| --- | --- | --- | --- |
-| Reads | Nothing | Working-tree files | `.git` objects and refs |
-| Replaces | — | `cat`, `sed -n`, `rg`, `find`, `ls -R` | `git log`, `status`, `diff`, `show`, `blame` |
-| New capability vs what I already approve | None — no arguments, opens nothing | **None** — a strict subset of `cat` | History, other branches, deleted content |
-| Subprocess | None | None | One, `git`, plumbing verbs only |
-| Network | Never | Never | Never |
-| Writes | Never | Never | Never |
-| Grant | Always allow | Blanket allow | Per-verb judgement; one verb is opt-in per invocation |
+| | `at-describe` | `at-peek` | `at-crate` | `at-recall` |
+| --- | --- | --- | --- | --- |
+| Reads | Nothing | Working-tree files | Extracted crate source, `Cargo.lock`, build output | `.git` objects and refs |
+| Replaces | — | `cat`, `sed -n`, `rg`, `find`, `ls -R` | `cargo info`, `find`/`ls` over the registry, `grep`/`sed` over a crate | `git log`, `status`, `diff`, `show`, `blame` |
+| New capability vs what I already approve | None — no arguments, opens nothing | **None** — a strict subset of `cat` | A store outside the worktree, still read-only | History, other branches, deleted content |
+| Subprocess | None | None | None | One, `git`, plumbing verbs only |
+| Network | Never | Never | Never | Never |
+| Writes | Never | Never | Never | Never |
+| Grant | Always allow | Blanket allow | Blanket allow | Per-verb judgement; one verb is opt-in per invocation |
 
 The namespace is a promise rather than a filing convention: **membership in `at-` claims that the
 binary's entire grammar is safe to allowlist.** No member has a write path in any form — not a
@@ -74,24 +77,34 @@ supposed to guarantee.
 graph TD
     Turn[Agent turn] --> D[at-describe]
     Turn --> P[at-peek]
+    Turn --> C[at-crate]
     Turn --> R[at-recall]
     D --> Cat[Catalogue of verbs and recipes]
     P --> Files[Working-tree files]
     P -. refuses .-> Secret[Secret-shaped paths · ignored paths]
+    C --> Crates[Registry source · Cargo.lock · build output]
+    C -. refuses .-> Outside[Paths outside the crate · writes]
     R --> Git[Read-only git plumbing]
     Git --> Obj[Objects and refs · deleted content]
     R -. refuses .-> Net[Network · reflog · writes]
 ```
 
-`at-describe` is why the other two can stay terse: it is the toolkit's own catalogue, bounded to a
-screen, and it spans both binaries — "to answer *why*, use `at-recall why`, then `at-peek slice`
+`at-describe` is why the others can stay terse: it is the toolkit's own catalogue, bounded to a
+screen, and it spans the binaries — "to answer *why*, use `at-recall why`, then `at-peek slice`
 around it" is a sentence no individual tool's `--help` can say. Per-verb flags stay in `--help`;
 `at-describe` answers "what can I ask".
 
-The line between the other two is not "code versus git" — it is **content that exists versus
-content that no longer does**. `at-recall` can read a secret that was committed and then removed,
-which is the one thing on this list that a `cat` approval never granted. That is why it is a
-separate binary rather than a verb on `peek`.
+The line between `at-peek` and `at-recall` is not "code versus git" — it is **content that exists
+versus content that no longer does**. `at-recall` can read a secret that was committed and then
+removed, which is the one thing on this list that a `cat` approval never granted. That is why it is
+a separate binary rather than a verb on `peek`.
+
+`at-crate` is the same distinction for a different store: content that exists, but outside the
+worktree. It reads the extracted registry sources, cargo's git checkouts, and the project's
+build-script output, and it resolves a version through `Cargo.lock` rather than guessing "latest".
+It is separate from `at-peek` because its root is the cargo home and the target directory, not the
+worktree — and because a path that resolves outside one root has to be a visible token, not an
+implicit widening.
 
 ## Before and after
 
@@ -106,6 +119,10 @@ question I currently watch an agent assemble a pipeline to answer.
 | Which function is line 120 in? | `rg -n '^\s*fn ' src/lib.rs \| head -30` + arithmetic | `at-peek scope src/lib.rs:120` |
 | Everything mentioning this | `rg -n sym \| head -40` | `at-peek search sym` |
 | How many matches | `rg -c sym` | `at-peek search sym --count` |
+| Where is this crate installed · which version | `cargo info <crate>` + `find ~/.cargo/registry/src …` | `at-crate where <crate>` · `at-crate installed <crate>` |
+| Read lines in an installed crate | `sed -n '80,210p' ~/.cargo/registry/src/.../f.rs` | `at-crate slice <crate>/<path>:80-210` |
+| Everything in an installed crate | `grep -rn sym ~/.cargo/registry/src/...` | `at-crate search <pat> <crate>` |
+| What did a build script generate | `head target/…/build/<crate>-*/out/f.rs` | `at-crate out <crate>` · `at-crate slice <crate>/<path> --build` |
 | What am I looking at? | `git status --short` *and* `git rev-parse --abbrev-ref HEAD` | `at-recall state` |
 | What changed lately? | `git log --oneline -20` | `at-recall log --limit 20` |
 | What have I changed? | `git diff --stat` | `at-recall diff @` |
@@ -174,6 +191,35 @@ $ at-peek slice crates/archivist/src/cache.rs:41-44
 
 Three lines of the contract are already visible in that example: a header naming what was read,
 line numbers on every line, and a trailer stating what was *not* shown and how to widen.
+
+## `at-crate` — installed crate source
+
+Crate source is the read that has no editor tool at all. `cargo info` names a version but not a
+path; the path is a registry directory with an opaque suffix; and the generated code that answers
+half the questions lives under a build hash. The browser-shot session that motivated this tool
+spent most of its investigation on `find`, `ls`, `grep` and `sed` against
+`~/.cargo/registry/src/…` and `target/debug/build/<crate>-<hash>/out`, with the version chosen by
+memory rather than by the project's lock.
+
+The verbs answer that in one read each:
+
+| Verb | Answers | Notes |
+| --- | --- | --- |
+| `at-crate where <crate>` | Where is it, at which version | Resolves the nearest `Cargo.lock` first; falls back to the store's single copy only when the lock has no entry, and says so. Prints source and build-output directories. |
+| `at-crate installed [<crate>]` | Which versions are extracted | One row per registry copy: name, version, registry, path. Bounded and counted. |
+| `at-crate files <crate>[/<path>]` | What is in it | Sorted tree, two levels by default; files carry sizes. |
+| `at-crate slice <crate>/<path>:<range>` | These exact lines | Same range syntax as `at-peek`; paths cannot escape the crate. |
+| `at-crate search <pattern> <crate>[/<path>]` | Every mention | Regex; the true total under the listing; `--count` and `--files-only`. |
+| `at-crate out [<crate>]` | What did its build script generate | Lists `target/**/build/<crate>-<hash>/out` and the files in each; `--build` reads one from `slice` or `search`. |
+
+Two resolution rules are the whole design:
+
+- **The lock decides the version.** A crate named twice in `Cargo.lock` is an error listing both,
+  not a newest-wins choice; `--version` is the visible token that picks one. A version that is in
+  the lock but not extracted says so — the tool never fetches it.
+- **A second build directory is an error, not a guess.** Cargo keeps one `out` per feature set and
+  target, and nothing in the directory says which the last build wrote. `out` lists them all;
+  `slice --build` refuses to choose until `--build-dir` names one.
 
 ## `at-recall` — history
 
@@ -393,7 +439,8 @@ spec, and each one is a test.
     page can be re-entered. They are results-conditional — a cut answer offers the wider read, a
     withheld answer offers the flag that reads it, a complete table offers the hunks behind it,
     and a clean tree offers nothing at all. `every_printed_exit_is_a_command_that_runs` executes
-    each one as printed, in both binaries, so an exit cannot name a flag the parser would refuse.
+    each one as printed, in every read-only binary, so an exit cannot name a flag the parser would
+    refuse.
 
     Exits replace prose that used to sit inside a bound: `slice` used to end
     `at-peek slice f.rs:1-412 for the rest`, which named the continuation without being one.
@@ -572,14 +619,18 @@ targets:
 
 ## Directive
 
-Ask questions with `at-peek` (working tree), `at-recall` (history) and `at-describe` (what the
-toolkit can do). All three are read-only; none needs a pipe, and none is `git`.
+Ask questions with `at-peek` (working tree), `at-crate` (installed crate source),
+`at-recall` (history) and `at-describe` (what the toolkit can do). All four are read-only; none
+needs a pipe, and none is `git`.
 
 | Question | Command |
 | --- | --- |
 | What is in here · what is this repo | `at-peek tree src --depth 2` · `at-peek overview` |
 | These exact lines · the declaration around line 120 | `at-peek slice <file>:40-60` · `at-peek scope <file>:120` |
 | Where is it declared or mentioned | `at-peek outline <file>` · `at-peek search <pat> [path]` |
+| Which version of a crate · where is it | `at-crate where <crate>` · `at-crate installed <crate>` |
+| Read or search an installed crate | `at-crate slice <crate>/<path>:40-60` · `at-crate search <pat> <crate>` |
+| What did a build script generate | `at-crate out <crate>` |
 | What am I looking at · what changed lately | `at-recall state` · `at-recall log --limit 20` |
 | Why are these lines like this | `at-recall why <file>:40-60` |
 | Write the PR description | `at-recall pr` |
@@ -607,7 +658,7 @@ false for them.
 ### The skills
 
 `skills/inspect-code/SKILL.md` — *"Use when you need to find, read or explain code or its history
-— maps the question to an `at-peek` or `at-recall` verb."* It carries what the rule cannot afford:
+— maps the question to an `at-peek`, `at-crate` or `at-recall` verb."* It carries what the rule cannot afford:
 the target syntax, and the traps. The traps are why it is a skill rather than a reference — each
 one is walked into exactly when the skill fires:
 
@@ -653,8 +704,8 @@ the text format is checked for shape only, so prose can be tuned without a test 
   spirit as this repository's rule-scanning tests. This one is the security test; a reviewer
   should be able to read that list and nothing else.
 - `no_write_api_in_the_source` — the grep from *Security*, as a test: no `fs::write`,
-  `File::create`, `OpenOptions`, `remove_file`, `rename`, `Command` or socket in either binary.
-  Absence is a stronger guarantee than behaviour, and cheaper to check.
+  `File::create`, `OpenOptions`, `remove_file`, `rename`, `Command` or socket in any read-only
+  binary. Absence is a stronger guarantee than behaviour, and cheaper to check.
 - `no_command_writes` — run every verb against a fixture repo and assert the tree and `.git` are
   byte-identical afterwards. Crude, and it catches the exact class of regression that would
   invalidate the whitelist.
@@ -686,11 +737,11 @@ the text format is checked for shape only, so prose can be tuned without a test 
 ## Decisions to settle before code
 
 1. ~~**One source for the catalogue.**~~ **Settled.** `at-describe` links the verb tables from
-   `at-peek` and `at-recall` rather than restating them, and every table lives in `at-core`'s
-   vocabulary, so the catalogue cannot describe a grammar the parsers do not enforce. The rule
-   quotes the substitutions rather than the table, so it has nothing to go stale. `at-describe`
-   also lists only the binaries it is linked with, which is why a separately installed tool does
-   not appear in it.
+   `at-peek`, `at-crate`, `at-recall` and `at-reach` rather than restating them, and every table
+   lives in `at-core`'s vocabulary, so the catalogue cannot describe a grammar the parsers do not
+   enforce. The rule quotes the substitutions rather than the table, so it has nothing to go stale.
+   `at-describe` also lists only the binaries it is linked with, which is why a separately installed
+   tool does not appear in it.
 2. **Sequencing.** Primitives first, recipes second: `at-peek`'s read verbs, then `at-recall`'s
    state/log/diff/blame/search, then `at-describe` and the recipes. A recipe written against
    half-finished primitives bakes in the wrong section shapes — and the recipes are the largest
@@ -708,7 +759,7 @@ the text format is checked for shape only, so prose can be tuned without a test 
    property, which is most of the reason these are standalone binaries.
    Recommendation: (a) for v1, with the honesty rule enforced in output rather than in a comment.
 5. ~~**The install path.**~~ **Settled:** a `nix profile install` of the flake's `agent-tools`
-   output, which puts all three binaries on `PATH` unconditionally — the `direnv exec .` fallback
+   output, which puts all five binaries on `PATH` unconditionally — the `direnv exec .` fallback
    stays documented for a shell that has not been installed into. `defrag-nix` exposes
    `packages.agent-tools` so a repository's devshell gets it without a second install.
 6. **Grant granularity.** The tiering assumes approvals are per-command-prefix, which gives three

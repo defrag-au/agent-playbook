@@ -66,6 +66,18 @@ picture with no error.
 - **Fractional text sizes must measure and draw at the same size.** Use the kit's `RichText` with
   `MeasureAt(pixel_scale)`, which measures the glyphs the draw will use, rather than `draw_text_ex`
   with a rounded `font_size`, or words overlap and spaces disappear.
+- **Text centred by its size or its line box sits high.** UI labels are mostly capitals and digits,
+  and the eye centres their ink: the band from the baseline to the top of a capital. The point size
+  is much taller than that band (VT323's capitals are about half of it), and `text_top`'s line box
+  hangs a descender below it, so `top = box.y + (box.h - size) / 2` or a hand-tuned `+4` leaves a
+  stamp's word high, a legend's square low beside its word, and a different error in every face.
+  Place text by a midline instead: `Painter::text_in(s, rect, size, color, Align)` for one line
+  against a box's start, centre or end (a chip, a button, a figure right against a tile's edge),
+  `Painter::stack_in(&[Line], rect, align, gap)` for a block such as a list row's title over its
+  subtitle, and `text_mid` / `mono_mid` on a row's midline with the icon beside it centred on the
+  same `y`. The widgets catalogue's "Text placement" section lists every one. Lay a card out as
+  named midlines (`title_mid`, `legend_mid`) and derive its height from the last one, rather than
+  fixed offsets from its top.
 - **Images decode from PNG and TGA only.** Convert art to PNG at build time, not JPEG.
 - **With `high_dpi`, touches arrive in device pixels and the mouse in points.** For one pointer,
   read the mouse (macroquad turns touches into mouse events) and convert once, through
@@ -134,6 +146,15 @@ The atlas upload storm and the random atlas doubling were found by solada-ledger
 on 2026-10-18, by counting uploads in an instrumented macroquad: 129 retained 16 MB regions
 matched the 166 full-atlas uploads of one frame. With the gate and the upstream packing fix,
 both of its views held about 19 MB of graphics memory on every run.
+
+The high-text trap was found by the BLOCKWATCH rework in cnft.dev-workers on 2026-10-24: every
+capture report was clean, and the user still saw a stamp's word riding high, a legend's squares
+below their words, and `block_train`'s "full" above its status light. The report checks that text
+fits its surface, not that it is centred in its box, so only the picture shows it. It came back
+the same day in TOKEN ARENA, built from scratch: chips, buttons and feed rows placed with
+`text_top` plus offsets, all off by a point or two. The midline helpers existed, but the painter
+had no row in the widgets catalogue, so nothing pointed at them; it now has a generated "Text
+placement" section, and `text_in` / `stack_in` cover the one-line and two-line box cases.
 
 The fixes live in the kit so a new game inherits them. The camera orientation is pinned by
 `the_window_camera_puts_the_origin_top_left` in `harness.rs`, which checks the camera's matrix and

@@ -86,9 +86,10 @@ src/              resolution engine + CLI
   render.rs         the managed block
   install.rs        splice and check
   main.rs           the CLI
-tools/            the read-only agent toolkit: four binaries, five crates
-  at-core/          the output contract and path containment, shared
+tools/            the read-only agent toolkit: five binaries, six crates
+  at-core/          the output contract, path containment and text reading, shared
   at-peek/          the working tree — stat, slice, search
+  at-crate/         installed crate source and build output — where, installed, files, slice, search, out
   at-recall/        history and state — state, log, diff, pr
   at-reach/         a private fleet tree — root, hosts, probe
   at-describe/      the catalogue, which opens nothing
@@ -104,7 +105,7 @@ references/       crate cheat sheets and API notes
 models/           compose-time overlays: generic, claude-code, deepseek-flash, zed
 projects/         one directory per repository: project.conf + rules/
 templates/        scaffolds for new rules, skills, projects and overlays
-docs/             precedence model, rule format, migration inventory, inspection tools
+docs/             precedence model, rule format, migration inventory, inspection and browser tools
 dist/             generated output (gitignored)
 ```
 
@@ -170,23 +171,27 @@ crate has no dependencies at all, so it still builds with no network and no regi
 ## The inspection toolkit
 
 The other half of this repository is not a rule. It is the thing that makes it possible to stop
-writing rules about shell pipelines: four read-only binaries, built from `tools/`, that give an
+writing rules about shell pipelines: five read-only binaries, built from `tools/`, that give an
 agent the reads it needs without an approval per command and without a bound hidden in a pipe.
 
 | Binary | Reads | Verbs |
 | --- | --- | --- |
 | `at-peek` | working-tree files, and spawns nothing at all | `stat`, `slice`, `search` |
+| `at-crate` | extracted crate source, `Cargo.lock`, and build-script output; spawns nothing | `where`, `installed`, `files`, `slice`, `search`, `out` |
 | `at-recall` | `.git` objects and refs, through one subprocess — `git`, read verbs only | `state`, `log`, `diff`, `pr` |
 | `at-reach` | a private fleet tree, and one read-only probe over `ssh` (or `sh` locally) | `root`, `hosts`, `probe` |
-| `at-describe` | nothing; it prints the catalogue | the three verb tables |
+| `at-describe` | nothing; it prints the catalogue | the four verb tables |
 
-`rg` becomes `at-peek search`, `sed -n '40,60p' f.rs` becomes `at-peek slice f.rs:40-60`, and
-`git status` plus `git branch` plus `git log -1` becomes `at-recall state`. The mapping an agent is
-held to is [`rules/org/defrag/agent-tools.md`](rules/org/defrag/agent-tools.md); the traps are
+`rg` becomes `at-peek search`, `sed -n '40,60p' f.rs` becomes `at-peek slice f.rs:40-60`,
+`grep -rn … ~/.cargo/registry/src` becomes `at-crate search <pattern> <crate>`, and `git status`
+plus `git branch` plus `git log -1` becomes `at-recall state`. The mapping an agent is held to is
+[`rules/org/defrag/agent-tools.md`](rules/org/defrag/agent-tools.md); the traps are
 [`skills/inspect-code/SKILL.md`](skills/inspect-code/SKILL.md).
 
 ```sh
 at-peek search 'render_claim' --count   # matches per file, with the true total
+at-crate where headless_chrome          # version, source path, build output
+at-crate search 'device_metrics' headless_chrome   # every mention in the crate
 at-recall state --summary               # branch, HEAD, changed paths — the frame, no rows
 at-recall pr --base main                # the facts a PR description is written from
 at-reach hosts                          # the private fleet inventory
@@ -210,22 +215,24 @@ intention:
   invocation that produced it and runs exactly as printed — an *address*, never a handle, so no
   state crosses invocations.
 
-The tier each binary sits in is the reason there are four, because a prefix allowlist can only
+The tier each binary sits in is the reason there are five, because a prefix allowlist can only
 see a difference that is in the binary. `at-describe` opens no file at all. `at-peek` reads files
-and runs nothing. `at-recall` runs `git` and nothing else, with read verbs only, a deny-list test
-asserting no mutating verb is reachable, a repository's pagers and diff drivers neutralised, and
-`@{…}` refused by syntax because the reflog is not read. `at-reach` reads a private fleet tree
-and runs one fixed probe over `ssh` or `sh`; it has no write, sudo or secret verb. Its contract
-is [`docs/fleet.md`](docs/fleet.md).
+and runs nothing. `at-crate` reads the cargo home, `Cargo.lock` and `target/`, and runs nothing —
+in particular it never invokes `cargo`, so an uninstalled crate is an answer rather than a fetch.
+`at-recall` runs `git` and nothing else, with read verbs only, a deny-list test asserting no
+mutating verb is reachable, a repository's pagers and diff drivers neutralised, and `@{…}` refused
+by syntax because the reflog is not read. `at-reach` reads a private fleet tree and runs one fixed
+probe over `ssh` or `sh`; it has no write, sudo or secret verb. Its contract is
+[`docs/fleet.md`](docs/fleet.md).
 
 `defrag-nix` installs them into every defrag devshell, so they are on `PATH` in an interactive
 shell in any of those repositories; a shell an agent spawned reaches for them as
 `direnv exec . at-peek …`.
 
 The verbs above are built. `tree`, `find`, `outline` and `scope` in `at-peek`; `show`, `blame`,
-`why` and `churn` in `at-recall`; `root`, `hosts` and `probe` in `at-reach`; and the `review` and
-`release` recipes are designed and not written — [`docs/inspection-tools.md`](docs/inspection-tools.md)
-is the design record, and `at-describe` answers with what exists rather than what was planned.
+`why` and `churn` in `at-recall`; and the `review` and `release` recipes are designed and not
+written — [`docs/inspection-tools.md`](docs/inspection-tools.md) is the design record, and
+`at-describe` answers with what exists rather than what was planned.
 
 ## The Zed thread tools
 

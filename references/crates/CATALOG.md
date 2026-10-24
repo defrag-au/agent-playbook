@@ -19,6 +19,7 @@ Budget: ≤ 200 lines and ≤ 8 KB per file. The test suite enforces a 10 KB cei
 | --- | --- | --- | --- |
 | chrono | 0.4.45 | `chrono-0.4.md` | `## Parse an RFC 3339 timestamp` |
 | clap | 4.6.7 | `clap-4.6.md` | `## Derive a parser` |
+| headless_chrome | 1.0.22 | `headless_chrome-1.0.22.md` | `## Launch a browser and own it` |
 | liquid | 0.26 | `liquid-0.26.md` | `## Building a Parser with Custom Extensions` |
 | ratatui | 0.29.0 | `ratatui-0.29.md` | `## Init, draw, restore` |
 | rmcp | 1.3 | `rmcp-1.3.md` | `## Simplest Pattern: #[tool_router(server_handler)]` |
@@ -34,6 +35,7 @@ Budget: ≤ 200 lines and ≤ 8 KB per file. The test suite enforces a 10 KB cei
 | --- | --- |
 | chrono | RFC 3339 parsing and `DateTime<Utc>` without the serde feature |
 | clap | Derive parser, subcommands and the feature set that produces them |
+| headless_chrome | Headless Chromium over CDP: process lifecycle, true viewport, input, console events, raw commands |
 | liquid | Parser builder, custom filters/tags and partials for the Liquid engine |
 | ratatui | Terminal init/draw/restore, the re-exported crossterm and widget layout |
 | rmcp | MCP server with `#[tool_router(server_handler)]` and transport-io |
