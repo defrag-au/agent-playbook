@@ -13,7 +13,7 @@ use chrono::{SecondsFormat, Utc};
 use headless_chrome::browser::tab::Tab;
 use headless_chrome::protocol::cdp::{Network, Page};
 use headless_chrome::{Browser, LaunchOptions};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::capture;
 use crate::collect::{self, Collector};
@@ -25,12 +25,14 @@ use crate::report::{
     Console, CssBox, Expect, FrameRate, Image, Peer, Predicate, Ready, Renderer, Report, Requests,
     Viewport,
 };
+use crate::scenario::{
+    parse_viewport, KeyState, LossHookSpec, PeerSpec, Scenario, Step, DEFAULT_SEED, MAX_PEERS,
+};
 
 const DEFAULT_BROWSER: &str = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
-const DEFAULT_SEED: u32 = 0x9e37_79b9;
 
 #[cfg(unix)]
-static PEER_PIDS: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
+static PEER_PIDS: [AtomicU32; MAX_PEERS] = [const { AtomicU32::new(0) }; MAX_PEERS];
 #[cfg(unix)]
 static SIGNALS_INSTALLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -66,118 +68,6 @@ fn install_peer_signal(index: usize, pid: u32) {
 
 #[cfg(not(unix))]
 fn install_peer_signal(_index: usize, _pid: u32) {}
-
-#[derive(Debug, Deserialize)]
-struct Scenario {
-    #[serde(default)]
-    run: RunConfig,
-    peer: Vec<PeerSpec>,
-    #[serde(default)]
-    step: Vec<Step>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct RunConfig {
-    artifacts: Option<PathBuf>,
-    timeout_ms: Option<u64>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct PeerSpec {
-    name: String,
-    url: String,
-    viewport: String,
-    dpr: Option<f64>,
-    touch: Option<bool>,
-    user_agent: Option<String>,
-    headed: Option<bool>,
-    browser: Option<PathBuf>,
-    preload: Option<PathBuf>,
-    frame_counter: Option<String>,
-    network: Option<NetworkSpec>,
-    loss_hook: Option<LossHookSpec>,
-}
-
-impl PeerSpec {
-    fn frame_counter(&self) -> String {
-        self.frame_counter
-            .clone()
-            .unwrap_or_else(|| "window.__frames".to_owned())
-    }
-}
-
-#[derive(Debug, Clone, Default, Deserialize)]
-struct NetworkSpec {
-    latency_ms: Option<u64>,
-    download_kbps: Option<u64>,
-    upload_kbps: Option<u64>,
-    loss_percent: Option<f64>,
-    jitter_ms: Option<u64>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct LossHookSpec {
-    rate: f64,
-    seed: Option<u32>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "action", rename_all = "snake_case")]
-enum Step {
-    Wait {
-        peer: Option<String>,
-        peers: Option<Vec<String>>,
-        predicate: Option<String>,
-        frames: Option<u32>,
-        network_idle: Option<u64>,
-        timeout_ms: Option<u64>,
-    },
-    Eval {
-        peer: String,
-        expression: String,
-        #[serde(default)]
-        await_promise: bool,
-        capture: Option<String>,
-    },
-    Key {
-        peer: String,
-        code: String,
-        state: KeyState,
-        hold_frames: Option<u32>,
-    },
-    Pointer {
-        peer: String,
-        kind: String,
-        x: Option<f64>,
-        y: Option<f64>,
-        selector: Option<String>,
-        steps: Option<u32>,
-    },
-    Capture {
-        peer: String,
-        out: String,
-        select: Option<String>,
-    },
-    Assert {
-        peer: String,
-        expression: String,
-        message: Option<String>,
-    },
-    Network {
-        peer: String,
-        latency_ms: Option<u64>,
-        download_kbps: Option<u64>,
-        upload_kbps: Option<u64>,
-        loss_percent: Option<f64>,
-    },
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum KeyState {
-    Down,
-    Up,
-}
 
 #[derive(Clone)]
 enum WaitKind {
@@ -267,7 +157,7 @@ pub fn run(args: Vec<String>) -> Result<bool> {
             "--json" => json = true,
             "-h" | "--help" => {
                 println!(
-                    "browser-shot run --scenario <file.toml> [--artifacts <dir>] [--json] [--browser <path>]"
+                    "browser-shot run --scenario <file.dsl|file.toml> [--artifacts <dir>] [--json] [--browser <path>]"
                 );
                 std::process::exit(0);
             }
@@ -276,30 +166,13 @@ pub fn run(args: Vec<String>) -> Result<bool> {
     }
 
     let scenario_path = scenario_path.ok_or_else(|| anyhow!("--scenario is required"))?;
-    let text = fs::read_to_string(&scenario_path)
-        .with_context(|| format!("read {}", scenario_path.display()))?;
-    let scenario: Scenario =
-        toml::from_str(&text).with_context(|| format!("parse {}", scenario_path.display()))?;
-
-    if scenario.peer.is_empty() {
-        bail!("the scenario declares no peers");
-    }
-    #[cfg(unix)]
-    if scenario.peer.len() > PEER_PIDS.len() {
-        bail!(
-            "the scenario declares {} peers; at most {} can be tracked for signal cleanup",
-            scenario.peer.len(),
-            PEER_PIDS.len()
-        );
-    }
-
-    let mut names = HashMap::new();
-    for (index, peer) in scenario.peer.iter().enumerate() {
-        if names.insert(peer.name.clone(), index).is_some() {
-            bail!("duplicate peer name {:?}", peer.name);
-        }
-        parse_viewport(&peer.viewport)?;
-    }
+    let scenario = Scenario::load(&scenario_path)?;
+    let names = scenario
+        .peer
+        .iter()
+        .enumerate()
+        .map(|(index, peer)| (peer.name.clone(), index))
+        .collect::<HashMap<_, _>>();
 
     let run_id = format!("browser-run-{}", std::process::id());
     let run_dir = std::env::current_dir()?.join(".tmp").join(run_id);
@@ -1123,13 +996,6 @@ fn substitute(expression: &str, captures: &HashMap<String, String>) -> String {
     result
 }
 
-fn parse_viewport(value: &str) -> Result<(u32, u32)> {
-    let (width, height) = value
-        .split_once('x')
-        .ok_or_else(|| anyhow!("viewport must be WxH, got {value:?}"))?;
-    Ok((width.parse()?, height.parse()?))
-}
-
 fn resolve_path(artifacts: &Path, out: &str) -> PathBuf {
     let path = PathBuf::from(out);
     if path.is_absolute() {
@@ -1198,12 +1064,6 @@ mod tests {
             substitute("accept(${offer})", &captures),
             "accept(\"v=0\\r\\n\")"
         );
-    }
-
-    #[test]
-    fn parses_a_viewport() {
-        assert_eq!(parse_viewport("390x844").unwrap(), (390, 844));
-        assert!(parse_viewport("390").is_err());
     }
 
     #[test]

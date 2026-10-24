@@ -1,8 +1,8 @@
-//! `browser-shot` — one screenshot from a browser the tool launches itself, with the sidecar
-//! contract from `docs/browser-automation.md`.
+//! `browser-shot` — screenshots and scenario runs from browsers the tool launches itself, with the
+//! sidecar contract from `docs/browser-automation.md`.
 //!
-//! Single peer only. The two-peer, network-emulation and loss-hook requirements are deliberately
-//! out of scope until a process needs them.
+//! `run` and `check` both accept the line-oriented DSL and the older TOML format. See `README.md`
+//! and `SCENARIO.md`.
 
 mod capture;
 mod collect;
@@ -12,6 +12,7 @@ mod keys;
 mod probe;
 mod report;
 mod runner;
+mod scenario;
 
 use std::ffi::OsStr;
 use std::fs;
@@ -184,6 +185,19 @@ impl Drop for Profile {
 }
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("check") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        let code = match scenario::check(args) {
+            Ok(true) => 0,
+            Ok(false) => 2,
+            Err(error) => {
+                eprintln!("browser-shot check: {error:#}");
+                1
+            }
+        };
+        std::process::exit(code);
+    }
+
     if std::env::args().nth(1).as_deref() == Some("run") {
         let args: Vec<String> = std::env::args().skip(2).collect();
         let code = match runner::run(args) {

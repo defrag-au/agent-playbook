@@ -56,12 +56,15 @@ failed requests are reported but do not fail the run on their own.
 
 ```sh
 direnv exec . cargo run -p browser-shot -- \
-  run --scenario .tmp/two-peer.toml --artifacts .tmp/two-peer-run --json
+  run --scenario .tmp/two-peer.dsl --artifacts .tmp/two-peer-run --json
 ```
 
 Each peer is a separate browser process with its own profile, storage and WebRTC stack. Peers are
 launched in parallel; a `wait` that names several peers dispatches to all of them concurrently.
 The run writes `run.json` / `run.txt`, plus one image and sidecar per peer.
+
+The line-oriented DSL is the preferred form; [`SCENARIO.md`](SCENARIO.md) is the grammar and field
+reference. The older TOML form is still accepted, and this is the same scenario in TOML:
 
 ```toml
 [run]
@@ -135,7 +138,7 @@ expression = "window.__frames > 0"
 message = "the page kept ticking"
 ```
 
-Steps:
+Steps (TOML field names; the DSL names are in `SCENARIO.md`):
 
 | `action` | Fields |
 | --- | --- |
@@ -150,6 +153,34 @@ Steps:
 A key step with `hold_frames` sends down, waits on the page's counter, then sends up, all in one
 step. Modifiers persist across steps until released. A failed `assert` sets exit 2 and names the
 expression and its value.
+
+## Scenario DSL
+
+The compact line-oriented front-end is documented in [`SCENARIO.md`](SCENARIO.md). `run` and `check`
+both accept it, chosen by extension; `.toml` remains supported for existing scenarios.
+
+```text
+run timeout=20s
+
+peer focused url="file:///tmp/keys.html" viewport=390x844
+peer unfocused url="file:///tmp/keys.html" viewport=390x844
+
+pointer focused click selector=#game
+key focused KeyW down hold=12
+assert focused "window.__keys[1].frame - window.__keys[0].frame === 12" message="held twelve frames"
+capture focused out=focused.png
+```
+
+```sh
+./target/debug/browser-shot run --scenario .tmp/keys.dsl --artifacts .tmp/keys-run
+./target/debug/browser-shot check --scenario .tmp/keys.dsl
+./target/debug/browser-shot check --scenario .tmp/keys.toml --json
+```
+
+`run` and `check` validate peer references and every action's required fields; a parse error names
+the line and column, and a semantic error names the line and step. `check` exits 0 valid, 2 invalid,
+1 operational. The grammar is deliberately line-oriented and can be ported to tree-sitter once the
+syntax settles.
 
 ## What the sidecar looks like
 
