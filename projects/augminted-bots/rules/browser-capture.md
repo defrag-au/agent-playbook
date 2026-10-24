@@ -15,8 +15,7 @@ artefacts land in `.tmp/`.** Never hand-launch Brave, reuse a debugging port, ru
 or clean up with `pkill`.
 
 ```sh
-direnv exec . cargo run --manifest-path ~/code/defrag/agent-playbook/Cargo.toml -p browser-shot -- \
-  "<url>" 390 844 .tmp/shot.png --settle-ms 4000
+browser-shot "<url>" 390 844 .tmp/shot.png --settle-ms 4000
 ```
 
 - Interactions, assertions or two peers → `run --scenario <file.dsl>`; the grammar and field tables
@@ -40,5 +39,5 @@ The predecessor was a Node script plus a hand-launched browser on port 9222, pro
 `pkill` it, and a fixed sleep. It could not do touch, right-click, drag, held modifiers or
 animation, and a wrong-DPR shot or a swallowed 404 looked exactly like evidence. `browser-shot`
 owns the browser process, emulates the viewport, stamps input against the page's frame counter, and
-states what it did not prove (2026-10-23/24). It lives in `agent-playbook/tools/browser-shot` until
-the `agent-toolbox` move; the invocation above is the stable part.
+states what it did not prove (2026-10-23/24). It is packaged from `agent-playbook` and on `PATH` in
+every defrag devshell, so the invocation above needs no checkout.

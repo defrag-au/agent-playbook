@@ -77,7 +77,7 @@ Full resolution rules, including how `activation` and `overrides` are evaluated,
 
 ```
 Cargo.toml        the workspace manifest; the composer is std-only, deliberately
-flake.nix         the devshell, and packages: `playbook` and `agent-tools`
+flake.nix         the devshell, and packages: `playbook`, `agent-tools` and `browser-shot`
 src/              resolution engine + CLI
   frontmatter.rs    flat `key: value` readers
   model.rs          Rule, Project, Target, Layer, Activation

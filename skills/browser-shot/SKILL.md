@@ -13,13 +13,13 @@ need a remote-debugging port, a warm profile, or a sleep.
 ## Run it from the repo that should own the artefacts
 
 ```sh
-direnv exec . cargo run --manifest-path ~/code/defrag/agent-playbook/Cargo.toml -p browser-shot -- \
-  "<url>" 390 844 .tmp/shot.png --settle-ms 4000
+browser-shot "<url>" 390 844 .tmp/shot.png --settle-ms 4000
 ```
 
 Run it from the target repo's root: `out` paths and `.tmp/` are relative to the current directory.
-The first invocation builds `~/code/defrag/agent-playbook/target/debug/browser-shot`; call that
-binary directly afterwards. Every run writes `<out>.png` and `<out>.txt`.
+`browser-shot` is on `PATH` in every defrag devshell — agent-playbook packages it and `defrag-nix`
+wires it into the base set — so there is nothing to build first. Every run writes `<out>.png` and
+`<out>.txt`.
 
 Never start Brave yourself, reuse a debugging port, or kill a browser by name — the tool owns the
 process it started.
@@ -39,8 +39,7 @@ process it started.
 ## Single shot
 
 ```sh
-direnv exec . cargo run --manifest-path ~/code/defrag/agent-playbook/Cargo.toml -p browser-shot -- \
-  "http://127.0.0.1:8095/?nav=0#/wallet-button" 390 844 .tmp/wallet-390.png \
+browser-shot "http://127.0.0.1:8095/?nav=0#/wallet-button" 390 844 .tmp/wallet-390.png \
   --dpr 3 --touch --settle-ms 6000
 ```
 

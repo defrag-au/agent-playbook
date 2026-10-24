@@ -53,8 +53,8 @@ Clippy is clean at `-D warnings` and should stay that way.
 ### The flake
 
 `flake.nix` pins the same fenix channel `defrag-nix` does, and exports `playbook`, `agent-tools`
-(`at-peek`, `at-crate`, `at-recall`, `at-reach`, `at-describe`), a devshell, and a `checks` entry
-that runs the suite.
+(`at-peek`, `at-crate`, `at-recall`, `at-reach`, `at-describe`), `browser-shot`, a devshell, and a
+`checks` entry that runs the suite.
 
 `playbook` carries its own data tree in `share/playbook` — `rules/`, `models/`, `projects/`,
 `memory/`, `templates/` — because an installed binary has nothing else to read: the compile-time

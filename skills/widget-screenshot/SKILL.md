@@ -16,12 +16,11 @@ profile on exit. Do not start Brave yourself, do not open a remote-debugging por
 `pkill` a browser — there is nothing to clean up by hand.
 
 ```sh
-direnv exec . cargo run --manifest-path ~/code/defrag/agent-playbook/Cargo.toml -p browser-shot -- \
-  "<url>" 1200 820 .tmp/shot.png --settle-ms 6000
+browser-shot "<url>" 1200 820 .tmp/shot.png --settle-ms 6000
 ```
 
-The first run builds `~/code/defrag/agent-playbook/target/debug/browser-shot`; call that binary
-directly afterwards. Every run writes `<out>.png` and `<out>.txt`. A hard kill can leave the
+It is on `PATH` in the repo's devshell, packaged from `agent-playbook`. Every run writes
+`<out>.png` and `<out>.txt`. A hard kill can leave the
 `.tmp/browser-shot-<pid>` profile behind; a normal exit or an error removes it.
 
 This replaces the old debugging-port procedure, and the incident is why: on 2026-10-16 four to
@@ -58,8 +57,7 @@ new story is linkable with no extra registration. `?nav=0` drops the sidebar so 
 whole viewport instead of `viewport − 180`.
 
 ```sh
-direnv exec . cargo run --manifest-path ~/code/defrag/agent-playbook/Cargo.toml -p browser-shot -- \
-  "http://127.0.0.1:8095/?nav=0#/wallet-button" 1200 820 .tmp/wallet-button.png \
+browser-shot "http://127.0.0.1:8095/?nav=0#/wallet-button" 1200 820 .tmp/wallet-button.png \
   --settle-ms 6000
 ```
 
@@ -111,8 +109,7 @@ width, height and DPR you ask for, and the sidecar's `layout` line proves what t
 laid out at. Use `?nav=0` and the real viewport:
 
 ```sh
-direnv exec . cargo run --manifest-path ~/code/defrag/agent-playbook/Cargo.toml -p browser-shot -- \
-  "http://127.0.0.1:8095/?nav=0#/activity-feed" 390 844 .tmp/activity-feed-390.png \
+browser-shot "http://127.0.0.1:8095/?nav=0#/activity-feed" 390 844 .tmp/activity-feed-390.png \
   --dpr 3 --touch --settle-ms 6000
 ```
 

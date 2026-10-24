@@ -188,8 +188,7 @@ grep -c "__wbindgen" <dist>/<game>.wasm    # must print 0
   reports console errors, uncaught exceptions and failed requests, and captures the canvas:
 
   ```sh
-  direnv exec . cargo run --manifest-path ~/code/defrag/agent-playbook/Cargo.toml -p browser-shot -- \
-    "<url>" 390 844 .tmp/game.png --select canvas --dpr 3 --touch \
+  browser-shot "<url>" 390 844 .tmp/game.png --select canvas --dpr 3 --touch \
     --settle-ms 5000 --no-settle
   ```
 
