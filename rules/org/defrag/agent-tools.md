@@ -13,8 +13,9 @@ targets:
 - Reading code with `rg`, `grep`, `sed`, `cat`, `head` or `wc` → use `at-peek`. Reading installed
   crate source or build-script output with `grep`, `sed` or `find` under `~/.cargo` or
   `target/…/build` → use `at-crate`. Reading history or working-tree state with `git status`,
-  `git diff`, `git log` or `git show` → use `at-recall`. All three are read-only, bounded by
-  construction, and say what they did not show.
+  `git diff` or `git log` → use `at-recall`. All three are read-only, bounded by construction, and
+  say what they did not show. `git show` and `git blame` have no `at-recall` verb yet — say so
+  rather than reaching for them silently.
 
 | Instead of | Use |
 | --- | --- |
@@ -34,8 +35,9 @@ targets:
   `at-peek search <pat>` · `at-peek search <pat> --count` · `at-peek search <pat> --files-only`.
   For installed crate source the same three are `at-crate slice <crate>/<path>:40-60`,
   `at-crate search <pat> <crate>` and `--count`.
-- `which at-peek` empty → `direnv exec . at-peek <verb>` (and the same for `at-crate`). An agent's
-  spawned shell does not inherit the devshell environment; an interactive one does.
+- `which at-peek` empty → `direnv exec . at-peek <verb>` (and the same for `at-recall`, `at-crate`
+  and `at-describe`). An agent's spawned shell does not inherit the devshell environment; an
+  interactive one does.
 - `at-crate` resolves a crate through the nearest `Cargo.lock`, not through memory or "latest". A
   crate named twice in the lock, or a file present in more than one build-script `out`, is an error
   naming the flag that chooses — never a guess. `--version` and `--build-dir` are those flags.

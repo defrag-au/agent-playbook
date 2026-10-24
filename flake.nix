@@ -126,6 +126,35 @@
           '';
         };
 
+      # The browser capture tool. Deliberately separate from `agent-tools`: every `at-*` binary
+      # runs nothing at all (bar `at-recall`'s `git`) and has no write path, where this one owns a
+      # browser process and writes an image beside a report. A shell can carry it without that
+      # changing what the toolkit's name promises.
+      #
+      # Nothing is needed at build time but the registry: the `offline` feature generates the CDP
+      # bindings from the protocol JSON shipped in the crate, and the binary finds Brave or Chrome
+      # on the machine when it runs.
+      browserShotFor =
+        rustPlatform:
+        rustPlatform.buildRustPackage {
+          pname = "browser-shot";
+          version = (lib.importTOML ./tools/browser-shot/Cargo.toml).package.version;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [ "-p" "browser-shot" ];
+          # As with `agent-tools`: the workspace root is the composer, so the default install
+          # phase would install `playbook`, and cargoBuildHook's `--target <triple>` puts the
+          # artefact under `target/<triple>/release/`.
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            install -m755 \
+              "$(find target -maxdepth 3 -type f -name browser-shot -perm -u+x | head -n1)" \
+              "$out/bin/browser-shot"
+            runHook postInstall
+          '';
+        };
+
       # The Zed thread tools. Deliberately separate from `agent-tools`: the audit binary reads a
       # private store outside the worktree, and the recover binary writes to it. Neither belongs in
       # a namespace whose promise is that its entire grammar is safe to allowlist.
@@ -163,6 +192,7 @@
         in
         {
           inherit playbook agent-tools;
+          browser-shot = browserShotFor rustPlatform;
           zed-thread-tools = zedThreadToolsFor rustPlatform;
           # What this repository is *for*; the toolkit is what it also ships.
           default = playbook;
