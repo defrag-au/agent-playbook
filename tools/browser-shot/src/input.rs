@@ -12,6 +12,7 @@ use headless_chrome::browser::tab::Tab;
 use headless_chrome::protocol::cdp::Input;
 
 use crate::probe::evaluate_text;
+use crate::report::epoch_ms;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Button {
@@ -171,6 +172,12 @@ pub struct InputRecord {
     pub locator: String,
 }
 
+struct Stamp<'a> {
+    event: &'a str,
+    frame: Option<f64>,
+    t_ms: f64,
+}
+
 pub fn dispatch(
     tab: &Tab,
     action: &Action,
@@ -181,26 +188,53 @@ pub fn dispatch(
 ) -> Result<InputRecord> {
     let (target, locator) = resolve(tab, &action.target, timeout)?;
     let steps = steps.max(1);
+    let mut stamps = Vec::new();
 
-    let stamps = match action.kind {
+    match action.kind {
         Kind::Hover => {
             move_mouse(tab, pointer, target, steps, modifiers, 0)?;
-            vec![("mousemove", stamp(tab, "mousemove"))]
+            let t_ms = epoch_ms();
+            stamps.push(Stamp {
+                event: "mousemove",
+                frame: stamp(tab, "mousemove"),
+                t_ms,
+            });
         }
         Kind::Click => {
             move_mouse(tab, pointer, target, steps, modifiers, 0)?;
             press(tab, target, action.button, modifiers)?;
+            let down_t = epoch_ms();
+            stamps.push(Stamp {
+                event: "mousedown",
+                frame: stamp(tab, "mousedown"),
+                t_ms: down_t,
+            });
             release(tab, target, action.button, modifiers)?;
-            vec![("mousedown", stamp(tab, "mousedown"))]
+            let up_t = epoch_ms();
+            stamps.push(Stamp {
+                event: "mouseup",
+                frame: stamp(tab, "mouseup"),
+                t_ms: up_t,
+            });
         }
         Kind::Drag => {
             let start = origin(action, pointer);
             move_mouse(tab, pointer, start, 1, modifiers, 0)?;
             press(tab, start, action.button, modifiers)?;
-            let down = stamp(tab, "mousedown");
+            let down_t = epoch_ms();
+            stamps.push(Stamp {
+                event: "mousedown",
+                frame: stamp(tab, "mousedown"),
+                t_ms: down_t,
+            });
             move_mouse(tab, pointer, target, steps, modifiers, action.button.mask())?;
             release(tab, target, action.button, modifiers)?;
-            vec![("mousedown", down), ("mouseup", stamp(tab, "mouseup"))]
+            let up_t = epoch_ms();
+            stamps.push(Stamp {
+                event: "mouseup",
+                frame: stamp(tab, "mouseup"),
+                t_ms: up_t,
+            });
         }
         Kind::Tap => {
             touch(
@@ -209,14 +243,24 @@ pub fn dispatch(
                 target,
                 modifiers,
             )?;
-            let down = stamp(tab, "touchstart");
+            let down_t = epoch_ms();
+            stamps.push(Stamp {
+                event: "touchstart",
+                frame: stamp(tab, "touchstart"),
+                t_ms: down_t,
+            });
             touch(
                 tab,
                 &Input::DispatchTouchEventTypeOption::TouchEnd,
                 target,
                 modifiers,
             )?;
-            vec![("touchstart", down), ("touchend", stamp(tab, "touchend"))]
+            let up_t = epoch_ms();
+            stamps.push(Stamp {
+                event: "touchend",
+                frame: stamp(tab, "touchend"),
+                t_ms: up_t,
+            });
         }
         Kind::Swipe => {
             let start = origin(action, pointer);
@@ -226,7 +270,12 @@ pub fn dispatch(
                 start,
                 modifiers,
             )?;
-            let down = stamp(tab, "touchstart");
+            let down_t = epoch_ms();
+            stamps.push(Stamp {
+                event: "touchstart",
+                frame: stamp(tab, "touchstart"),
+                t_ms: down_t,
+            });
             for step in 1..=steps {
                 let t = f64::from(step) / f64::from(steps);
                 let x = start.x + (target.x - start.x) * t;
@@ -244,9 +293,14 @@ pub fn dispatch(
                 target,
                 modifiers,
             )?;
-            vec![("touchstart", down), ("touchend", stamp(tab, "touchend"))]
+            let up_t = epoch_ms();
+            stamps.push(Stamp {
+                event: "touchend",
+                frame: stamp(tab, "touchend"),
+                t_ms: up_t,
+            });
         }
-    };
+    }
 
     pointer.x = target.x;
     pointer.y = target.y;
@@ -401,7 +455,7 @@ fn describe(
     locator: &str,
     target: Point,
     steps: u32,
-    stamps: &[(&str, Option<f64>)],
+    stamps: &[Stamp<'_>],
 ) -> String {
     let button = if matches!(action.kind, Kind::Click | Kind::Drag) && action.button != Button::Left
     {
@@ -425,7 +479,12 @@ fn describe(
     };
     let stamps = stamps
         .iter()
-        .filter_map(|(event, frame)| frame.map(|frame| format!("{event} @ frame {frame:.0}")))
+        .map(|stamp| {
+            let frame = stamp
+                .frame
+                .map_or_else(String::new, |frame| format!(" @ frame {frame:.0}"));
+            format!("{}{frame} · t={:.3}", stamp.event, stamp.t_ms)
+        })
         .collect::<Vec<_>>()
         .join(", ");
     let stamps = if stamps.is_empty() {

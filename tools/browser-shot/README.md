@@ -14,7 +14,7 @@ self-contained — no paths into the rest of the repository — so it can move t
 ```sh
 direnv exec . cargo run -p browser-shot -- \
   "http://127.0.0.1:8095/?nav=0#/wallet-button" 390 844 .tmp/wallet-390.png \
-  --select canvas --dpr 3 --touch --ready "window.__ready === true"
+  --dpr 3 --touch --settle-ms 6000
 ```
 
 ```
@@ -144,8 +144,8 @@ Steps (TOML field names; the DSL names are in `SCENARIO.md`):
 
 | `action` | Fields |
 | --- | --- |
-| `wait` | `peer` or `peers`, and one or more of `predicate`, `frames`, `network_idle`; `timeout_ms` |
-| `eval` | `peer`, `expression`, `await_promise`, `capture` (stores the result for `${name}` substitution), optional `timeout_ms` on an awaited expression |
+| `wait` | `peer` or `peers`, and one or more of `predicate`, `frames`, `rate`, `network_idle`; `timeout_ms` |
+| `eval` | `peer`, `expression`, `await_promise`, `capture` (stores the result for `${name}` substitution), optional `out` (writes the value as JSON), optional `timeout_ms` on an awaited expression |
 | `key` | `peer`, `code`, `state` (`down`/`up`), optional `hold_frames` on a down step |
 | `pointer` | `peer`, `kind` (`click`/`hover`/`drag`/`tap`/`swipe`), `x`+`y` or `selector`, `steps`, optional `button`, `from_x`+`from_y` |
 | `capture` | `peer`, `out`, optional `select` |
@@ -222,6 +222,30 @@ validation rather than dispatching a touch event the page never bound.
 The sidecar stamps each pointer event against the page's own frame counter, for example
 `drag (coordinates) 60,200 -> 200,320 · 4 steps · mousedown @ frame 150, mouseup @ frame 190`.
 
+## Series over time: `eval out=`
+
+A measurement is not a boolean. `eval <peer> "<expression>" out=<file>` writes the value as JSON
+under the artifacts directory, beside the images:
+
+```text
+peer anim url="file:///tmp/game.html" viewport=390x844
+wait anim frames=10
+eval anim "window.__btSamples" out=samples.json
+```
+
+`capture=` and `out=` are separate on purpose: `capture=` binds a value for `${name}`
+interpolation, `out=` writes an artefact, and a scenario can do either. The value is serialised in
+the page and written exactly as produced — arrays, nested objects and fractional numbers keep their
+precision, with no sample cap. A `Map`, a cyclic object, a `BigInt`, a function, `undefined` or a
+non-finite number fails the step with the type and path (`cannot encode a cyclic object at $.self`),
+rather than being silently stringified. The file is written when the step runs, so a later
+assertion failure (exit 2) leaves it on disk; `run.json` has an `outputs` array naming every file.
+
+Every tool-side event is stamped with fractional epoch milliseconds: `input` and pointer events,
+`eval`, each `ready` predicate and `burst` carry `t=1750.123`, and `captured` is ISO with
+milliseconds. A page that timestamps itself with `performance.timeOrigin + performance.now()` can
+be joined to those directly, which is what a two-peer latency comparison needs.
+
 ## Animation review: bursts
 
 One image cannot show whether an animation is smooth. A `burst` step takes a sequence of frames and
@@ -248,7 +272,7 @@ images say what it looked like.
 
 ```
 url          file:///…/browser-shot-canvas.html
-captured     2026-10-24T05:47:58Z
+captured     2026-10-24T07:42:00.706Z
 peer         0 (of 1 process)
 browser      Chrome/155.0.8059.85
 pid          69541
@@ -257,14 +281,16 @@ renderer     WebGL 2.0 (… SwiftShader …) — SOFTWARE
 viewport     390x844 dpr 3 touch
 image        1170x2532 (element canvas)
 css box      390x844 at 0,0
-ready        fonts.ready = loaded; window.__ready === true = true; frame.stable = 3 samples, 2 identical after 2343 ms
+ready        fonts.ready = loaded · t=1792827720706.097; window.__ready === true = true · t=1792827720802.441; frame.stable = 3 samples, 2 identical after 2343 ms · t=1792827723145.002
 waited       3 predicates, 2681 ms
 frame rate   59.3 Hz (64 -> 124 frames in 1011 ms)
 console      0 errors, 0 warnings, 0 uncaught
 requests     0 failed (1 total)
 network      latency 80 ms, loss 2% — HTTP/WebSocket only, NOT WebRTC
 overlay      drop 2.00% injected in send() (seed 1, 5/100 dropped)
-input        KeyW down @ frame 42 · focus canvas#game · scroll none; KeyW up @ frame 54 (held 12 frames) · focus canvas#game · scroll none
+input        KeyW down @ frame 42 · t=1792827721103.221 · focus canvas#game · scroll none; KeyW up @ frame 54 (held 12 frames) · t=1792827721311.004 · focus canvas#game · scroll none
+eval         window.__btSamples · t=1792827724520.550 out=samples.json
+burst        screencast frames/pulse — t=1792827725001.332 — 120/120 frames, 58.8 fps …
 focus        canvas#game
 scroll       none
 locator      canvas
@@ -284,7 +310,7 @@ with it.
 | Requirement | State |
 | --- | --- |
 | 1. N isolated browser processes, driven concurrently | **Covered.** One process and profile per peer; launches and shared waits run in parallel. Verified with two peers. |
-| 2. Deterministic readiness, no fixed sleeps | **Covered.** `wait_until`, `frames` and `network_idle`; a timeout names the predicate and its last value. Frame rate is measured over one second and reported per peer. |
+| 2. Deterministic readiness, no fixed sleeps | **Covered.** `wait_until`, `frames`, `rate` and `network_idle`; a timeout names the predicate and its last value. Frame rate is measured over one second and reported per peer, and a rate under 20 Hz warns that the capture is not representative. |
 | 3. Element capture at real pixel dimensions | **Covered.** Reports the CSS box and PNG size; a DPR mismatch fails. |
 | 4. True device emulation | **Covered.** Viewport, DPR, touch and UA through CDP; touch is verified via `navigator.maxTouchPoints`. |
 | 5. Evaluate before the document's scripts | **Covered** with `--preload` and the per-peer `preload`. The loss hook installs before the document runs. |
@@ -303,7 +329,10 @@ DPR 3 canvas producing 1170x2532 with no DPR warning; an overflowing page failin
 2; a throwing page exiting 2 and naming `uncaught: Error: kaboom`; SIGINT with two peers leaving
 no browser process; a sidecar stating the network emulation does not reach WebRTC; a `KeyW` hold
 of exactly 12 frames; an unfocused canvas reporting `BODY`; an arrow key scrolling the document;
-and a coordinate click landing at 200,400.
+and a coordinate click landing at 200,400. The follow-up requirements in
+[`browser-automation-followup.md`](../../docs/browser-automation-followup.md) are covered:
+`eval … out=` persists a series (R1), and every event line carries fractional epoch milliseconds
+(R2).
 
 ## Known limits
 
@@ -311,6 +340,17 @@ and a coordinate click landing at 200,400.
   open.** On this machine a `wait frames=10` after a right click timed out at three seconds, while
   the same page with `preventDefault()` on `contextmenu` passed. Put a right click after any
   frame-timed input, or prevent the menu in the page.
+- **A rate is a one-second sample, taken when the report is built.** A counter that a wasm app
+  defines late is therefore measured after it exists, not at launch. `--no-settle` captures
+  immediately, so on a page that has not defined its counter yet the sidecar says what was missing
+  (`frame counter "window.__frames" is not a finite number`) rather than pretending it was zero.
+- **A rate under 20 Hz is a warning, not a failure.** The sidecar names the rate and says a
+  capture or interaction is not representative; animation review and a two-peer run should use
+  `--headed`. The rate is also a scenario condition: `wait p rate=30` fails the peer when it is not
+  met.
+- **`screencast` only delivers frames the page actually paints.** A static page produces one frame
+  and then waits out the timeout; an animation or a live canvas keeps the stream going. This is
+  paint-driven, not clock-driven, so a screen that changes nothing is not measurable this way.
 - **A burst's `screencast` mode captures the viewport, not an element.** It also forces
   `Emulation.setVisibleSize` to the device-pixel size; without that, the browser delivers frames
   at the window's backing size (`390x216` for a 390x844 viewport), not the emulated one.

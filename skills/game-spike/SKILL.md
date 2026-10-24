@@ -184,13 +184,21 @@ grep -c "__wbindgen" <dist>/<game>.wasm    # must print 0
 - **Then load it in a browser and read the console.** A web build that passes every native check
   and capture can still die on its first frame: `fight-macroquad` did, on a WebGL-1-only call.
   Expect at most a notice that an unused `sapp_jsutils` is present, and the audio autoplay warning
-  until the first key press. Headless works without a window on the user's desktop: start
-  Chrome or Brave with `--headless=new --remote-debugging-port=<port>`, then read
-  `Runtime.consoleAPICalled` and `Runtime.exceptionThrown` and take `Page.captureScreenshot` over
-  the DevTools protocol. `--screenshot` with `--virtual-time-budget` hangs on a game's frame loop.
-  On a Linux box with no GPU, Chrome has no WebGL ("WebGL context unavailable") until it is told
-  to render in software: add `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader
-  --ignore-gpu-blocklist`.
+  until the first key press. Use the `browser-shot` skill — it launches its own headless browser,
+  reports console errors, uncaught exceptions and failed requests, and captures the canvas:
+
+  ```sh
+  direnv exec . cargo run --manifest-path ~/code/defrag/agent-playbook/Cargo.toml -p browser-shot -- \
+    "<url>" 390 844 .tmp/game.png --select canvas --dpr 3 --touch \
+    --settle-ms 5000 --no-settle
+  ```
+
+  A macroquad client has no browser-side readiness signal by default — `Game::ready` is the
+  native harness — so a first look uses `--no-settle` and a five-second floor. If the client sets
+  `window.__ready`, pass `--ready "window.__ready === true"` instead. Read `.tmp/game.txt` before
+  judging the image. On a Linux box with no GPU the sidecar says the renderer is software, which
+  is the same SwiftShader caveat as
+  `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`.
 
 ## 6. Write it down
 

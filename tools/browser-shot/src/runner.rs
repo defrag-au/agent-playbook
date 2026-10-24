@@ -24,8 +24,8 @@ use crate::input::{self, Action, Pointer};
 use crate::keys;
 use crate::probe;
 use crate::report::{
-    BurstInfo, Console, CssBox, Expect, FrameRate, Image, Peer, Predicate, Ready, Renderer, Report,
-    Requests, Viewport,
+    epoch_ms, BurstInfo, Console, CssBox, EvalRecord, Expect, FrameRate, Image, Peer, Predicate,
+    Ready, Renderer, Report, Requests, Viewport,
 };
 use crate::scenario::{
     parse_viewport, KeyState, LossHookSpec, PeerSpec, Scenario, Step, DEFAULT_SEED, MAX_PEERS,
@@ -75,6 +75,7 @@ fn install_peer_signal(_index: usize, _pid: u32) {}
 enum WaitKind {
     Predicate(String),
     Frames(u32),
+    Rate(f64),
     NetworkIdle(u64),
 }
 
@@ -98,6 +99,7 @@ struct BurstFrame {
     width: u32,
     height: u32,
     start_ms: u64,
+    t_ms: f64,
     interval_ms: u64,
     capture_ms: u64,
     write_ms: u64,
@@ -130,6 +132,7 @@ struct RunReport {
     passed: bool,
     peers: Vec<Report>,
     checks: Vec<AssertResult>,
+    outputs: Vec<String>,
 }
 
 struct RunProfile {
@@ -155,6 +158,7 @@ struct PeerState {
     pointer: Pointer,
     modifiers: u32,
     inputs: Vec<String>,
+    evals: Vec<EvalRecord>,
     bursts: Vec<BurstInfo>,
     focus: String,
     scroll: String,
@@ -165,6 +169,8 @@ struct PeerState {
     ready_waited: Duration,
     frame_latency: f64,
     frame_rate: Option<FrameRate>,
+    frame_rate_error: Option<String>,
+    rate_warned: bool,
     last_capture: Option<CaptureInfo>,
     expect: Option<Expect>,
     warns: Vec<String>,
@@ -240,6 +246,7 @@ pub fn run(args: Vec<String>) -> Result<bool> {
 
     let mut captures: HashMap<String, String> = HashMap::new();
     let mut checks = Vec::new();
+    let mut outputs = Vec::new();
 
     for step in &scenario.step {
         match step {
@@ -248,11 +255,12 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                 peers: selected,
                 predicate,
                 frames,
+                rate,
                 network_idle,
                 timeout_ms,
             } => {
                 let indices = selected_indices(peer, selected, &names, peers.len())?;
-                let kinds = wait_kinds(predicate, frames, network_idle)?;
+                let kinds = wait_kinds(predicate, frames, rate, network_idle)?;
                 let step_timeout = timeout_ms.map_or(timeout, Duration::from_millis);
                 let tasks = indices
                     .iter()
@@ -282,6 +290,9 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                                         WaitKind::Frames(frames) => {
                                             probe::wait_for_frames(&tab, &counter, frames, timeout)
                                         }
+                                        WaitKind::Rate(minimum) => {
+                                            probe::wait_for_rate(&tab, &counter, minimum, timeout)
+                                        }
                                         WaitKind::NetworkIdle(window) => {
                                             probe::wait_for_network_idle(
                                                 &collector,
@@ -310,11 +321,23 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                 expression,
                 await_promise,
                 capture,
+                out,
                 timeout_ms,
             } => {
                 let index = peer_index(peer, &names)?;
                 let expression = substitute(expression, &captures);
-                let value = if *await_promise {
+                let value = if let Some(out) = out {
+                    let json = probe::evaluate_json(&peers[index].tab, &expression, *await_promise)
+                        .with_context(|| format!("evaluate on {peer}"))?;
+                    let path = resolve_path(&artifacts, out);
+                    if let Some(parent) = path.parent() {
+                        fs::create_dir_all(parent)?;
+                    }
+                    fs::write(&path, format!("{json}\n"))
+                        .with_context(|| format!("write {}", path.display()))?;
+                    outputs.push(path.display().to_string());
+                    json
+                } else if *await_promise {
                     let limit = timeout_ms.map_or(timeout, Duration::from_millis);
                     probe::evaluate_settled(&peers[index].tab, &expression, limit)
                         .with_context(|| format!("evaluate on {peer}"))?
@@ -329,6 +352,23 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                     }
                     collect::remote_text(&object)
                 };
+                // Timestamped when the value came back, not when the request went out: the CDP
+                // call itself can wait ~100 ms for the websocket, and the page computes at the
+                // end of it. This is the tool side of the join with `performance.now()`.
+                let t_ms = epoch_ms();
+                let mut detail = Vec::new();
+                if let Some(out) = out {
+                    detail.push(format!("out={out}"));
+                }
+                if let Some(capture) = capture {
+                    detail.push(format!("capture={capture}"));
+                }
+                peers[index].evals.push(EvalRecord {
+                    peer: peer.clone(),
+                    expression: expression.clone(),
+                    detail: (!detail.is_empty()).then(|| detail.join(" ")),
+                    t_ms,
+                });
                 if let Some(name) = capture {
                     captures.insert(name.clone(), value);
                 }
@@ -359,13 +399,15 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                     })?;
                     let target = origin + f64::from(*hold);
                     keys::key(&peer_state.tab, code, true, &mut peer_state.modifiers)?;
+                    let down_t = epoch_ms();
                     probe::wait_until_frame(&peer_state.tab, &counter, target, timeout)?;
                     keys::key(&peer_state.tab, code, false, &mut peer_state.modifiers)?;
+                    let up_t = epoch_ms();
 
                     let down_event = keys::last_event(&peer_state.tab, code, true);
                     let up_event = keys::last_event(&peer_state.tab, code, false);
                     if let Some(event) = &down_event {
-                        peer_state.record_key_event(code, true, event, None);
+                        peer_state.record_key_event(code, true, event, None, down_t);
                     }
                     let held = match (&down_event, &up_event) {
                         (Some(down_event), Some(up_event)) => down_event
@@ -376,7 +418,7 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                     };
                     if let Some(up_event) = &up_event {
                         let held_label = held.map(|held| format!("{held:.0} frames"));
-                        peer_state.record_key_event(code, false, up_event, held_label);
+                        peer_state.record_key_event(code, false, up_event, held_label, up_t);
                     }
                     if let Some(held) = held {
                         if (held - f64::from(*hold)).abs() > 0.5 {
@@ -388,9 +430,10 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                     }
                 } else {
                     keys::key(&peer_state.tab, code, down, &mut peer_state.modifiers)?;
+                    let t_ms = epoch_ms();
                     let event = keys::last_event(&peer_state.tab, code, down);
                     if let Some(event) = &event {
-                        peer_state.record_key_event(code, down, event, None);
+                        peer_state.record_key_event(code, down, event, None, t_ms);
                     }
                 }
             }
@@ -568,6 +611,7 @@ pub fn run(args: Vec<String>) -> Result<bool> {
         passed,
         peers: reports,
         checks,
+        outputs,
     };
 
     fs::write(
@@ -721,7 +765,6 @@ impl PeerState {
         let fonts = probe::wait_for_fonts(&tab, timeout);
         let ready_waited = Duration::from_millis(fonts.waited_ms);
         let frame_latency = probe::eval_latency_frames(&tab, &spec.frame_counter()).unwrap_or(0.0);
-        let frame_rate = probe::measure_frame_rate(&tab, &spec.frame_counter());
         let touch_ok = if spec.touch.unwrap_or(false) {
             probe::number(&tab, "navigator.maxTouchPoints").unwrap_or(0.0) > 0.0
         } else {
@@ -751,6 +794,7 @@ impl PeerState {
             pointer: Pointer::default(),
             modifiers: 0,
             inputs: Vec::new(),
+            evals: Vec::new(),
             bursts: Vec::new(),
             focus: "none".to_owned(),
             scroll: "none".to_owned(),
@@ -760,7 +804,9 @@ impl PeerState {
             warned_readiness: false,
             ready_waited,
             frame_latency,
-            frame_rate,
+            frame_rate: None,
+            frame_rate_error: None,
+            rate_warned: false,
             last_capture: None,
             expect: None,
             warns,
@@ -776,13 +822,14 @@ impl PeerState {
         down: bool,
         event: &keys::KeyEvent,
         held: Option<String>,
+        t_ms: f64,
     ) {
         let frame = event
             .frame
             .map_or_else(|| "unavailable".to_owned(), |frame| format!("{frame:.0}"));
         let held = held.map_or_else(String::new, |held| format!(" (held {held})"));
         self.inputs.push(format!(
-            "{} {} @ frame {frame}{held} · focus {} · scroll {}",
+            "{} {} @ frame {frame}{held} · t={t_ms:.3} · focus {} · scroll {}",
             code,
             if down { "down" } else { "up" },
             event.focus,
@@ -829,6 +876,25 @@ impl PeerState {
                 .unwrap_or(false)
     }
 
+    fn ensure_frame_rate(&mut self) {
+        if self.frame_rate.is_some() {
+            return;
+        }
+        match probe::measure_frame_rate(&self.tab, &self.spec.frame_counter()) {
+            Ok(rate) => {
+                if !self.rate_warned {
+                    if let Some(warning) = probe::low_rate_warning(&rate) {
+                        self.warns.push(warning);
+                        self.rate_warned = true;
+                    }
+                }
+                self.frame_rate = Some(rate);
+                self.frame_rate_error = None;
+            }
+            Err(error) => self.frame_rate_error = Some(error.to_string()),
+        }
+    }
+
     fn capture(
         &mut self,
         artifacts: &Path,
@@ -836,6 +902,7 @@ impl PeerState {
         select: Option<&str>,
         timeout: Duration,
     ) -> Result<CaptureInfo> {
+        self.ensure_frame_rate();
         if !self.user_waited && !self.warned_readiness {
             self.warned_readiness = true;
             self.warns.push(
@@ -960,6 +1027,7 @@ impl PeerState {
         }
         let summary = prefix.with_extension("txt");
         let started = Instant::now();
+        let started_ms = epoch_ms();
         let mut frames = Vec::new();
         let mut last_start = None;
 
@@ -975,6 +1043,7 @@ impl PeerState {
             }
 
             let frame_started = Instant::now();
+            let frame_t = epoch_ms();
             let (captured, css) = if let Some(selector) = select {
                 let (captured, viewport) = capture::element(&self.tab, selector, timeout)?;
                 let css = CssBox {
@@ -1008,6 +1077,7 @@ impl PeerState {
                 width: captured.width,
                 height: captured.height,
                 start_ms,
+                t_ms: frame_t,
                 interval_ms: interval,
                 capture_ms,
                 write_ms,
@@ -1029,6 +1099,7 @@ impl PeerState {
             requested_frames,
             frames,
             started,
+            started_ms,
         )
     }
 
@@ -1086,6 +1157,7 @@ impl PeerState {
         })?;
 
         let started = Instant::now();
+        let started_ms = epoch_ms();
         let mut frames = Vec::new();
         let mut last_start = None;
         while frames.len() < requested_frames as usize {
@@ -1102,6 +1174,7 @@ impl PeerState {
             match frames_rx.recv_timeout(remaining) {
                 Ok(frame) => {
                     let received = Instant::now();
+                    let received_t = epoch_ms();
                     let start_ms = received.duration_since(started).as_millis() as u64;
                     let interval = last_start
                         .map(|last: Instant| received.duration_since(last).as_millis() as u64)
@@ -1129,6 +1202,7 @@ impl PeerState {
                         width: frame_width,
                         height: frame_height,
                         start_ms,
+                        t_ms: received_t,
                         interval_ms: interval,
                         capture_ms,
                         write_ms,
@@ -1162,6 +1236,7 @@ impl PeerState {
             requested_frames,
             frames,
             started,
+            started_ms,
         )
     }
 
@@ -1223,7 +1298,7 @@ impl PeerState {
 
         Report {
             url: self.tab.get_url(),
-            captured: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+            captured: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
             peer: Peer {
                 index: self.index as u32,
                 of: self.of as u32,
@@ -1260,6 +1335,7 @@ impl PeerState {
                 waited_ms: self.ready_waited.as_millis() as u64,
             },
             frame_rate: self.frame_rate.clone(),
+            frame_rate_error: self.frame_rate_error.clone(),
             console: Console {
                 errors: snapshot.console_errors,
                 warnings: snapshot.console_warnings,
@@ -1274,6 +1350,7 @@ impl PeerState {
             network: self.network.clone(),
             overlay,
             input: self.inputs.clone(),
+            evals: self.evals.clone(),
             bursts: self.bursts.clone(),
             focus: self.focus.clone(),
             scroll: self.scroll.clone(),
@@ -1367,6 +1444,7 @@ fn loss_snapshot(tab: &Tab) -> Option<(f64, u64, u64)> {
 fn wait_kinds(
     predicate: &Option<String>,
     frames: &Option<u32>,
+    rate: &Option<f64>,
     network_idle: &Option<u64>,
 ) -> Result<Vec<WaitKind>> {
     let mut kinds = Vec::new();
@@ -1376,11 +1454,14 @@ fn wait_kinds(
     if let Some(frames) = frames {
         kinds.push(WaitKind::Frames(*frames));
     }
+    if let Some(rate) = rate {
+        kinds.push(WaitKind::Rate(*rate));
+    }
     if let Some(window) = network_idle {
         kinds.push(WaitKind::NetworkIdle(*window));
     }
     if kinds.is_empty() {
-        bail!("wait needs predicate, frames or network_idle");
+        bail!("wait needs predicate, frames, rate or network_idle");
     }
     Ok(kinds)
 }
@@ -1460,6 +1541,7 @@ fn finish_burst(
     requested_frames: u32,
     frames: Vec<BurstFrame>,
     started: Instant,
+    started_ms: f64,
 ) -> Result<BurstInfo> {
     let count = frames.len();
     let width = frames.first().map_or(0, |frame| frame.width);
@@ -1493,6 +1575,7 @@ fn finish_burst(
         mode: mode.to_owned(),
         prefix: prefix.display().to_string(),
         summary: summary.display().to_string(),
+        started_ms,
         frames: count,
         requested_frames: requested_frames as usize,
         width,
@@ -1513,6 +1596,7 @@ fn finish_burst(
     use std::fmt::Write as _;
     let _ = writeln!(text, "mode      {mode}");
     let _ = writeln!(text, "prefix    {}", info.prefix);
+    let _ = writeln!(text, "started   t={started_ms:.3}");
     let _ = writeln!(
         text,
         "frames    {}/{} in {} ms",
@@ -1539,13 +1623,14 @@ fn finish_burst(
     );
     let _ = writeln!(
         text,
-        "index start_ms interval_ms capture_ms write_ms size file"
+        "index start_ms t_ms interval_ms capture_ms write_ms size file"
     );
     for (index, frame) in frames.iter().enumerate() {
         let _ = writeln!(
             text,
-            "{index:>5} {:>8} {:>11} {:>10} {:>8} {}x{} {}",
+            "{index:>5} {:>8} {:>14.3} {:>11} {:>10} {:>8} {}x{} {}",
             frame.start_ms,
+            frame.t_ms,
             frame.interval_ms,
             frame.capture_ms,
             frame.write_ms,
@@ -1598,6 +1683,17 @@ fn render_run_text(report: &RunReport) -> String {
         for burst in &peer.bursts {
             let _ = writeln!(out, "burst {}  {}", peer.peer.index, burst.summary_line());
         }
+        for eval in &peer.evals {
+            let detail = eval
+                .detail
+                .as_ref()
+                .map_or_else(String::new, |detail| format!(" {detail}"));
+            let _ = writeln!(
+                out,
+                "eval {}  {} · t={:.3}{detail}",
+                peer.peer.index, eval.expression, eval.t_ms
+            );
+        }
     }
     for check in &report.checks {
         let _ = writeln!(
@@ -1608,6 +1704,9 @@ fn render_run_text(report: &RunReport) -> String {
             check.expression,
             check.value
         );
+    }
+    for output in &report.outputs {
+        let _ = writeln!(out, "output   {output}");
     }
     let _ = writeln!(
         out,

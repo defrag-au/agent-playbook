@@ -4,7 +4,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use headless_chrome::browser::tab::Tab;
 use serde_json::Value;
 
@@ -72,20 +72,40 @@ pub fn eval_latency_frames(tab: &Tab, counter: &str) -> Option<f64> {
 
 /// Measure the page's actual frame rate from its own counter and clock, so a report can say
 /// what it observed instead of repeating the display's nominal refresh rate.
-pub fn measure_frame_rate(tab: &Tab, counter: &str) -> Option<FrameRate> {
-    let (first_at, first_frame) = frame_sample(tab, counter)?;
+///
+/// The measurement is taken when a report is built, not at launch: a wasm app defines
+/// `window.__frames` only once it has started, so a launch-time read on a real bundle fails and
+/// says nothing about the rate during the run.
+pub fn measure_frame_rate(tab: &Tab, counter: &str) -> Result<FrameRate> {
+    let (first_at, first_frame) = frame_sample(tab, counter)
+        .ok_or_else(|| anyhow::anyhow!("frame counter {counter:?} is not a finite number"))?;
     std::thread::sleep(Duration::from_secs(1));
-    let (last_at, last_frame) = frame_sample(tab, counter)?;
+    let (last_at, last_frame) = frame_sample(tab, counter).ok_or_else(|| {
+        anyhow::anyhow!("frame counter {counter:?} stopped being a finite number")
+    })?;
     let elapsed_ms = last_at - first_at;
-    let frames = last_frame - first_frame;
-    if !(elapsed_ms.is_finite() && elapsed_ms > 0.0 && frames.is_finite() && frames >= 0.0) {
-        return None;
+    if !(elapsed_ms.is_finite() && elapsed_ms > 0.0) {
+        bail!("performance.now() did not advance while sampling {counter:?}");
     }
-    Some(FrameRate {
+    let frames = last_frame - first_frame;
+    if !frames.is_finite() || frames < 0.0 {
+        bail!("frame counter {counter:?} went backwards ({first_frame} -> {last_frame})");
+    }
+    Ok(FrameRate {
         fps: frames * 1000.0 / elapsed_ms,
         first_frame,
         last_frame,
         window_ms: elapsed_ms.round() as u64,
+    })
+}
+
+/// A rate below this makes a capture or an interaction unrepresentative of what a player sees.
+pub fn low_rate_warning(rate: &FrameRate) -> Option<String> {
+    (rate.fps > 0.0 && rate.fps < 20.0).then(|| {
+        format!(
+            "measured {:.1} Hz: under 20 Hz a capture or interaction is not representative; animation and two-peer runs need --headed",
+            rate.fps
+        )
     })
 }
 
@@ -145,6 +165,85 @@ pub fn error_of(object: &headless_chrome::protocol::cdp::Runtime::RemoteObject) 
         Some(headless_chrome::protocol::cdp::Runtime::RemoteObjectSubtype::Error)
     )
     .then(|| remote_text(object))
+}
+
+/// Evaluate an expression and return its value as JSON text, at the precision the page produced.
+///
+/// `JSON.stringify` alone would silently turn a `Map` into `{}`; the page-side walk rejects that,
+/// a cyclic object, a `BigInt`, a function, `undefined` and a non-finite number with the type and
+/// path that could not be encoded. The JSON is returned as the page produced it rather than being
+/// re-serialised in Rust, so no digits are reinterpreted on the way to disk.
+pub fn evaluate_json(tab: &Tab, expression: &str, await_promise: bool) -> Result<String> {
+    let call = if await_promise {
+        format!(
+            "return (async () => {{ try {{ return finish(await ({expression})); }} \
+             catch (error) {{ return capture(error); }} }})();"
+        )
+    } else {
+        format!(
+            "try {{ return finish(({expression})); }} catch (error) {{ return capture(error); }}"
+        )
+    };
+    let script = format!(
+        r#"(() => {{
+  const seen = new WeakSet();
+  const fail = (what, path) => {{ throw new Error('cannot encode ' + what + ' at ' + path); }};
+  const walk = (value, path) => {{
+    if (value === null) return;
+    const type = typeof value;
+    if (type === 'bigint') fail('BigInt', path);
+    if (type === 'function') fail('function', path);
+    if (type === 'symbol') fail('symbol', path);
+    if (type === 'undefined') fail('undefined', path);
+    if (type === 'number') {{
+      if (!Number.isFinite(value)) fail('non-finite number', path);
+      return;
+    }}
+    if (type !== 'object') return;
+    if (seen.has(value)) fail('a cyclic object', path);
+    seen.add(value);
+    if (Array.isArray(value)) {{
+      for (let index = 0; index < value.length; index++) {{
+        walk(value[index], path + '[' + index + ']');
+      }}
+    }} else {{
+      const name = value.constructor && value.constructor.name;
+      if (name && name !== 'Object') fail(name, path);
+      for (const key of Object.keys(value)) walk(value[key], path + '.' + key);
+    }}
+    seen.delete(value);
+  }};
+  const finish = (value) => {{
+    walk(value, '$');
+    return JSON.stringify({{ ok: true, json: JSON.stringify(value) }});
+  }};
+  const capture = (error) => JSON.stringify({{ ok: false, error: String((error && error.message) || error) }});
+  {call}
+}})()"#
+    );
+
+    let object = tab
+        .evaluate(&script, await_promise)
+        .context("evaluate the expression for out=")?;
+    if let Some(error) = error_of(&object) {
+        bail!("{error}");
+    }
+    let text = remote_text(&object);
+    let encoded: EncodedValue =
+        serde_json::from_str(&text).with_context(|| format!("decode the encoded value: {text}"))?;
+    if !encoded.ok {
+        bail!("{}", encoded.error);
+    }
+    Ok(encoded.json)
+}
+
+#[derive(serde::Deserialize)]
+struct EncodedValue {
+    ok: bool,
+    #[serde(default)]
+    json: String,
+    #[serde(default)]
+    error: String,
 }
 
 pub fn evaluate_text(tab: &Tab, expression: &str) -> String {
@@ -234,6 +333,31 @@ pub fn wait_for_frames(tab: &Tab, counter: &str, frames: u32, timeout: Duration)
             return Predicate::failed(counter, last, started);
         }
         std::thread::sleep(POLL);
+    }
+}
+
+/// Wait until the page sustains at least `minimum_fps` over a one-second sample.
+///
+/// A rate is a condition like any other: it names itself and the last value it saw when it times
+/// out, so a scenario can require 30 fps rather than asserting a frame count that happens to imply
+/// one on this machine.
+pub fn wait_for_rate(tab: &Tab, counter: &str, minimum_fps: f64, timeout: Duration) -> Predicate {
+    let started = Instant::now();
+    let mut last;
+
+    loop {
+        match measure_frame_rate(tab, counter) {
+            Ok(rate) => {
+                last = format!("{:.1} Hz (needs {minimum_fps:.1})", rate.fps);
+                if rate.fps >= minimum_fps {
+                    return Predicate::passed("frame.rate", format!("{:.1} Hz", rate.fps), started);
+                }
+            }
+            Err(error) => last = format!("error: {error}"),
+        }
+        if started.elapsed() >= timeout {
+            return Predicate::failed("frame.rate", last, started);
+        }
     }
 }
 

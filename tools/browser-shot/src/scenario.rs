@@ -94,6 +94,7 @@ pub(crate) enum Step {
         peers: Option<Vec<String>>,
         predicate: Option<String>,
         frames: Option<u32>,
+        rate: Option<f64>,
         network_idle: Option<u64>,
         timeout_ms: Option<u64>,
     },
@@ -103,6 +104,7 @@ pub(crate) enum Step {
         #[serde(default)]
         await_promise: bool,
         capture: Option<String>,
+        out: Option<String>,
         timeout_ms: Option<u64>,
     },
     Key {
@@ -170,6 +172,7 @@ impl Step {
                 peers,
                 predicate,
                 frames,
+                rate,
                 network_idle,
                 ..
             } => {
@@ -184,6 +187,9 @@ impl Step {
                 if let Some(frames) = frames {
                     conditions.push(format!("frames {frames}"));
                 }
+                if let Some(rate) = rate {
+                    conditions.push(format!("rate {rate}"));
+                }
                 if let Some(network_idle) = network_idle {
                     conditions.push(format!("network_idle {network_idle}"));
                 }
@@ -193,12 +199,16 @@ impl Step {
                 peer,
                 expression,
                 capture,
+                out,
                 ..
             } => {
                 let capture = capture
                     .as_ref()
                     .map_or_else(String::new, |capture| format!(" -> {capture}"));
-                format!("{peer} {expression}{capture}")
+                let out = out
+                    .as_ref()
+                    .map_or_else(String::new, |out| format!(" => {out}"));
+                format!("{peer} {expression}{capture}{out}")
             }
             Self::Key {
                 peer,
@@ -392,6 +402,7 @@ impl Scenario {
                     peers,
                     predicate,
                     frames,
+                    rate,
                     network_idle,
                     timeout_ms,
                 } => {
@@ -407,8 +418,17 @@ impl Scenario {
                             bail!("{at}: unknown peer {name:?}");
                         }
                     }
-                    if predicate.is_none() && frames.is_none() && network_idle.is_none() {
-                        bail!("{at}: needs predicate, frames or network_idle");
+                    if predicate.is_none()
+                        && frames.is_none()
+                        && rate.is_none()
+                        && network_idle.is_none()
+                    {
+                        bail!("{at}: needs predicate, frames, rate or network_idle");
+                    }
+                    if let Some(rate) = rate {
+                        if !rate.is_finite() || *rate <= 0.0 {
+                            bail!("{at}: rate must be a positive number of frames per second");
+                        }
                     }
                     if *timeout_ms == Some(0) {
                         bail!("{at}: timeout must be greater than zero");
@@ -418,12 +438,16 @@ impl Scenario {
                     peer,
                     expression,
                     await_promise,
+                    out,
                     timeout_ms,
                     ..
                 } => {
                     check_peer(&names, &at, peer)?;
                     if expression.trim().is_empty() {
                         bail!("{at}: expression must not be empty");
+                    }
+                    if out.as_deref() == Some("") {
+                        bail!("{at}: out must not be empty");
                     }
                     if *timeout_ms == Some(0) {
                         bail!("{at}: timeout must be greater than zero");
@@ -778,7 +802,7 @@ const PEER_FIELDS: &[&str] = &[
     "network",
     "loss_hook",
 ];
-const WAIT_FIELDS: &[&str] = &["predicate", "frames", "network_idle", "timeout"];
+const WAIT_FIELDS: &[&str] = &["predicate", "frames", "rate", "network_idle", "timeout"];
 const KEY_FIELDS: &[&str] = &["hold"];
 const POINTER_FIELDS: &[&str] = &["selector", "at", "steps", "button", "from"];
 const CAPTURE_FIELDS: &[&str] = &["out", "select"];
@@ -941,7 +965,7 @@ fn format_line(line: &LineTokens) -> Result<String> {
                 await_promise = Some(value);
             }
             push_flag(&mut parts, "await", await_promise, "await=false");
-            push_fields(&mut parts, &mut kvs, &["capture", "timeout"]);
+            push_fields(&mut parts, &mut kvs, &["capture", "out", "timeout"]);
         }
         "key" => {
             if positionals.len() != 3 {
@@ -1402,6 +1426,7 @@ fn parse_wait(tokens: &[Token], first: &Token) -> Result<Step> {
     let mut kvs = collect_kvs(tokens)?;
     let predicate = take_string(&mut kvs, "predicate");
     let frames = take_u32(&mut kvs, "frames")?;
+    let rate = take_f64(&mut kvs, "rate")?;
     let network_idle = take_duration(&mut kvs, "network_idle")?;
     let timeout_ms = take_duration(&mut kvs, "timeout")?;
     reject_unknown(&kvs, first, "wait")?;
@@ -1412,6 +1437,7 @@ fn parse_wait(tokens: &[Token], first: &Token) -> Result<Step> {
             peers: None,
             predicate,
             frames,
+            rate,
             network_idle,
             timeout_ms,
         })
@@ -1421,6 +1447,7 @@ fn parse_wait(tokens: &[Token], first: &Token) -> Result<Step> {
             peers: Some(peers),
             predicate,
             frames,
+            rate,
             network_idle,
             timeout_ms,
         })
@@ -1455,6 +1482,7 @@ fn parse_eval(tokens: &[Token], first: &Token) -> Result<Step> {
         await_promise = value;
     }
     let capture = take_string(&mut kvs, "capture");
+    let out = take_string(&mut kvs, "out");
     let timeout_ms = take_duration(&mut kvs, "timeout")?;
     reject_unknown(&kvs, first, "eval")?;
 
@@ -1463,6 +1491,7 @@ fn parse_eval(tokens: &[Token], first: &Token) -> Result<Step> {
         expression,
         await_promise,
         capture,
+        out,
         timeout_ms,
     })
 }
@@ -2035,13 +2064,32 @@ assert b "window.__received === 100" message="all messages arrive"
     }
 
     #[test]
+    fn parses_a_rate_wait() {
+        let text = "peer a url=x viewport=390x844\nwait a rate=30 timeout=5s\n";
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        match &scenario.step[0] {
+            Step::Wait { rate, .. } => assert_eq!(*rate, Some(30.0)),
+            other => panic!("expected a wait step, got {other:?}"),
+        }
+        assert_eq!(format_dsl(text).unwrap(), text);
+    }
+
+    #[test]
+    fn rejects_a_non_positive_rate_wait() {
+        let text = "peer a url=x viewport=390x844\nwait a rate=0\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("positive number"), "{error}");
+    }
+
+    #[test]
     fn rejects_an_empty_wait() {
         let text = "peer a url=x viewport=390x844\nwait a\n";
         let error = parse_dsl(text).unwrap().validate().unwrap_err();
         assert!(
             error
                 .to_string()
-                .contains("predicate, frames or network_idle"),
+                .contains("predicate, frames, rate or network_idle"),
             "{error}"
         );
     }
@@ -2249,6 +2297,33 @@ hold_frames = 12
         let error = parse_dsl(text).unwrap().validate().unwrap_err();
         assert!(
             error.to_string().contains("is set by browser-shot"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn parses_and_formats_an_eval_out() {
+        let text = "peer a url=x viewport=390x844\neval a \"window.__samples\" out=samples.json\n";
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        match &scenario.step[0] {
+            Step::Eval { out, .. } => assert_eq!(out.as_deref(), Some("samples.json")),
+            other => panic!("expected an eval step, got {other:?}"),
+        }
+        let formatted = format_dsl(text).unwrap();
+        assert_eq!(
+            formatted,
+            "peer a url=x viewport=390x844\neval a window.__samples out=samples.json\n"
+        );
+        assert_eq!(format_dsl(&formatted).unwrap(), formatted);
+    }
+
+    #[test]
+    fn rejects_an_empty_eval_out() {
+        let text = "peer a url=x viewport=390x844\neval a window.__samples out=\"\"\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(
+            error.to_string().contains("out must not be empty"),
             "{error}"
         );
     }

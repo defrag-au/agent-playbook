@@ -1,8 +1,13 @@
 # Browser automation for agents
 
-**Status:** requirements, 2026-10-24; nothing built. This is the contract a browser layer has to
-meet before an agent can make a visual claim about a web build, and before the two-peer WebRTC
-spike in `augminted-bots/docs/P2P_OVERLAY_DESIGN.md` can be run at all.
+**Status:** requirements, 2026-10-24. **Built:** [`tools/browser-shot`](../tools/browser-shot/README.md)
+implements these, and its README carries a requirement-by-requirement coverage table. Three
+deviations are recorded in *Where the implementation differs* below. The follow-up gaps in
+[`browser-automation-followup.md`](browser-automation-followup.md) — persisting an `eval` result,
+millisecond event timestamps, and reporting a frame rate on a page that never settles — are
+implemented in the same tool as of 2026-10-24. What still
+blocks the two-peer spike is client-side: `island-funk` exposes no frame counter, readiness flag or
+channel handles for a scenario to drive.
 
 ## The problem
 
@@ -231,7 +236,9 @@ applies to. Concurrency belongs in the file, not in shell job control.
 
 ## Acceptance
 
-The layer is done when these pass, and not before.
+The layer is done when these pass, and not before. Items 3, 8, 9 and 12 were re-run independently
+against a purpose-built probe page; the rest are `browser-shot`'s own claim and have not been
+re-verified here.
 
 1. Two peers, each loading a page, open a DataChannel to the other, exchange 100 messages; all
    arrive; then with 2% injected drop the receiver never blocks and reports the gap count.
@@ -251,6 +258,19 @@ The layer is done when these pass, and not before.
 10. Arrow keys on a page without `preventDefault` are reported as having scrolled the document.
 11. A click at explicit coordinates on a canvas lands at those coordinates, not at the box centre,
     and the sidecar records which form was used.
+
+## Where the implementation differs
+
+- **Jitter is not emulated.** CDP has no jitter knob; `browser-shot` rejects it with an error rather
+  than silently treating it as zero. Latency, bandwidth and loss are available; jitter is not, and
+  the sidecar is the place to read which was actually applied.
+- **The browser is not pinned.** It defaults to the browser installed on the machine (Brave on
+  macOS), with `--browser PATH` and a peer's `browser=` to override. Two machines can therefore
+  produce different pixels from the same scenario. Acceptable for review; not acceptable for a
+  golden-image test, and the sidecar names the browser version so a difference is attributable.
+- **No iframe traversal, and a synchronous `eval` cannot be timed out.** A `timeout` is a page-side
+  `Promise.race`, so an un-awaited infinite loop blocks the renderer. Neither limit is on the path
+  of the four jobs above.
 
 ## What this replaces, and what it does not
 

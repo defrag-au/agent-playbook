@@ -32,7 +32,8 @@ use capture::{dimensions_match, Captured};
 use collect::Snapshot;
 use input::{Action, Pointer};
 use report::{
-    Console, CssBox, Expect, Image, Peer, Predicate, Ready, Renderer, Report, Requests, Viewport,
+    epoch_ms, Console, CssBox, Expect, Image, Peer, Predicate, Ready, Renderer, Report, Requests,
+    Viewport,
 };
 
 const DEFAULT_BROWSER: &str = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
@@ -439,7 +440,7 @@ fn print_usage() {
   --steps N               interpolate each pointer move over N steps (default 1)
   --settle-ms N           minimum time before a frame may be accepted (default 1200)
   --timeout-ms N          timeout for every wait (default 30000)
-  --no-settle             skip the stability loop; wait --settle-ms, then capture once
+  --no-settle             skip the stability loop; capture once
   --headed                run with a window instead of headless
   --report PATH           sidecar path (default: the image with a .txt extension)
   --browser PATH          browser executable (default: {DEFAULT_BROWSER})
@@ -655,6 +656,7 @@ fn run(options: Options) -> Result<bool> {
         },
         passed: settle.outcome != Outcome::Unstable,
         waited_ms: settle.elapsed.as_millis() as u64,
+        t_ms: epoch_ms(),
     });
 
     let snapshot = collector
@@ -687,6 +689,17 @@ fn run(options: Options) -> Result<bool> {
     if readiness_failed && !options.actions.is_empty() {
         warnings.push("input skipped because readiness did not pass".to_owned());
     }
+
+    let (frame_rate, frame_rate_error) =
+        match probe::measure_frame_rate(&tab, &options.frame_counter) {
+            Ok(rate) => {
+                if let Some(warning) = probe::low_rate_warning(&rate) {
+                    warnings.push(warning);
+                }
+                (Some(rate), None)
+            }
+            Err(error) => (None, Some(error.to_string())),
+        };
 
     let expected_width = css
         .as_ref()
@@ -773,7 +786,7 @@ fn run(options: Options) -> Result<bool> {
     let last_input = input_records.last();
     let report = Report {
         url: tab.get_url(),
-        captured: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+        captured: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         peer: Peer { index: 0, of: 1 },
         browser: browser_version,
         pid: browser_pid,
@@ -809,7 +822,8 @@ fn run(options: Options) -> Result<bool> {
             predicates,
             waited_ms: (readiness_waited + settle.elapsed).as_millis() as u64,
         },
-        frame_rate: None,
+        frame_rate,
+        frame_rate_error,
         console: Console {
             errors: snapshot.console_errors,
             warnings: snapshot.console_warnings,
@@ -827,6 +841,7 @@ fn run(options: Options) -> Result<bool> {
             .iter()
             .map(|record| record.description.clone())
             .collect(),
+        evals: Vec::new(),
         bursts: Vec::new(),
         focus: last_input.map_or_else(|| "none".to_owned(), |record| record.focus.clone()),
         scroll: last_input.map_or_else(|| "none".to_owned(), |record| record.scroll.clone()),

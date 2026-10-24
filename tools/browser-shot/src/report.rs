@@ -6,6 +6,17 @@ use std::fmt::Write as _;
 
 use serde::Serialize;
 
+/// Wall-clock epoch milliseconds, at the precision the system clock gives us.
+///
+/// Every tool-side event is stamped with this so it can be ordered against a page's
+/// `performance.timeOrigin + performance.now()` without arithmetic against a header value.
+pub fn epoch_ms() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs_f64() * 1000.0)
+        .unwrap_or(0.0)
+}
+
 #[derive(Debug, Serialize)]
 pub struct Report {
     pub url: String,
@@ -21,11 +32,13 @@ pub struct Report {
     pub image: Image,
     pub ready: Ready,
     pub frame_rate: Option<FrameRate>,
+    pub frame_rate_error: Option<String>,
     pub console: Console,
     pub requests: Requests,
     pub network: String,
     pub overlay: String,
     pub input: Vec<String>,
+    pub evals: Vec<EvalRecord>,
     pub bursts: Vec<BurstInfo>,
     pub focus: String,
     pub scroll: String,
@@ -96,11 +109,20 @@ pub struct FrameRate {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct EvalRecord {
+    pub peer: String,
+    pub expression: String,
+    pub detail: Option<String>,
+    pub t_ms: f64,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct Predicate {
     pub name: String,
     pub value: String,
     pub passed: bool,
     pub waited_ms: u64,
+    pub t_ms: f64,
 }
 
 impl Predicate {
@@ -114,6 +136,7 @@ impl Predicate {
             value: value.into(),
             passed: true,
             waited_ms: started.elapsed().as_millis() as u64,
+            t_ms: epoch_ms(),
         }
     }
 
@@ -127,6 +150,7 @@ impl Predicate {
             value: value.into(),
             passed: false,
             waited_ms: started.elapsed().as_millis() as u64,
+            t_ms: epoch_ms(),
         }
     }
 }
@@ -151,6 +175,7 @@ pub struct BurstInfo {
     pub mode: String,
     pub prefix: String,
     pub summary: String,
+    pub started_ms: f64,
     pub frames: usize,
     pub requested_frames: usize,
     pub width: u32,
@@ -170,9 +195,10 @@ pub struct BurstInfo {
 impl BurstInfo {
     pub fn summary_line(&self) -> String {
         format!(
-            "{} {} — {}/{} frames, {:.1} fps, interval {}/{}/{} ms, capture {}/{}/{} ms, write {}/{}/{} ms (min/median/max) — {}",
+            "{} {} — t={:.3} — {}/{} frames, {:.1} fps, interval {}/{}/{} ms, capture {}/{}/{} ms, write {}/{}/{} ms (min/median/max) — {}",
             self.mode,
             self.prefix,
+            self.started_ms,
             self.frames,
             self.requested_frames,
             self.fps,
@@ -274,10 +300,11 @@ impl Report {
             .iter()
             .map(|predicate| {
                 format!(
-                    "{} = {}{}",
+                    "{} = {}{} · t={:.3}",
                     predicate.name,
                     predicate.value,
-                    if predicate.passed { "" } else { " FAILED" }
+                    if predicate.passed { "" } else { " FAILED" },
+                    predicate.t_ms
                 )
             })
             .collect::<Vec<_>>()
@@ -314,7 +341,16 @@ impl Report {
                     rate.fps, rate.first_frame, rate.last_frame, rate.window_ms
                 ),
             ),
-            None => line(&mut out, "frame rate", "not measured"),
+            None => line(
+                &mut out,
+                "frame rate",
+                &format!(
+                    "not measured: {}",
+                    self.frame_rate_error
+                        .as_deref()
+                        .unwrap_or("no frame counter was sampled")
+                ),
+            ),
         }
         line(
             &mut out,
@@ -353,6 +389,17 @@ impl Report {
                 self.input.join("; ")
             },
         );
+        for eval in &self.evals {
+            let detail = eval
+                .detail
+                .as_ref()
+                .map_or_else(String::new, |detail| format!(" {detail}"));
+            line(
+                &mut out,
+                "eval",
+                &format!("{} · t={:.3}{detail}", eval.expression, eval.t_ms),
+            );
+        }
         for burst in &self.bursts {
             line(&mut out, "burst", &burst.summary_line());
         }

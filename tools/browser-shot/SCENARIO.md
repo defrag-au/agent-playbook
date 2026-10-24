@@ -71,8 +71,14 @@ Durations are milliseconds by default; `ms` and `s` suffixes are accepted (`time
 | --- | --- |
 | `predicate="…"` | wait until the expression is truthy |
 | `frames=60` | wait for N frames of the peer's counter |
+| `rate=30` | wait until the page sustains at least this many frames per second over a one-second sample |
 | `network_idle=500` | wait for no in-flight requests for this window |
 | `timeout=15s` | override the run timeout |
+
+A failed `rate` wait names the rate it last measured and fails the peer, so a scenario can require
+30 fps rather than asserting a frame count. The sidecar's `frame rate` line uses the same
+measurement and, when it cannot take one, names the precondition that failed — for example
+`not measured: frame counter "window.__frames" is not a finite number`.
 
 `eval`
 
@@ -80,11 +86,25 @@ Durations are milliseconds by default; `ms` and `s` suffixes are accepted (`time
 | --- | --- |
 | `await` / `await=true` | await the returned promise |
 | `capture=name` | store the result for `${name}` in later expressions |
+| `out=samples.json` | write the value, JSON-serialised, under the artifacts directory |
 | `timeout=5s` | bound an awaited promise; requires `await` |
 
 An awaited expression is bounded by this timeout, or by the run/step timeout when it is omitted. The
 bound is a page-side `Promise.race`, so a promise that never settles fails the step rather than
 hanging the run. A rejected promise or a thrown exception fails the step too, naming the page error.
+
+`out=` is a measurement artefact, not the interpolation binding: `capture=` keeps a value in memory
+for `${name}`, `out=` writes a file. The value is serialised in the page and written exactly as the
+page produced it, so nested arrays and objects and fractional numbers survive. A `Map`, a cyclic
+object, a `BigInt`, a function, `undefined` or a non-finite number fails the step, naming the type
+and path (`cannot encode a cyclic object at $.self`). The file is written when the step runs, so a
+later assertion failure (exit 2) does not discard it. `run.json`'s `outputs` lists the files
+written.
+
+Every tool-side event carries a wall-clock epoch millisecond timestamp: `input` and pointer
+events, `eval`, the `ready` predicates and `burst` (`t=1750.123`), and `captured` is ISO with
+milliseconds. A page timestamping itself with `performance.timeOrigin + performance.now()` can be
+ordered against them directly.
 
 `key` — `peer`, `code`, `down|up` are positional.
 
@@ -187,6 +207,23 @@ Measured on this machine at 390x844: `mode=screencast` gives ~58.8 fps with inte
 and 22 ms, while `mode=capture` gives ~130 ms per frame (~7.5 fps). Use `capture` when the image
 matters more than the timing, and `screencast` when it is the other way around. A burst's report
 is printed as a `burst` line in the sidecar and summarised in `run.json`.
+
+### Recording a series
+
+A run that measures something writes the samples, not a boolean. `out=` is relative to the
+artifacts directory and survives an assertion failure:
+
+```text
+run timeout=30s
+
+peer anim url="file:///tmp/game.html" viewport=390x844
+
+wait anim frames=10
+eval anim "window.__btSamples" out=samples.json
+assert anim "window.__btSamples.length > 0" message="the page produced samples"
+```
+
+Each sample keeps its fractional precision; `run.json` lists `outputs: ["…/samples.json"]`.
 
 The keys scenario:
 

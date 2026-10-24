@@ -71,10 +71,13 @@ picture with no error.
   is much taller than that band (VT323's capitals are about half of it), and `text_top`'s line box
   hangs a descender below it, so `top = box.y + (box.h - size) / 2` or a hand-tuned `+4` leaves a
   stamp's word high, a legend's square low beside its word, and a different error in every face.
-  Place text by a midline instead: `Painter::text_centred` / `mono_centred` in a box,
-  `text_mid` / `mono_mid` on a row's midline, with the icon beside it centred on the same `y`.
-  Lay a card out as named midlines (`title_mid`, `legend_mid`) and derive its height from the last
-  one, rather than fixed offsets from its top.
+  Place text by a midline instead: `Painter::text_in(s, rect, size, color, Align)` for one line
+  against a box's start, centre or end (a chip, a button, a figure right against a tile's edge),
+  `Painter::stack_in(&[Line], rect, align, gap)` for a block such as a list row's title over its
+  subtitle, and `text_mid` / `mono_mid` on a row's midline with the icon beside it centred on the
+  same `y`. The widgets catalogue's "Text placement" section lists every one. Lay a card out as
+  named midlines (`title_mid`, `legend_mid`) and derive its height from the last one, rather than
+  fixed offsets from its top.
 - **Images decode from PNG and TGA only.** Convert art to PNG at build time, not JPEG.
 - **With `high_dpi`, touches arrive in device pixels and the mouse in points.** For one pointer,
   read the mouse (macroquad turns touches into mouse events) and convert once, through
@@ -147,7 +150,11 @@ both of its views held about 19 MB of graphics memory on every run.
 The high-text trap was found by the BLOCKWATCH rework in cnft.dev-workers on 2026-10-24: every
 capture report was clean, and the user still saw a stamp's word riding high, a legend's squares
 below their words, and `block_train`'s "full" above its status light. The report checks that text
-fits its surface, not that it is centred in its box, so only the picture shows it.
+fits its surface, not that it is centred in its box, so only the picture shows it. It came back
+the same day in TOKEN ARENA, built from scratch: chips, buttons and feed rows placed with
+`text_top` plus offsets, all off by a point or two. The midline helpers existed, but the painter
+had no row in the widgets catalogue, so nothing pointed at them; it now has a generated "Text
+placement" section, and `text_in` / `stack_in` cover the one-line and two-line box cases.
 
 The fixes live in the kit so a new game inherits them. The camera orientation is pinned by
 `the_window_camera_puts_the_origin_top_left` in `harness.rs`, which checks the camera's matrix and
