@@ -226,14 +226,14 @@ pub fn again(
     let mut command = format!("{tool} {verb}");
     for part in positionals {
         command.push(' ');
-        command.push_str(&quoted(part));
+        command.push_str(&shell_word(part));
     }
     for flag in flags {
         command.push(' ');
         command.push_str(flag);
     }
     if let Some(root) = root {
-        command.push_str(&format!(" --root {}", quoted(root)));
+        command.push_str(&format!(" --root {}", shell_word(root)));
     }
     command
 }
@@ -241,7 +241,7 @@ pub fn again(
 /// Single quotes when a shell would need them, and only then — an exit should read like the command
 /// a person would type, not like a serialised argument list. `'` is closed and reopened, which is
 /// the only escape a single-quoted shell word needs.
-fn quoted(part: &str) -> String {
+pub fn shell_word(part: &str) -> String {
     let plain = part
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || "._/-~=:,+^@{}()[]".contains(c));
@@ -419,12 +419,12 @@ mod tests {
 
     #[test]
     fn an_exit_command_quotes_only_what_needs_it() {
-        assert_eq!(quoted("src/main.rs"), "src/main.rs");
-        assert_eq!(quoted("HEAD~1..HEAD"), "HEAD~1..HEAD");
-        assert_eq!(quoted("src/my file.rs"), "'src/my file.rs'");
+        assert_eq!(shell_word("src/main.rs"), "src/main.rs");
+        assert_eq!(shell_word("HEAD~1..HEAD"), "HEAD~1..HEAD");
+        assert_eq!(shell_word("src/my file.rs"), "'src/my file.rs'");
         // `'` inside single quotes: closed, escaped, reopened — what a shell needs, and nothing
         // more elaborate than a person would type.
-        assert_eq!(quoted("it's.rs"), r"'it'\''s.rs'");
+        assert_eq!(shell_word("it's.rs"), r"'it'\''s.rs'");
     }
 
     #[test]

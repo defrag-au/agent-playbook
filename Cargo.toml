@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "tools/at-core",
+    "tools/at-crate",
     "tools/at-describe",
     "tools/at-peek",
     "tools/at-recall",

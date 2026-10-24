@@ -159,6 +159,51 @@ types rather than guessing.
   browser yourself with `--remote-debugging-port=0`, poll `DevToolsActivePort` in the profile
   directory (port on line 1, `/devtools/browser/...` on line 2), then
   `Browser::connect("ws://127.0.0.1:<port><path>")`. Cleanup is yours in that mode.
+- **`Emulation.setTouchEmulationEnabled` has the wrong generated parameters.**
+  `auto_generate_cdp` 0.4.6 swaps them with the deprecated `Page.setTouchEmulationEnabled`:
+  the `Emulation` struct carries `configuration`, and the modern `maxTouchPoints` lands on the
+  `Page` struct. Send the correct shape yourself:
+
+  ```rust
+  use headless_chrome::protocol::cdp::types::Method;
+
+  #[derive(Debug, serde::Serialize)]
+  struct SetTouchEmulation {
+      enabled: bool,
+      #[serde(rename = "maxTouchPoints", skip_serializing_if = "Option::is_none")]
+      max_touch_points: Option<u32>,
+  }
+  #[derive(Debug, serde::Deserialize)]
+  struct Empty {}
+  impl Method for SetTouchEmulation {
+      const NAME: &'static str = "Emulation.setTouchEmulationEnabled";
+      type ReturnObject = Empty;
+  }
+  tab.call_method(SetTouchEmulation { enabled: true, max_touch_points: Some(5) })?;
+  ```
+
+  Then verify with `navigator.maxTouchPoints`; a call that silently did nothing is the failure
+  this check catches.
+- **A fractional element clip is floored before the DPR is applied.** A 389.99997 CSS px box at
+  DPR 3 captures 1167 px, not 1170. Expand the clip to whole CSS pixels before calling
+  `Page.captureScreenshot`:
+
+  ```rust
+  let clip = Page::Viewport {
+      x: measured.x.floor(),
+      y: measured.y.floor(),
+      width: (measured.x + measured.width).ceil() - measured.x.floor(),
+      height: (measured.y + measured.height).ceil() - measured.y.floor(),
+      scale: measured.scale,
+  };
+  ```
+
+  For an element below the fold, also set `capture_beyond_viewport: Some(true)`.
+- **`Element::call_js_fn` uses `return_by_value: false`.** Return a primitive (a joined string,
+  a number) and parse it; an array comes back as an object reference with `value: None`.
+- **`--headless` is the new headless.** `headless(true)` adds `--headless`; pass
+  `--headless=new` yourself only with `headless(false)`. For a headed run set `enable_gpu(true)`
+  or the crate adds `--disable-gpu` and the window renders in software.
 - A persistent `user_data_dir` is never deleted by the crate; only the temp directory it
   creates itself is.
 - `--enable-automation` is a default argument. Harmless for screenshots; visible to bot checks.

@@ -1,0 +1,13 @@
+[package]
+name = "at-crate"
+version = "0.1.0"
+edition = "2021"
+description = "Tier 1 of the agent toolkit: read-only inspection of installed crate source and build output"
+license = "MIT"
+
+# Two dependencies, the same two `at-peek` takes: the shared output contract, and the regex
+# engine `search` needs to displace `grep`. Neither adds a capability — the tool reads files
+# and runs nothing.
+[dependencies]
+at-core = { path = "../at-core" }
+regex = "1"

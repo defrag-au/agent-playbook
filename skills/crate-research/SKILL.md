@@ -19,13 +19,36 @@ https://crates.io/crates/<crate>
 The summary page is authoritative for the version, and it links the source repository. An
 internet search will happily return a blog post about an API that was renamed two majors ago.
 
-## 2. Read the source, in this order
+Once the crate is in the project, the version that matters is the one `Cargo.lock` chose — not
+the latest one. `at-crate where <crate>` names it, the extracted source directory, and any
+build-script output. `at-crate installed <crate>` lists every extracted version when the crate
+is not in this project's lock.
+
+## 2. Read the installed source with `at-crate`
+
+The source on disk is the version that will compile, and it is the one to read. Do not reconstruct
+paths under `~/.cargo/registry` with `find`, `ls`, `grep` or `sed`:
+
+```sh
+at-crate where headless_chrome              # version, source path, build output
+at-crate files headless_chrome --depth 2    # src/, examples/, json/, benches/ …
+at-crate slice headless_chrome/README.md    # the crate's own description
+at-crate slice headless_chrome/examples/take_screenshot.rs
+at-crate search 'set_device_metrics' headless_chrome
+```
+
+Read in this order:
 
 1. **The README** — what the crate thinks it is for, and usually a quickstart.
 2. **The `examples/` directory** — this is the highest-value thing in the repository. Examples
    are compiled, so they are current in a way prose is not, and they show the shape of real
    usage rather than the shape of the API surface.
 3. **The changelog** — only if you are upgrading, or if the README and examples disagree.
+
+Generated protocol or schema code is part of the API too. `at-crate out <crate>` lists the
+build-script `out` directories; `at-crate slice <crate>/<path>:1-60 --build` reads one, and
+`at-crate search <pat> <crate> --build` searches them. When a crate has several build directories,
+the commands name `--build-dir` rather than picking the newest — use it.
 
 ## 3. Write a cheat sheet
 

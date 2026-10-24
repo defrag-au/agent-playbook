@@ -1,14 +1,15 @@
 ---
 name: inspect-code
-description: Use when finding, reading, counting or locating code or history — replaces rg, grep, sed, cat, head, wc, git status, git diff and git log for that job with the read-only at-peek and at-recall verbs, and covers what to do when the toolkit is not installed.
+description: Use when finding, reading, counting or locating code, installed crate source or history — replaces rg, grep, sed, cat, head, wc, find, cargo info, git status, git diff and git log for that job with the read-only at-peek, at-crate and at-recall verbs, and covers what to do when the toolkit is not installed.
 ---
 
-# Reading code and history with the agent toolkit
+# Reading code, crates and history with the agent toolkit
 
 The situation that should have brought you here: you are about to run `rg`, `grep`, `sed`, `cat`,
-`head`, `wc`, `git status`, `git diff` or `git log` to look at something. Don't — reach for
-`at-peek` for the working tree and `at-recall` for history and state. Both are read-only, bounded
-by construction, and their output says what they did not show.
+`head`, `wc`, `find`, `cargo info`, `git status`, `git diff` or `git log` to look at something.
+Don't — reach for `at-peek` for the working tree, `at-crate` for installed crate source and
+build-script output, and `at-recall` for history and state. All are read-only, bounded by
+construction, and their output says what they did not show.
 
 `at-describe` lists everything the toolkit can do, on one screen. This skill is the mapping and
 the traps.
@@ -24,6 +25,15 @@ at-peek slice crates/x/src/lib.rs:40-60       # these exact lines, numbered
 at-peek slice crates/x/src/lib.rs:40+20       # twenty lines from 40
 at-peek stat crates/x/src/lib.rs              # lines, bytes, language, mtime
 
+# installed crate source — at-crate runs nothing at all
+at-crate where headless_chrome               # version, source path, build output
+at-crate installed headless_chrome           # every extracted version
+at-crate files headless_chrome --depth 2     # the crate's shape
+at-crate search 'device_metrics' headless_chrome   # every mention in the crate
+at-crate slice headless_chrome/src/lib.rs:40-60    # these lines, numbered
+at-crate out headless_chrome                 # build-script output directories
+at-crate slice headless_chrome/protocol.rs:1-60 --build   # generated code
+
 # history and state — at-recall runs git, read verbs only, and never the reflog
 at-recall state                               # branch, HEAD, merge or rebase in progress, changed paths
 at-recall diff                                # what changed, one line per file, with the totals
@@ -37,8 +47,10 @@ at-recall pr                                  # base, commits, diffstat by kind,
 at-recall pr --with areas                     # just the shape of the change set
 ```
 
-`--limit N` caps the output (default 200 lines); `--root <path>` points the tool at another tree;
-`--max-files N` bounds a walk. Every ceiling is announced when it clamps.
+`--limit N` caps the output (default 200 lines); `--root <path>` points the working-tree tool at
+another tree; `--max-files N` bounds a walk. Every ceiling is announced when it clamps. `at-crate`
+takes `--cargo-home` and `--project` instead of `--root`, and `--version`/`--build-dir` are the two
+disambiguation tokens it will ask for rather than guess.
 
 ## What the output tells you
 
@@ -69,6 +81,7 @@ at-recall state --summary                       # branch, HEAD, pending, # 6 pat
 at-recall diff --summary                        # # 6 files, +78 -33, not shown
 at-peek search 'fn main' --summary               # # 12 matches in 4 files, not shown
 at-recall diff src/a.rs src/b.rs --patch        # several paths, one invocation
+at-crate search 'device_metrics' headless_chrome --summary   # # 12 matches in 3 files, not shown
 ```
 
 A `--summary` answer still ends with its exits, so the survey is where the loop starts: read the
@@ -146,9 +159,9 @@ without leaving the question.
 
 ## Traps
 
-- **Neither tool is a read for the purposes of editing.** They do not satisfy the editor tools'
-  read-before-edit check, so a `slice` followed by an edit gets a stale-read refusal. Use them to
-  understand, then read the file with the editor tools before changing it.
+- **None of these tools is a read for the purposes of editing.** They do not satisfy the editor
+  tools' read-before-edit check, so a `slice` followed by an edit gets a stale-read refusal. Use
+  them to understand, then read the file with the editor tools before changing it.
 - **`path:40-60` is one token, not two arguments**, and ranges are 1-based and inclusive.
 - **`at-peek` never opens `.git`.** "Is this file tracked", "what branch is this" and "who wrote
   it" are `at-recall` questions — of which only the first two are answered so far. `blame` is
@@ -172,7 +185,15 @@ without leaving the question.
 - **A file in another repository needs `--root`.** Each invocation resolves one root — the worktree
   you are in, or the path you name — so reading a file in a sibling repo is
   `at-peek slice --root ~/code/github/pallas src/hashes.rs:95-166`. An absolute path is not a
-  reason to reach for `sed`; it is a reason to name the root.
+  reason to reach for `sed`; it is a reason to name the root. Installed crate source is not a
+  `--root` job at all: it is `at-crate slice <crate>/<path>:40-60`, which resolves the version
+  from `Cargo.lock` first.
+- **`at-crate` refuses to guess between versions or build directories.** A crate named twice in
+  `Cargo.lock` needs `--version`; a file present in more than one build-script `out` needs
+  `--build-dir`. The error lists the candidates, and the printed exit names the flag.
+- **`at-crate` never runs `cargo`.** An uninstalled crate is an answer, not a fetch. If `where`
+  says the lock's version is not extracted, build the project (or run a cargo command) yourself;
+  do not reach for `cargo info` to paper over it.
 - **`search` does not honour `.gitignore`.** It refuses a fixed list of directory names
   (`target`, `node_modules`, `.direnv`, `dist`, `result`, `.tmp`, `.git`) and names what it
   skipped. If a search looks incomplete, read the trailer before concluding the code is absent.
@@ -180,4 +201,5 @@ without leaving the question.
   path rather than raising it.
 - **If `which at-peek` finds nothing**, the devshell environment is not loaded — a spawned shell
   does not inherit it, only an interactive one does. Reach for it explicitly:
-  `direnv exec . at-peek search '<pat>'`. Do not fall back to `rg` without saying so.
+  `direnv exec . at-peek search '<pat>'` (and the same for `at-crate`). Do not fall back to `rg`
+  without saying so.

@@ -10,15 +10,20 @@ targets:
 
 ## Directive
 
-- Reading code with `rg`, `grep`, `sed`, `cat`, `head` or `wc` → use `at-peek`. Reading history or
-  working-tree state with `git status`, `git diff`, `git log` or `git show` → use `at-recall`. Both
-  are read-only, bounded by construction, and say what they did not show.
+- Reading code with `rg`, `grep`, `sed`, `cat`, `head` or `wc` → use `at-peek`. Reading installed
+  crate source or build-script output with `grep`, `sed` or `find` under `~/.cargo` or
+  `target/…/build` → use `at-crate`. Reading history or working-tree state with `git status`,
+  `git diff`, `git log` or `git show` → use `at-recall`. All three are read-only, bounded by
+  construction, and say what they did not show.
 
 | Instead of | Use |
 | --- | --- |
 | `rg`, `grep` | `at-peek search <pattern> [path…]` |
 | `sed -n '40,60p' <file>`, `head`, `cat` | `at-peek slice <file>:40-60` |
 | `wc -l`, `ls -l`, `stat` | `at-peek stat <path>…` |
+| `grep -rn … ~/.cargo/registry/src`, `sed -n … <crate>/src/…`, `find ~/.cargo/registry` | `at-crate search <pattern> <crate>` · `at-crate slice <crate>/<path>:40-60` · `at-crate where <crate>` |
+| `cargo info <crate>`, `ls ~/.cargo/registry/src/…` | `at-crate where <crate>` · `at-crate installed [<crate>]` |
+| `head target/…/build/<crate>-*/out/…`, `grep … target/…/build/…/out/…` | `at-crate out <crate>` · `at-crate slice <crate>/<path> --build` · `at-crate search <pattern> <crate> --build` |
 | `git status`, `git status --porcelain` | `at-recall state` |
 | `git diff`, `git diff --stat` | `at-recall diff [<rev>] [<path>…]` — add `--patch` for the hunks |
 | `git log`, `git log --oneline` | `at-recall log [<rev>] [<path>…]` |
@@ -27,8 +32,13 @@ targets:
 
 - The exact lines · every mention · how many · which files → `at-peek slice <file>:40-60` ·
   `at-peek search <pat>` · `at-peek search <pat> --count` · `at-peek search <pat> --files-only`.
-- `which at-peek` empty → `direnv exec . at-peek <verb>`. An agent's spawned shell does not
-  inherit the devshell environment; an interactive one does.
+  For installed crate source the same three are `at-crate slice <crate>/<path>:40-60`,
+  `at-crate search <pat> <crate>` and `--count`.
+- `which at-peek` empty → `direnv exec . at-peek <verb>` (and the same for `at-crate`). An agent's
+  spawned shell does not inherit the devshell environment; an interactive one does.
+- `at-crate` resolves a crate through the nearest `Cargo.lock`, not through memory or "latest". A
+  crate named twice in the lock, or a file present in more than one build-script `out`, is an error
+  naming the flag that chooses — never a guess. `--version` and `--build-dir` are those flags.
 - Output that was cut says so, and so does anything that would make it wrong. Repeat both when
   you report the finding: `# 50 of 143` is the difference between a fact and a guess.
 - A `# next:` line is the next question, already spelled as a command. Run it as printed rather
@@ -39,8 +49,9 @@ targets:
   read, and the bound is the part that makes the answer reportable.
 - The tools are for understanding, not for preparing an edit. Read the file with the editor tools
   before editing it.
-- `at-peek` runs nothing at all; `at-recall` runs `git` and nothing else. That difference is why
-  they are separate binaries, and why they are separate approvals if I have tiered them.
+- `at-peek` and `at-crate` run nothing at all; `at-recall` runs `git` and nothing else. That
+  difference is why they are separate binaries, and why they are separate approvals if I have
+  tiered them.
 - A **recipe** is one verb that composes the reads its sibling verbs use, so a count cannot disagree
   with the listing beside it: `at-recall pr` answers "write me a PR description" with the base, the
   branch's commits and the diffstat by kind, and a caveat naming tracked files that have changed
@@ -51,7 +62,8 @@ targets:
   description: why a change exists is not in the repository.
 - `at-recall` answers `state`, `log`, `diff` and the `pr` recipe. `blame`, `show` and `churn`, and the
   `review` and `release` recipes, are designed and not written — ask for the one you want rather than
-  reaching for `git`, and name the question, because that is what turns it into a verb.
+  reaching for `git`, and name the question, because that is what turns it into a verb. `at-crate`
+  answers `where`, `installed`, `files`, `slice`, `search` and `out`.
 
 ## Rationale
 
@@ -68,6 +80,11 @@ The tool exists and is on `PATH` in every defrag devshell, which is not enough o
 agent reaches for the command it knows, and only looks for an alternative when that one is
 unavailable. So the rule is keyed on the substitution — `rg` → `at-peek search`, `git status` →
 `at-recall state` — because that is the form the thought takes at the moment of the reach.
+
+Installed crate source is the same reach with a worse address: `cargo info` names a version but
+not a path, the path is a registry directory with an opaque suffix, and generated code sits under
+a build hash. `at-crate` resolves through the project's lock, so "the version the project uses" is
+the default rather than a memory of the latest one.
 
 **Why `ecosystem:defrag` and not `org:defrag`.** The rule is true of a repository because of the
 toolchain it is built with, not because of who operates it: `~/code/hodlcroft/compositor` lives

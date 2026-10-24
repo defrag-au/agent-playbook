@@ -1,49 +1,82 @@
-//! `browser-shot` — one screenshot from a browser the tool launches itself.
+//! `browser-shot` — one screenshot from a browser the tool launches itself, with the sidecar
+//! contract from `docs/browser-automation.md`.
 //!
-//! The spike behind `tools/browser-shot/README.md`. It proves the four properties the Node
-//! loop leaves to prose: the tool owns the browser process, the viewport is a real layout
-//! viewport, the wait is condition-based instead of a fixed sleep, and every run writes a
-//! report beside the image.
+//! Single peer only. The two-peer, network-emulation and loss-hook requirements are deliberately
+//! out of scope until a process needs them.
+
+mod capture;
+mod collect;
+mod input;
+mod probe;
+mod report;
 
 use std::ffi::OsStr;
-use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+#[cfg(unix)]
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
-use headless_chrome::browser::tab::point::Point;
+use chrono::{SecondsFormat, Utc};
 use headless_chrome::browser::tab::Tab;
-use headless_chrome::protocol::cdp::types::Event;
-use headless_chrome::protocol::cdp::Emulation;
-use headless_chrome::protocol::cdp::Page::CaptureScreenshotFormatOption;
-use headless_chrome::protocol::cdp::Runtime::RemoteObject;
+use headless_chrome::protocol::cdp::types::Method;
+use headless_chrome::protocol::cdp::{Emulation, Network, Page};
 use headless_chrome::{Browser, LaunchOptions};
 
-const DEFAULT_BRAVE: &str = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
+use capture::Captured;
+use collect::Snapshot;
+use input::{Action, Pointer};
+use report::{
+    Console, CssBox, Expect, Image, Peer, Predicate, Ready, Renderer, Report, Requests, Viewport,
+};
+
+const DEFAULT_BROWSER: &str = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 const SAMPLE_MS: u64 = 250;
 const STABLE_SAMPLES: u32 = 2;
-const MAX_CONSOLE_LINES: usize = 50;
-const KNOWN_NOISE: &[&str] = &["GPU stall due to ReadPixels"];
 
-#[derive(Debug, Clone, Copy)]
-enum Action {
-    Click(f64, f64),
-    Hover(f64, f64),
-}
+const RENDERER_JS: &str = r#"(() => {
+  const canvases = Array.from(document.querySelectorAll('canvas'));
+  let gl = null;
+  for (const canvas of canvases) {
+    gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    if (gl) break;
+  }
+  if (!gl) {
+    const canvas = document.createElement('canvas');
+    gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+  }
+  if (!gl) return 'no WebGL context';
+  const extension = gl.getExtension('WEBGL_debug_renderer_info');
+  const renderer = extension ? gl.getParameter(extension.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  return gl.getParameter(gl.VERSION) + ' (' + renderer + ')';
+})()"#;
 
 struct Options {
     url: String,
     width: u32,
     height: u32,
+    dpr: f64,
+    touch: bool,
+    user_agent: Option<String>,
+    select: Option<String>,
     out: PathBuf,
     report: PathBuf,
-    brave: PathBuf,
+    browser: PathBuf,
     settle_ms: u64,
     timeout_ms: u64,
     no_settle: bool,
     keep_profile: bool,
+    headed: bool,
+    preload: Option<PathBuf>,
+    ready: Option<String>,
+    frames: Option<u32>,
+    frame_counter: String,
+    network_idle_ms: Option<u64>,
+    expect: Option<String>,
+    json: bool,
+    steps: u32,
     actions: Vec<Action>,
 }
 
@@ -106,10 +139,57 @@ impl Stability {
             Decision::Continue
         }
     }
+}
 
-    fn into_frame(self) -> Vec<u8> {
-        self.previous
+#[derive(Debug, serde::Serialize)]
+struct SetTouchEmulation {
+    enabled: bool,
+    #[serde(rename = "maxTouchPoints", skip_serializing_if = "Option::is_none")]
+    max_touch_points: Option<u32>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Empty {}
+
+#[cfg(unix)]
+static CHILD_PID: AtomicU32 = AtomicU32::new(0);
+
+#[cfg(unix)]
+extern "C" fn handle_signal(_: libc::c_int) {
+    let pid = CHILD_PID.load(Ordering::SeqCst);
+    if pid != 0 {
+        // Async-signal-safe: the browser is the only process this tool started.
+        unsafe {
+            libc::kill(pid as i32, libc::SIGTERM);
+        }
     }
+    unsafe { libc::_exit(130) };
+}
+
+#[cfg(unix)]
+fn install_signal_handlers(pid: u32) {
+    CHILD_PID.store(pid, Ordering::SeqCst);
+    unsafe {
+        libc::signal(
+            libc::SIGINT,
+            handle_signal as *const () as libc::sighandler_t,
+        );
+        libc::signal(
+            libc::SIGTERM,
+            handle_signal as *const () as libc::sighandler_t,
+        );
+    }
+}
+
+#[cfg(not(unix))]
+fn install_signal_handlers(_pid: u32) {}
+
+// `auto_generate_cdp` 0.4.6 swaps the parameters of `Emulation.setTouchEmulationEnabled` and
+// the deprecated `Page.setTouchEmulationEnabled`, so the generated `Emulation` struct carries
+// `configuration` instead of `maxTouchPoints`. Send the correct shape ourselves.
+impl Method for SetTouchEmulation {
+    const NAME: &'static str = "Emulation.setTouchEmulationEnabled";
+    type ReturnObject = Empty;
 }
 
 struct Profile {
@@ -136,19 +216,40 @@ impl Drop for Profile {
     }
 }
 
-fn main() -> Result<()> {
-    run(parse_args()?)
+fn main() {
+    let code = match parse_args().and_then(run) {
+        Ok(true) => 0,
+        Ok(false) => 2,
+        Err(error) => {
+            eprintln!("browser-shot: {error:#}");
+            1
+        }
+    };
+    std::process::exit(code);
 }
 
 fn parse_args() -> Result<Options> {
     let mut positional = Vec::new();
     let mut actions = Vec::new();
-    let mut brave = PathBuf::from(DEFAULT_BRAVE);
+    let mut browser = PathBuf::from(DEFAULT_BROWSER);
     let mut report = None;
     let mut settle_ms = 1200;
     let mut timeout_ms = 30_000;
     let mut no_settle = false;
     let mut keep_profile = false;
+    let mut dpr = 1.0;
+    let mut touch = false;
+    let mut user_agent = None;
+    let mut select = None;
+    let mut headed = false;
+    let mut preload = None;
+    let mut ready = None;
+    let mut frames = None;
+    let mut frame_counter = String::from("window.__frames");
+    let mut network_idle_ms = None;
+    let mut expect = None;
+    let mut json = false;
+    let mut steps = 1;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -156,19 +257,38 @@ fn parse_args() -> Result<Options> {
             "--click" => {
                 let value = take(&mut args, "--click")?;
                 let (x, y) = parse_point(&value)?;
-                actions.push(Action::Click(x, y));
+                actions.push(Action::Click { x, y });
             }
             "--hover" => {
                 let value = take(&mut args, "--hover")?;
                 let (x, y) = parse_point(&value)?;
-                actions.push(Action::Hover(x, y));
+                actions.push(Action::Hover { x, y });
             }
+            "--click-selector" => {
+                actions.push(Action::ClickSelector(take(&mut args, "--click-selector")?));
+            }
+            "--hover-selector" => {
+                actions.push(Action::HoverSelector(take(&mut args, "--hover-selector")?));
+            }
+            "--steps" => steps = take(&mut args, "--steps")?.parse()?,
+            "--dpr" => dpr = take(&mut args, "--dpr")?.parse()?,
+            "--touch" => touch = true,
+            "--user-agent" => user_agent = Some(take(&mut args, "--user-agent")?),
+            "--select" => select = Some(take(&mut args, "--select")?),
             "--settle-ms" => settle_ms = take(&mut args, "--settle-ms")?.parse()?,
             "--timeout-ms" => timeout_ms = take(&mut args, "--timeout-ms")?.parse()?,
             "--report" => report = Some(PathBuf::from(take(&mut args, "--report")?)),
-            "--brave" => brave = PathBuf::from(take(&mut args, "--brave")?),
+            "--browser" => browser = PathBuf::from(take(&mut args, "--browser")?),
             "--keep-profile" => keep_profile = true,
             "--no-settle" => no_settle = true,
+            "--headed" => headed = true,
+            "--preload" => preload = Some(PathBuf::from(take(&mut args, "--preload")?)),
+            "--ready" => ready = Some(take(&mut args, "--ready")?),
+            "--frames" => frames = Some(take(&mut args, "--frames")?.parse()?),
+            "--frame-counter" => frame_counter = take(&mut args, "--frame-counter")?,
+            "--network-idle" => network_idle_ms = Some(take(&mut args, "--network-idle")?.parse()?),
+            "--expect" => expect = Some(take(&mut args, "--expect")?),
+            "--json" => json = true,
             "-h" | "--help" => {
                 print_usage();
                 std::process::exit(0);
@@ -191,6 +311,12 @@ fn parse_args() -> Result<Options> {
     if width == 0 || height == 0 {
         bail!("width and height must be greater than zero");
     }
+    if dpr <= 0.0 {
+        bail!("--dpr must be greater than zero");
+    }
+    if steps == 0 {
+        bail!("--steps must be at least one");
+    }
 
     let out = PathBuf::from(&positional[3]);
     let report = report.unwrap_or_else(|| out.with_extension("txt"));
@@ -199,13 +325,26 @@ fn parse_args() -> Result<Options> {
         url: positional[0].clone(),
         width,
         height,
+        dpr,
+        touch,
+        user_agent,
+        select,
         out,
         report,
-        brave,
+        browser,
         settle_ms,
         timeout_ms,
         no_settle,
         keep_profile,
+        headed,
+        preload,
+        ready,
+        frames,
+        frame_counter,
+        network_idle_ms,
+        expect,
+        json,
+        steps,
         actions,
     })
 }
@@ -233,99 +372,109 @@ fn print_usage() {
     println!(
         "browser-shot <url> <width> <height> <out.png> [options]
 
-  --click x,y         move the pointer there and click (repeatable)
-  --hover x,y         move the pointer there without clicking (repeatable)
-  --settle-ms N       minimum time before a frame may be accepted (default 1200)
-  --timeout-ms N      give up waiting for a stable frame after N ms (default 30000)
-  --no-settle         wait --settle-ms, then capture once
-  --report PATH       report path (default: the image with a .txt extension)
-  --brave PATH        browser executable (default: {DEFAULT_BRAVE})
-  --keep-profile      leave .tmp/browser-shot-<pid> behind for inspection
-  -h, --help          print this"
+  --dpr N                 device scale factor (default 1)
+  --touch                 enable touch emulation (with mobile metrics)
+  --user-agent UA         override the user agent
+  --select CSS            capture this element instead of the viewport
+  --ready EXPR            wait until this JS expression is truthy
+  --frames N              wait for N more frames of --frame-counter
+  --frame-counter EXPR    frame counter expression (default window.__frames)
+  --network-idle MS       wait for no in-flight requests for MS
+  --preload PATH          run this JS before the document's own scripts
+  --expect EXPR           assert this JS expression after readiness
+  --click x,y             move there and click (repeatable)
+  --hover x,y             move there without clicking (repeatable)
+  --click-selector CSS    click the centre of this element (repeatable)
+  --hover-selector CSS    hover the centre of this element (repeatable)
+  --steps N               interpolate each pointer move over N steps (default 1)
+  --settle-ms N           minimum time before a frame may be accepted (default 1200)
+  --timeout-ms N          timeout for every wait (default 30000)
+  --no-settle             skip the stability loop; wait --settle-ms, then capture once
+  --headed                run with a window instead of headless
+  --report PATH           sidecar path (default: the image with a .txt extension)
+  --browser PATH          browser executable (default: {DEFAULT_BROWSER})
+  --keep-profile          leave .tmp/browser-shot-<pid> behind
+  --json                  print the typed report to stdout
+  -h, --help              print this
+
+Exit codes: 0 pass, 2 artifact written but an assertion failed, 1 operational error."
     );
 }
 
-fn run(options: Options) -> Result<()> {
-    if !options.brave.exists() {
+fn run(options: Options) -> Result<bool> {
+    if !options.browser.exists() {
         bail!(
-            "browser not found at {}; pass --brave <path>",
-            options.brave.display()
+            "browser not found at {}; pass --browser <path>",
+            options.browser.display()
         );
     }
 
-    // Declared before the browser so it drops after the child has been reaped.
+    let timeout = Duration::from_millis(options.timeout_ms);
     let profile = Profile::new(options.keep_profile)?;
 
+    let headless = !options.headed;
+    let mut browser_args = vec![
+        OsStr::new("--hide-scrollbars"),
+        OsStr::new("--disable-component-update"),
+        OsStr::new("--no-first-run"),
+    ];
+    if headless {
+        browser_args.push(OsStr::new("--use-gl=swiftshader"));
+        browser_args.push(OsStr::new("--enable-unsafe-swiftshader"));
+    }
+
     let launch = LaunchOptions::default_builder()
-        .path(Some(options.brave.clone()))
+        .path(Some(options.browser.clone()))
         .user_data_dir(Some(profile.path.clone()))
-        .headless(true)
+        .headless(headless)
+        .enable_gpu(!headless)
         .ignore_certificate_errors(false)
         .idle_browser_timeout(Duration::from_secs(300))
-        .args(vec![
-            OsStr::new("--use-gl=swiftshader"),
-            OsStr::new("--enable-unsafe-swiftshader"),
-            OsStr::new("--hide-scrollbars"),
-            OsStr::new("--disable-component-update"),
-            OsStr::new("--no-first-run"),
-        ])
+        .args(browser_args)
         .build()
         .map_err(|error| anyhow!("invalid launch options: {error}"))?;
 
     let browser = Browser::new(launch).context("launch the browser")?;
+    if let Some(pid) = browser.get_process_id() {
+        install_signal_handlers(pid);
+    }
     let tab = browser.new_tab().context("open a tab")?;
+    let browser_version = browser
+        .get_version()
+        .map(|version| version.product)
+        .unwrap_or_else(|_| "unknown".to_owned());
 
     tab.enable_log()
         .context("enable the Log domain")?
         .enable_runtime()
         .context("enable the Runtime domain")?;
+    tab.call_method(Network::Enable {
+        max_total_buffer_size: None,
+        max_resource_buffer_size: None,
+        max_post_data_size: None,
+        report_direct_socket_traffic: None,
+        enable_durable_messages: None,
+    })
+    .context("enable the Network domain")?;
 
-    let console: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let collector = collect::shared(Instant::now());
     {
-        let sink = Arc::clone(&console);
-        tab.add_event_listener(Arc::new(move |event: &Event| match event {
-            Event::RuntimeConsoleAPICalled(event) => {
-                let level = format!("{:?}", event.params.Type).to_ascii_lowercase();
-                if level == "error" || level == "warning" {
-                    let text = event
-                        .params
-                        .args
-                        .iter()
-                        .map(remote_text)
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    push_bounded(&sink, format!("[console {level}] {text}"));
+        let sink = Arc::clone(&collector);
+        tab.add_event_listener(Arc::new(
+            move |event: &headless_chrome::protocol::cdp::types::Event| {
+                if let Ok(mut collector) = sink.lock() {
+                    collector.handle(event);
                 }
-            }
-            Event::LogEntryAdded(event) => {
-                let entry = &event.params.entry;
-                let level = format!("{:?}", entry.level).to_ascii_lowercase();
-                if level == "error" || level == "warning" {
-                    let source = format!("{:?}", entry.source).to_ascii_lowercase();
-                    if !KNOWN_NOISE.iter().any(|noise| entry.text.contains(noise)) {
-                        push_bounded(&sink, format!("[{level} {source}] {}", entry.text));
-                    }
-                }
-            }
-            Event::RuntimeExceptionThrown(event) => {
-                let details = &event.params.exception_details;
-                let text = details
-                    .exception
-                    .as_ref()
-                    .and_then(|exception| exception.description.clone())
-                    .unwrap_or_else(|| details.text.clone());
-                push_bounded(&sink, format!("[uncaught] {text}"));
-            }
-            _ => {}
-        }))
-        .context("subscribe to console events")?;
+            },
+        ))
+        .context("subscribe to console and network events")?;
     }
 
     tab.call_method(Emulation::SetDeviceMetricsOverride {
         width: options.width,
         height: options.height,
-        device_scale_factor: 1.0,
-        mobile: true,
+        device_scale_factor: options.dpr,
+        mobile: options.touch,
         scale: None,
         screen_width: None,
         screen_height: None,
@@ -339,30 +488,113 @@ fn run(options: Options) -> Result<()> {
     })
     .context("set the viewport")?;
 
+    if options.touch {
+        tab.call_method(SetTouchEmulation {
+            enabled: true,
+            max_touch_points: Some(5),
+        })
+        .context("enable touch emulation")?;
+    }
+
+    if let Some(user_agent) = &options.user_agent {
+        tab.call_method(Emulation::SetUserAgentOverride {
+            user_agent: user_agent.clone(),
+            accept_language: None,
+            platform: None,
+            user_agent_metadata: None,
+        })
+        .context("set the user agent")?;
+    }
+
+    if let Some(path) = &options.preload {
+        let source = fs::read_to_string(path)
+            .with_context(|| format!("read preload script {}", path.display()))?;
+        tab.call_method(Page::AddScriptToEvaluateOnNewDocument {
+            source,
+            world_name: None,
+            include_command_line_api: None,
+            run_immediately: Some(true),
+        })
+        .context("install the preload script")?;
+    }
+
     tab.navigate_to(&options.url)
         .with_context(|| format!("navigate to {}", options.url))?;
     tab.wait_until_navigated().context("wait for navigation")?;
 
-    for action in &options.actions {
-        match action {
-            Action::Click(x, y) => {
-                tab.click_point(Point { x: *x, y: *y }).context("click")?;
-                std::thread::sleep(Duration::from_millis(800));
-            }
-            Action::Hover(x, y) => {
-                tab.move_mouse_to_point(Point { x: *x, y: *y })
-                    .context("hover")?;
-                std::thread::sleep(Duration::from_millis(2500));
-            }
+    let readiness_started = Instant::now();
+    let mut predicates = Vec::new();
+    predicates.push(probe::wait_for_fonts(&tab, timeout));
+    if let Some(window) = options.network_idle_ms {
+        predicates.push(probe::wait_for_network_idle(
+            &collector,
+            Duration::from_millis(window),
+            timeout,
+        ));
+    }
+    if let Some(expression) = &options.ready {
+        predicates.push(probe::wait_for_predicate(&tab, expression, timeout));
+    }
+    if let Some(frames) = options.frames {
+        predicates.push(probe::wait_for_frames(
+            &tab,
+            &options.frame_counter,
+            frames,
+            timeout,
+        ));
+    }
+    let readiness_waited = readiness_started.elapsed();
+    let readiness_failed = predicates.iter().any(|predicate| !predicate.passed);
+
+    let touch_points = if options.touch {
+        probe::evaluate_text(&tab, "navigator.maxTouchPoints")
+            .parse::<u32>()
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    let mut input_records = Vec::new();
+    let mut pointer = Pointer::default();
+    if !readiness_failed {
+        for action in &options.actions {
+            let record = input::dispatch(&tab, action, options.steps, &mut pointer, timeout)?;
+            input_records.push(record);
         }
     }
 
-    let started = Instant::now();
-    let (png, settle) = if options.no_settle {
-        std::thread::sleep(Duration::from_millis(options.settle_ms));
-        let png = capture(&tab)?;
+    let expect =
+        options.expect.as_ref().map(
+            |expression| match probe::evaluate_labeled(&tab, expression) {
+                Ok((value, label)) => Expect {
+                    expression: expression.clone(),
+                    value: label,
+                    passed: probe::truthy(&value),
+                },
+                Err(error) => Expect {
+                    expression: expression.clone(),
+                    value: format!("error: {error}"),
+                    passed: false,
+                },
+            },
+        );
+
+    let grab = |tab: &Tab| -> Result<(Captured, Option<Page::Viewport>)> {
+        match &options.select {
+            Some(selector) => {
+                let (captured, viewport) = capture::element(tab, selector, timeout)?;
+                Ok((captured, Some(viewport)))
+            }
+            None => Ok((capture::viewport(tab)?, None)),
+        }
+    };
+
+    let (captured, clip, settle) = if options.no_settle {
+        let started = Instant::now();
+        let (captured, clip) = grab(&tab)?;
         (
-            png,
+            captured,
+            clip,
             Settle {
                 outcome: Outcome::Skipped,
                 elapsed: started.elapsed(),
@@ -371,59 +603,252 @@ fn run(options: Options) -> Result<()> {
             },
         )
     } else {
-        wait_for_stable(&tab, options.settle_ms, options.timeout_ms)?
+        wait_for_stable(&tab, &grab, options.settle_ms, options.timeout_ms)?
+    };
+
+    let renderer_name = probe::evaluate_text(&tab, RENDERER_JS);
+    let software = is_software_renderer(&renderer_name);
+
+    predicates.push(Predicate {
+        name: "frame.stable".to_owned(),
+        value: if settle.outcome == Outcome::Skipped {
+            "skipped".to_owned()
+        } else {
+            format!(
+                "{} samples, {} identical after {} ms",
+                settle.samples,
+                settle.identical,
+                settle.elapsed.as_millis()
+            )
+        },
+        passed: settle.outcome != Outcome::Unstable,
+        waited_ms: settle.elapsed.as_millis() as u64,
+    });
+
+    let snapshot = collector
+        .lock()
+        .map(|collector| collector.snapshot())
+        .unwrap_or_else(|_| Snapshot::default());
+
+    let css = clip.map(|viewport| CssBox {
+        x: round_to(viewport.x, 2),
+        y: round_to(viewport.y, 2),
+        width: round_to(viewport.width, 2),
+        height: round_to(viewport.height, 2),
+    });
+
+    let mut warnings = Vec::new();
+    for predicate in predicates.iter().filter(|predicate| !predicate.passed) {
+        warnings.push(format!(
+            "readiness failed: {} = {}",
+            predicate.name, predicate.value
+        ));
+    }
+    if readiness_failed && !options.actions.is_empty() {
+        warnings.push("input skipped because readiness did not pass".to_owned());
+    }
+
+    let expected_width = css
+        .as_ref()
+        .map_or(f64::from(options.width), |css| css.width);
+    let expected_height = css
+        .as_ref()
+        .map_or(f64::from(options.height), |css| css.height);
+    let dpr_ok = dimensions_match(captured.width, expected_width * options.dpr, options.dpr)
+        && dimensions_match(captured.height, expected_height * options.dpr, options.dpr);
+    if !dpr_ok {
+        warnings.push(format!(
+            "DPR mismatch: asked {}x{} px for a CSS box of {}x{}, got {}x{}",
+            (expected_width * options.dpr).round(),
+            (expected_height * options.dpr).round(),
+            expected_width,
+            expected_height,
+            captured.width,
+            captured.height
+        ));
+    }
+
+    if software {
+        warnings.push(format!("renderer is software: {renderer_name}"));
+    }
+    if options.touch && touch_points == 0 {
+        warnings.push("touch emulation did not take: navigator.maxTouchPoints = 0".to_owned());
+    }
+    if settle.outcome == Outcome::Unstable {
+        warnings.push(format!(
+            "no stable frame within {} ms; the image was taken anyway",
+            settle.elapsed.as_millis()
+        ));
+    }
+    if settle.outcome == Outcome::Skipped {
+        warnings.push("settle skipped (--no-settle)".to_owned());
+    }
+    if snapshot.uncaught > 0 {
+        warnings.push(format!("{} uncaught exception(s)", snapshot.uncaught));
+    }
+    if snapshot.console_errors > 0 {
+        warnings.push(format!("{} console error(s)", snapshot.console_errors));
+    }
+    if snapshot.requests_failed > 0 {
+        warnings.push(format!("{} request(s) failed", snapshot.requests_failed));
+    }
+    if let Some(expect) = expect.as_ref().filter(|expect| !expect.passed) {
+        warnings.push(format!(
+            "expectation failed: {} = {}",
+            expect.expression, expect.value
+        ));
+    }
+    if let Some(selector) = &options.select {
+        if let Some(css) = css.as_ref() {
+            if let Some((backing_width, backing_height)) =
+                capture::canvas_backing(&tab, selector, timeout)
+            {
+                let expected_width = (css.width * options.dpr).round() as u32;
+                let expected_height = (css.height * options.dpr).round() as u32;
+                if backing_width < expected_width || backing_height < expected_height {
+                    warnings.push(format!(
+                        "canvas backing store {backing_width}x{backing_height} is smaller than {expected_width}x{expected_height}; the captured pixels are an upscale"
+                    ));
+                }
+            }
+        }
+        if let Some((scroll_width, client_width, scroll_height, client_height)) =
+            capture::overflow(&tab, selector, timeout)
+        {
+            if scroll_width > client_width + 1 || scroll_height > client_height + 1 {
+                warnings.push(format!(
+                    "{selector} overflows its box: scroll {scroll_width}x{scroll_height} > client {client_width}x{client_height}"
+                ));
+            }
+        }
+    }
+
+    let passed = !readiness_failed
+        && settle.outcome != Outcome::Unstable
+        && dpr_ok
+        && expect.as_ref().is_none_or(|expect| expect.passed)
+        && snapshot.uncaught == 0
+        && (!options.touch || touch_points > 0);
+
+    let last_input = input_records.last();
+    let report = Report {
+        url: tab.get_url(),
+        captured: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+        peer: Peer { index: 0, of: 1 },
+        browser: browser_version,
+        mode: if options.headed {
+            "headed"
+        } else {
+            "headless (new)"
+        }
+        .to_owned(),
+        renderer: Renderer {
+            name: renderer_name,
+            software,
+        },
+        viewport: Viewport {
+            width: options.width,
+            height: options.height,
+            dpr: options.dpr,
+            touch: options.touch,
+            user_agent: options.user_agent.clone(),
+        },
+        image: Image {
+            width: captured.width,
+            height: captured.height,
+            scope: options.select.as_ref().map_or_else(
+                || "viewport".to_owned(),
+                |selector| format!("element {selector}"),
+            ),
+            css,
+        },
+        ready: Ready {
+            predicates,
+            waited_ms: (readiness_waited + settle.elapsed).as_millis() as u64,
+        },
+        console: Console {
+            errors: snapshot.console_errors,
+            warnings: snapshot.console_warnings,
+            uncaught: snapshot.uncaught,
+            lines: snapshot.console_lines,
+        },
+        requests: Requests {
+            total: snapshot.requests_total,
+            failed: snapshot.requests_failed,
+            lines: snapshot.request_lines,
+        },
+        network: "not emulated".to_owned(),
+        overlay: "none".to_owned(),
+        input: input_records
+            .iter()
+            .map(|record| record.description.clone())
+            .collect(),
+        focus: last_input.map_or_else(|| "none".to_owned(), |record| record.focus.clone()),
+        scroll: last_input.map_or_else(|| "none".to_owned(), |record| record.scroll.clone()),
+        locator: last_input.map_or_else(|| "none".to_owned(), |record| record.locator.clone()),
+        expect,
+        warnings,
+        profile: format!(
+            "{} ({})",
+            profile.path.display(),
+            if profile.keep {
+                "kept"
+            } else {
+                "removed on exit"
+            }
+        ),
+        screenshot: options.out.display().to_string(),
+        sidecar: options.report.display().to_string(),
+        passed,
     };
 
     if let Some(parent) = options.out.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(&options.out, &png).with_context(|| format!("write {}", options.out.display()))?;
-
+    fs::write(&options.out, &captured.bytes)
+        .with_context(|| format!("write {}", options.out.display()))?;
     if let Some(parent) = options.report.parent() {
         fs::create_dir_all(parent)?;
     }
-    let report = render_report(&options, &profile, &tab, &png, &settle, &console);
-    fs::write(&options.report, report)
+    fs::write(&options.report, report.render_text())
         .with_context(|| format!("write {}", options.report.display()))?;
 
-    println!(
-        "{} @ {}x{} ({})",
-        options.out.display(),
-        options.width,
-        options.height,
-        match settle.outcome {
-            Outcome::Stable => "stable",
-            Outcome::Unstable => "UNSETTLED",
-            Outcome::Skipped => "settle skipped",
-        }
-    );
-
-    if settle.outcome == Outcome::Unstable {
-        bail!(
-            "no stable frame within {} ms; the image and report were still written",
-            settle.elapsed.as_millis()
+    if options.json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!(
+            "{} @ {}x{} ({}) · {}",
+            options.out.display(),
+            captured.width,
+            captured.height,
+            if report.passed { "pass" } else { "FAIL" },
+            options.report.display()
         );
     }
 
-    Ok(())
+    Ok(report.passed)
 }
 
-fn capture(tab: &Tab) -> Result<Vec<u8>> {
-    tab.capture_screenshot(CaptureScreenshotFormatOption::Png, None, None, true)
-        .context("capture a screenshot")
-}
-
-fn wait_for_stable(tab: &Tab, min_settle_ms: u64, timeout_ms: u64) -> Result<(Vec<u8>, Settle)> {
+fn wait_for_stable<F>(
+    tab: &Tab,
+    mut grab: F,
+    min_settle_ms: u64,
+    timeout_ms: u64,
+) -> Result<(Captured, Option<Page::Viewport>, Settle)>
+where
+    F: FnMut(&Tab) -> Result<(Captured, Option<Page::Viewport>)>,
+{
     let started = Instant::now();
-    let mut stability = Stability::new(capture(tab)?);
+    let (first, _) = grab(tab)?;
+    let mut stability = Stability::new(first.bytes.clone());
     let min_settle = Duration::from_millis(min_settle_ms);
     let timeout = Duration::from_millis(timeout_ms);
 
     loop {
         std::thread::sleep(Duration::from_millis(SAMPLE_MS));
-        let current = capture(tab)?;
+        let (current, current_clip) = grab(tab)?;
         let elapsed = started.elapsed();
-        let decision = stability.observe(current, elapsed, min_settle, timeout);
+        let decision = stability.observe(current.bytes.clone(), elapsed, min_settle, timeout);
 
         if decision == Decision::Continue {
             continue;
@@ -439,101 +864,24 @@ fn wait_for_stable(tab: &Tab, min_settle_ms: u64, timeout_ms: u64) -> Result<(Ve
             samples: stability.samples,
             identical: stability.identical,
         };
-        return Ok((stability.into_frame(), settle));
+        return Ok((current, current_clip, settle));
     }
 }
 
-fn remote_text(object: &RemoteObject) -> String {
-    if let Some(description) = &object.description {
-        return description.clone();
-    }
-    if let Some(value) = &object.value {
-        return match value {
-            serde_json::Value::String(text) => text.clone(),
-            other => other.to_string(),
-        };
-    }
-    if let Some(value) = &object.unserializable_value {
-        return format!("{value:?}");
-    }
-    format!("{:?}", object.Type)
+fn dimensions_match(actual: u32, expected: f64, tolerance: f64) -> bool {
+    (f64::from(actual) - expected).abs() <= tolerance.max(1.0)
 }
 
-fn push_bounded(sink: &Arc<Mutex<Vec<String>>>, line: String) {
-    if let Ok(mut lines) = sink.lock() {
-        if lines.len() < MAX_CONSOLE_LINES {
-            lines.push(line);
-        }
-    }
+fn round_to(value: f64, places: i32) -> f64 {
+    let factor = 10f64.powi(places);
+    (value * factor).round() / factor
 }
 
-fn render_report(
-    options: &Options,
-    profile: &Profile,
-    tab: &Tab,
-    png: &[u8],
-    settle: &Settle,
-    console: &Arc<Mutex<Vec<String>>>,
-) -> String {
-    let mut report = String::new();
-    let title = tab
-        .get_title()
-        .unwrap_or_else(|_| "<unavailable>".to_owned());
-
-    let _ = writeln!(report, "browser-shot · {}", options.url);
-    let _ = writeln!(
-        report,
-        "viewport: {}x{} @ 1.0 (mobile emulation)",
-        options.width, options.height
-    );
-    let _ = writeln!(report, "title: {title}");
-    let _ = writeln!(report, "url: {}", tab.get_url());
-    let _ = writeln!(
-        report,
-        "settled: {} after {} ms ({} samples, {} consecutive identical)",
-        match settle.outcome {
-            Outcome::Stable => "yes",
-            Outcome::Unstable => "NO",
-            Outcome::Skipped => "skipped (--no-settle)",
-        },
-        settle.elapsed.as_millis(),
-        settle.samples,
-        settle.identical
-    );
-    let _ = writeln!(
-        report,
-        "screenshot: {} · {} bytes",
-        options.out.display(),
-        png.len()
-    );
-    if png.is_empty() {
-        let _ = writeln!(report, "warning: the screenshot is empty");
-    }
-    let _ = writeln!(
-        report,
-        "profile: {} ({})",
-        profile.path.display(),
-        if profile.keep {
-            "kept"
-        } else {
-            "removed on exit"
-        }
-    );
-
-    let lines = console
-        .lock()
-        .map(|lines| lines.clone())
-        .unwrap_or_default();
-    if lines.is_empty() {
-        let _ = writeln!(report, "console: no errors or warnings");
-    } else {
-        let _ = writeln!(report, "console: {} line(s)", lines.len());
-        for line in &lines {
-            let _ = writeln!(report, "  {line}");
-        }
-    }
-
-    report
+fn is_software_renderer(renderer: &str) -> bool {
+    let renderer = renderer.to_ascii_lowercase();
+    ["swiftshader", "llvmpipe", "softpipe", "software"]
+        .iter()
+        .any(|marker| renderer.contains(marker))
 }
 
 #[cfg(test)]
@@ -572,5 +920,22 @@ mod tests {
     #[test]
     fn rejects_a_malformed_point() {
         assert!(parse_point("12").is_err());
+    }
+
+    #[test]
+    fn recognises_software_renderers() {
+        assert!(is_software_renderer(
+            "WebGL 2.0 (Google SwiftShader) — SOFTWARE"
+        ));
+        assert!(is_software_renderer("WebGL 1.0 (Mesa/llvmpipe)"));
+        assert!(!is_software_renderer("WebGL 2.0 (Apple M3 Pro)"));
+    }
+
+    #[test]
+    fn dpr_matching_tolerates_one_css_pixel() {
+        assert!(dimensions_match(1170, 1170.0, 1.0));
+        assert!(dimensions_match(1170, 1169.4, 1.0));
+        assert!(!dimensions_match(1170, 1168.0, 1.0));
+        assert!(dimensions_match(1170, 1169.9999, 3.0));
     }
 }

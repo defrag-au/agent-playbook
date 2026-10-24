@@ -568,6 +568,7 @@ fn no_write_api_in_the_source() {
     let mut checked = 0;
     for source in [
         tools.join("at-peek").join("src"),
+        tools.join("at-crate").join("src"),
         tools.join("at-describe").join("src"),
     ] {
         for file in source_files(&source) {
@@ -587,7 +588,7 @@ fn no_write_api_in_the_source() {
         }
     }
     assert!(
-        checked >= 6,
+        checked >= 20,
         "the scan found only {checked} source files; it is not looking"
     );
 }
