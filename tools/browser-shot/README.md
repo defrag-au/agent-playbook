@@ -165,7 +165,7 @@ run timeout=20s
 peer focused url="file:///tmp/keys.html" viewport=390x844
 peer unfocused url="file:///tmp/keys.html" viewport=390x844
 
-pointer focused click selector=#game
+pointer focused click selector="#game"
 key focused KeyW down hold=12
 assert focused "window.__keys[1].frame - window.__keys[0].frame === 12" message="held twelve frames"
 capture focused out=focused.png
@@ -175,12 +175,19 @@ capture focused out=focused.png
 ./target/debug/browser-shot run --scenario .tmp/keys.dsl --artifacts .tmp/keys-run
 ./target/debug/browser-shot check --scenario .tmp/keys.dsl
 ./target/debug/browser-shot check --scenario .tmp/keys.toml --json
+./target/debug/browser-shot fmt --scenario .tmp/keys.dsl            # print formatted
+./target/debug/browser-shot fmt --scenario .tmp/keys.dsl --write    # rewrite in place
+./target/debug/browser-shot fmt --scenario .tmp/keys.dsl --check    # exit 2 if it would change
 ```
 
 `run` and `check` validate peer references and every action's required fields; a parse error names
 the line and column, and a semantic error names the line and step. `check` exits 0 valid, 2 invalid,
-1 operational. The grammar is deliberately line-oriented and can be ported to tree-sitter once the
-syntax settles.
+1 operational. `fmt` preserves comments, orders fields canonically, quotes values containing `#`
+(so the tree-sitter grammar can treat `#` as a comment), and prints unless `--write` is given.
+
+The tree-sitter grammar and highlight query live in
+[`tree-sitter-scenario/`](tree-sitter-scenario/README.md). Generated files are checked in; run
+`bunx tree-sitter-cli generate --js-runtime native` there after changing `grammar.js`.
 
 ## What the sidecar looks like
 

@@ -125,7 +125,7 @@ run timeout=20s
 peer focused url="file:///tmp/keys.html" viewport=390x844
 peer unfocused url="file:///tmp/keys.html" viewport=390x844
 
-pointer focused click selector=#game
+pointer focused click selector="#game"
 key focused KeyW down hold=12
 assert focused "window.__keys[1].frame - window.__keys[0].frame === 12" message="held twelve frames"
 assert focused "window.__keys[0].focus === 'game'" message="the canvas held focus"
@@ -160,18 +160,27 @@ capture a out=peer-a.png
 capture b out=peer-b.png
 ```
 
-## Run or check it locally
+## Run, check or format it locally
 
 ```sh
 ./target/debug/browser-shot run --scenario .tmp/keys.dsl --artifacts .tmp/keys-run
 ./target/debug/browser-shot check --scenario .tmp/keys.dsl
 ./target/debug/browser-shot check --scenario .tmp/keys.toml --json
+./target/debug/browser-shot fmt --scenario .tmp/keys.dsl            # print formatted
+./target/debug/browser-shot fmt --scenario .tmp/keys.dsl --write    # rewrite in place
+./target/debug/browser-shot fmt --scenario .tmp/keys.dsl --check    # exit 2 if it would change
 ```
+
+`fmt` preserves comments and blank-line grouping, orders fields canonically, and quotes values
+containing `#` so the tree-sitter grammar can treat `#` as a comment unambiguously. It is a syntax
+operation: it can lay out a half-written scenario before its peers exist, so run `check` for
+semantic validation. It formats the DSL only; TOML is not rewritten. The tree-sitter grammar and
+highlights are in [`tree-sitter-scenario/`](tree-sitter-scenario/README.md).
 
 `check` parses the file, validates peer references and every action's required fields, and prints a
 summary. Exit codes are `0` valid, `2` invalid, `1` an operational failure. A parse error names the
 line and column; a semantic error names the line and the step.
 
-The grammar is deliberately line-oriented so it can be ported to tree-sitter later: one
-`grammar.js`, the same field names, and an LSP that offers peer names and action fields. Until then,
-the parser here is the source of truth and the grammar above is the contract.
+The grammar is deliberately line-oriented; `tree-sitter-scenario/grammar.js` is the same grammar
+for editors, and the formatter's canonical output is what it parses. The Rust parser here remains
+the semantic source of truth; an LSP that offers peer names and action fields is the next step.

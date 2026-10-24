@@ -10,6 +10,17 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
+macro_rules! bail_at {
+    ($token:expr, $message:expr $(,)?) => {
+        return Err(anyhow!(
+            "line {}:{}: {}",
+            $token.line,
+            $token.column,
+            $message
+        ))
+    };
+}
+
 pub(crate) const DEFAULT_SEED: u32 = 0x9e37_79b9;
 /// The signal handler keeps one slot per process. Keep this in step with the array in `runner.rs`.
 pub(crate) const MAX_PEERS: usize = 8;
@@ -620,6 +631,269 @@ pub(crate) fn check(args: Vec<String>) -> Result<bool> {
     }
 }
 
+const RUN_FIELDS: &[&str] = &["timeout", "artifacts"];
+const PEER_FIELDS: &[&str] = &[
+    "url",
+    "viewport",
+    "dpr",
+    "user_agent",
+    "browser",
+    "preload",
+    "frame_counter",
+    "network",
+    "loss_hook",
+];
+const WAIT_FIELDS: &[&str] = &["predicate", "frames", "network_idle", "timeout"];
+const KEY_FIELDS: &[&str] = &["hold"];
+const POINTER_FIELDS: &[&str] = &["selector", "at", "steps"];
+const CAPTURE_FIELDS: &[&str] = &["out", "select"];
+const ASSERT_FIELDS: &[&str] = &["message"];
+const NETWORK_FIELDS: &[&str] = &["latency", "download", "upload", "loss"];
+
+pub(crate) fn fmt(args: Vec<String>) -> Result<bool> {
+    let mut scenario_path = None;
+    let mut write = false;
+    let mut check = false;
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--scenario" => {
+                scenario_path = Some(PathBuf::from(
+                    args.next()
+                        .ok_or_else(|| anyhow!("--scenario needs a value"))?,
+                ));
+            }
+            "--write" => write = true,
+            "--check" => check = true,
+            "-h" | "--help" => {
+                println!("browser-shot fmt --scenario <file.dsl> [--write|--check]");
+                return Ok(true);
+            }
+            other => bail!("unknown option {other}; try --help"),
+        }
+    }
+    if write && check {
+        bail!("--write and --check are mutually exclusive");
+    }
+    let path = scenario_path.ok_or_else(|| anyhow!("--scenario is required"))?;
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if extension == "toml" {
+        bail!("fmt formats the DSL; TOML is not rewritten");
+    }
+
+    let text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let formatted = match format_dsl(&text).with_context(|| format!("format {}", path.display())) {
+        Ok(formatted) => formatted,
+        Err(error) => {
+            eprintln!("browser-shot fmt: {error:#}");
+            return Ok(false);
+        }
+    };
+
+    if check {
+        if formatted == text {
+            println!("unchanged {}", path.display());
+            return Ok(true);
+        }
+        println!("would format {}", path.display());
+        return Ok(false);
+    }
+    if write {
+        fs::write(&path, &formatted).with_context(|| format!("write {}", path.display()))?;
+        println!("formatted {}", path.display());
+        return Ok(true);
+    }
+    print!("{formatted}");
+    Ok(true)
+}
+
+fn format_dsl(text: &str) -> Result<String> {
+    // Formatting is a syntax operation. `check` and `run` own the semantic rules, so a
+    // half-written scenario can still be laid out before its peers exist.
+    parse_dsl(text)?;
+    let mut lines = Vec::new();
+    for (index, raw) in text.lines().enumerate() {
+        let parsed = tokenize_line(raw, index + 1)?;
+        if parsed.tokens.is_empty() {
+            if let Some(comment) = parsed.comment {
+                lines.push(comment);
+            } else if lines.last().is_some_and(|line| !line.is_empty()) {
+                lines.push(String::new());
+            }
+        } else {
+            lines.push(format_line(&parsed)?);
+        }
+    }
+    while lines.last().is_some_and(String::is_empty) {
+        lines.pop();
+    }
+    if lines.is_empty() {
+        Ok(String::new())
+    } else {
+        Ok(format!("{}\n", lines.join("\n")))
+    }
+}
+
+fn format_line(line: &LineTokens) -> Result<String> {
+    let first = line
+        .tokens
+        .first()
+        .ok_or_else(|| anyhow!("internal formatter error: empty line"))?;
+    if first.is_kv() {
+        bail_at!(first, "a line must start with an action");
+    }
+    let action = first.value.as_str();
+    let rest = &line.tokens[1..];
+    let positionals = positionals(rest);
+    let mut kvs = collect_kvs(rest)?;
+    let mut parts = vec![action.to_owned()];
+
+    match action {
+        "run" => push_fields(&mut parts, &mut kvs, RUN_FIELDS),
+        "peer" => {
+            let name = positionals
+                .first()
+                .ok_or_else(|| anyhow!("line {}: peer needs a name", first.line))?;
+            parts.push(format_value(&name.value));
+            let mut touch = None;
+            let mut headed = None;
+            for token in positionals.iter().skip(1) {
+                match token.value.as_str() {
+                    "touch" => touch = Some(true),
+                    "headed" => headed = Some(true),
+                    other => bail_at!(
+                        token,
+                        &format!("peer: unexpected value {other:?}; use key=value fields"),
+                    ),
+                }
+            }
+            if let Some(value) = take_bool(&mut kvs, "touch")? {
+                touch = Some(value);
+            }
+            if let Some(value) = take_bool(&mut kvs, "headed")? {
+                headed = Some(value);
+            }
+            push_fields(&mut parts, &mut kvs, PEER_FIELDS);
+            push_flag(&mut parts, "touch", touch, "touch=false");
+            push_flag(&mut parts, "headed", headed, "headed=false");
+        }
+        "wait" => {
+            let peer_list = positionals
+                .first()
+                .ok_or_else(|| anyhow!("line {}: wait needs a peer or peer list", first.line))?;
+            parts.push(format_value(&peer_list.value));
+            push_fields(&mut parts, &mut kvs, WAIT_FIELDS);
+        }
+        "eval" => {
+            if positionals.len() < 2 {
+                bail_at!(first, "eval needs a peer and an expression");
+            }
+            parts.push(format_value(&positionals[0].value));
+            parts.push(format_value(&positionals[1].value));
+            let mut await_promise = None;
+            for token in positionals.iter().skip(2) {
+                match token.value.as_str() {
+                    "await" => await_promise = Some(true),
+                    other => bail_at!(token, &format!("eval: unexpected value {other:?}")),
+                }
+            }
+            if let Some(value) = take_bool(&mut kvs, "await")? {
+                await_promise = Some(value);
+            }
+            push_flag(&mut parts, "await", await_promise, "await=false");
+            push_fields(&mut parts, &mut kvs, &["capture"]);
+        }
+        "key" => {
+            if positionals.len() != 3 {
+                bail_at!(first, "key needs a peer, code and state");
+            }
+            parts.push(format_value(&positionals[0].value));
+            parts.push(format_value(&positionals[1].value));
+            parts.push(format_value(&positionals[2].value));
+            push_fields(&mut parts, &mut kvs, KEY_FIELDS);
+        }
+        "pointer" => {
+            if positionals.len() != 2 {
+                bail_at!(first, "pointer needs a peer and click or hover");
+            }
+            parts.push(format_value(&positionals[0].value));
+            parts.push(format_value(&positionals[1].value));
+            push_fields(&mut parts, &mut kvs, POINTER_FIELDS);
+        }
+        "capture" => {
+            if positionals.len() != 1 {
+                bail_at!(first, "capture needs a peer");
+            }
+            parts.push(format_value(&positionals[0].value));
+            push_fields(&mut parts, &mut kvs, CAPTURE_FIELDS);
+        }
+        "assert" => {
+            if positionals.len() != 2 {
+                bail_at!(first, "assert needs a peer and one expression");
+            }
+            parts.push(format_value(&positionals[0].value));
+            parts.push(format_value(&positionals[1].value));
+            push_fields(&mut parts, &mut kvs, ASSERT_FIELDS);
+        }
+        "network" => {
+            if positionals.len() != 1 {
+                bail_at!(first, "network needs a peer");
+            }
+            parts.push(format_value(&positionals[0].value));
+            push_fields(&mut parts, &mut kvs, NETWORK_FIELDS);
+        }
+        other => bail_at!(
+            first,
+            &format!(
+                "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, assert or network"
+            ),
+        ),
+    }
+
+    reject_unknown(&kvs, first, action)?;
+    let text = parts.join(" ");
+    Ok(match &line.comment {
+        Some(comment) => format!("{text}  {comment}"),
+        None => text,
+    })
+}
+
+fn push_fields(parts: &mut Vec<String>, kvs: &mut BTreeMap<String, Token>, order: &[&str]) {
+    for key in order {
+        if let Some(token) = kvs.remove(*key) {
+            parts.push(format!("{key}={}", format_value(&token.value)));
+        }
+    }
+}
+
+fn push_flag(parts: &mut Vec<String>, name: &str, value: Option<bool>, false_form: &str) {
+    match value {
+        Some(true) => parts.push(name.to_owned()),
+        Some(false) => parts.push(false_form.to_owned()),
+        None => {}
+    }
+}
+
+fn format_value(value: &str) -> String {
+    let quote = value.is_empty()
+        || value.chars().any(|character| {
+            character.is_whitespace() || matches!(character, '=' | '"' | '\'' | '\\' | '#')
+        });
+    if !quote {
+        return value.to_owned();
+    }
+    let escaped = value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\t', "\\t");
+    format!("\"{escaped}\"")
+}
+
 pub(crate) fn parse_viewport(value: &str) -> Result<(u32, u32)> {
     let (width, height) = value
         .split_once('x')
@@ -650,17 +924,6 @@ impl Token {
     }
 }
 
-macro_rules! bail_at {
-    ($token:expr, $message:expr $(,)?) => {
-        return Err(anyhow!(
-            "line {}:{}: {}",
-            $token.line,
-            $token.column,
-            $message
-        ))
-    };
-}
-
 fn parse_dsl(text: &str) -> Result<Scenario> {
     let mut run = RunConfig::default();
     let mut run_seen = false;
@@ -671,7 +934,8 @@ fn parse_dsl(text: &str) -> Result<Scenario> {
 
     for (index, raw) in text.lines().enumerate() {
         let line = index + 1;
-        let tokens = tokenize_line(raw, line)?;
+        let parsed = tokenize_line(raw, line)?;
+        let tokens = parsed.tokens;
         let Some(first) = tokens.first() else {
             continue;
         };
@@ -741,9 +1005,15 @@ fn parse_dsl(text: &str) -> Result<Scenario> {
     })
 }
 
-fn tokenize_line(line: &str, number: usize) -> Result<Vec<Token>> {
+struct LineTokens {
+    tokens: Vec<Token>,
+    comment: Option<String>,
+}
+
+fn tokenize_line(line: &str, number: usize) -> Result<LineTokens> {
     let chars: Vec<char> = line.chars().collect();
     let mut tokens = Vec::new();
+    let mut comment = None;
     let mut index = 0;
 
     while index < chars.len() {
@@ -754,6 +1024,13 @@ fn tokenize_line(line: &str, number: usize) -> Result<Vec<Token>> {
             break;
         }
         if chars[index] == '#' {
+            comment = Some(
+                chars[index..]
+                    .iter()
+                    .collect::<String>()
+                    .trim_end()
+                    .to_owned(),
+            );
             break;
         }
 
@@ -828,7 +1105,7 @@ fn tokenize_line(line: &str, number: usize) -> Result<Vec<Token>> {
         }
     }
 
-    Ok(tokens)
+    Ok(LineTokens { tokens, comment })
 }
 
 fn read_quoted(
@@ -871,6 +1148,9 @@ fn read_quoted(
 }
 
 fn parse_run(tokens: &[Token], first: &Token) -> Result<RunConfig> {
+    if let Some(extra) = positionals(tokens).first() {
+        bail_at!(extra, "run takes fields only");
+    }
     let mut kvs = collect_kvs(tokens)?;
     let timeout_ms = take_duration(&mut kvs, "timeout")?;
     let artifacts = take_string(&mut kvs, "artifacts").map(PathBuf::from);
@@ -1481,6 +1761,34 @@ assert b "window.__received === 100" message="all messages arrive"
         let error = parse_dsl(text).unwrap().validate().unwrap_err();
         assert!(error.to_string().contains("unknown peer \"b\""), "{error}");
         assert!(error.to_string().contains("line 2"), "{error}");
+    }
+
+    #[test]
+    fn formats_fields_in_a_canonical_order() {
+        let input = "peer   a   viewport=390x844   url=x   touch\nkey a KeyW down hold=12\nassert a \"window.x === 1\" message=\"a message\" # note\n";
+        let expected = "peer a url=x viewport=390x844 touch\nkey a KeyW down hold=12\nassert a \"window.x === 1\" message=\"a message\"  # note\n";
+        let formatted = format_dsl(input).unwrap();
+        assert_eq!(formatted, expected);
+        assert_eq!(format_dsl(&formatted).unwrap(), formatted);
+    }
+
+    #[test]
+    fn formats_without_requiring_semantic_validity() {
+        assert_eq!(format_dsl("# draft\n").unwrap(), "# draft\n");
+    }
+
+    #[test]
+    fn formats_hash_values_as_quoted() {
+        let input = "peer a url=x viewport=390x844\npointer a click selector=#game\n";
+        let formatted = format_dsl(input).unwrap();
+        assert!(formatted.contains("selector=\"#game\""), "{formatted}");
+    }
+
+    #[test]
+    fn formats_comments_and_blank_lines() {
+        let input = "# header\n\n\npeer a url=x viewport=390x844\n";
+        let formatted = format_dsl(input).unwrap();
+        assert_eq!(formatted, "# header\n\npeer a url=x viewport=390x844\n");
     }
 
     #[test]

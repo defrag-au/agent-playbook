@@ -1,8 +1,8 @@
 //! `browser-shot` — screenshots and scenario runs from browsers the tool launches itself, with the
 //! sidecar contract from `docs/browser-automation.md`.
 //!
-//! `run` and `check` both accept the line-oriented DSL and the older TOML format. See `README.md`
-//! and `SCENARIO.md`.
+//! `run` and `check` both accept the line-oriented DSL and the older TOML format; `fmt` formats the
+//! DSL. See `README.md` and `SCENARIO.md`.
 
 mod capture;
 mod collect;
@@ -185,6 +185,19 @@ impl Drop for Profile {
 }
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("fmt") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        let code = match scenario::fmt(args) {
+            Ok(true) => 0,
+            Ok(false) => 2,
+            Err(error) => {
+                eprintln!("browser-shot fmt: {error:#}");
+                1
+            }
+        };
+        std::process::exit(code);
+    }
+
     if std::env::args().nth(1).as_deref() == Some("check") {
         let args: Vec<String> = std::env::args().skip(2).collect();
         let code = match scenario::check(args) {
