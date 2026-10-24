@@ -9,4 +9,4 @@ license = "MIT"
 # `at-peek` carries. This is the binary that spawns `git`, so what it links should be readable in
 # a sitting.
 [dependencies]
-at-core = { path = "../at-core" }
+at-core = { workspace = true }

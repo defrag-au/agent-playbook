@@ -13,12 +13,12 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 base64 = "0.22"
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono = { workspace = true }
 libc = "0.2"
 # `headless_chrome` returns CDP's `RemoteObject.value` as `serde_json::Value`, which is the
 # dynamic-external-API case the typed-JSON rule exempts.
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 toml = "1"
 # `headless_chrome` owns the browser process and kills it on drop, which is the property
 # the hand-rolled Node loop lacked. `offline` generates the CDP bindings from the protocol

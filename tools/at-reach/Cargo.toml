@@ -8,4 +8,4 @@ license = "MIT"
 # One dependency: the shared output contract. The SSH call is std::process::Command, so this
 # binary links nothing that could turn a probe into a write.
 [dependencies]
-at-core = { path = "../at-core" }
+at-core = { workspace = true }

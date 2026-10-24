@@ -9,5 +9,5 @@ license = "MIT"
 # engine `search` needs to displace `grep`. Neither adds a capability — the tool reads files
 # and runs nothing.
 [dependencies]
-at-core = { path = "../at-core" }
-regex = "1"
+at-core = { workspace = true }
+regex = { workspace = true }
