@@ -8,6 +8,7 @@ use skill_store::export;
 use skill_store::fsx;
 use skill_store::publish::{self, Options};
 use skill_store::source;
+use skill_store::status;
 use skill_store::store::Store;
 use skill_store::verify;
 
@@ -146,6 +147,118 @@ fn a_second_version_stores_only_what_changed() {
     assert!(fs::read_to_string(second.join("skill/SKILL.md"))
         .expect("v2 body")
         .contains("two"));
+}
+
+#[test]
+fn a_user_block_carries_an_address_or_is_not_written() {
+    use skill_store::inventory::Inventory;
+
+    let temp = Temp::new("user-block");
+    let store = temp.path.join("store");
+    let skill = write_skill(&temp.path, "widget-screenshot", "one");
+
+    publish::publish(
+        &skill,
+        &store,
+        &Options {
+            init: true,
+            ..Default::default()
+        },
+    )
+    .expect("publish");
+    let inventory = Inventory::read(&store.join("widget-screenshot")).expect("inventory");
+    let version = inventory.versions.get("v1").expect("v1");
+    assert!(
+        version.user.is_none(),
+        "a store with no repository has no address to record, and a name alone is an OCFL \
+         warning (W008) — so nothing is recorded rather than something invented"
+    );
+
+    fs::write(
+        skill.join("SKILL.md"),
+        "---\nname: widget-screenshot\ndescription: A test skill for widget-screenshot.\n---\n\ntwo\n",
+    )
+    .expect("change");
+    publish::publish(
+        &skill,
+        &store,
+        &Options {
+            user: Some("tester"),
+            address: Some("https://example.com/tester"),
+            ..Default::default()
+        },
+    )
+    .expect("v2");
+    let inventory = Inventory::read(&store.join("widget-screenshot")).expect("inventory");
+    let version = inventory.versions.get("v2").expect("v2");
+    let user = version.user.as_ref().expect("user block");
+    assert_eq!(user.name, "tester");
+    assert_eq!(user.address.as_deref(), Some("https://example.com/tester"));
+}
+
+#[test]
+fn a_user_with_no_address_and_no_repository_is_refused() {
+    let temp = Temp::new("user-no-address");
+    let store = temp.path.join("store");
+    let skill = write_skill(&temp.path, "widget-screenshot", "one");
+
+    let error = publish::publish(
+        &skill,
+        &store,
+        &Options {
+            init: true,
+            user: Some("tester"),
+            ..Default::default()
+        },
+    )
+    .expect_err("a name with no address is W008");
+    assert!(error.contains("--address"), "{error}");
+    assert!(
+        !store.join("widget-screenshot").exists(),
+        "a refused publish must not leave an object behind"
+    );
+}
+
+#[test]
+fn a_store_in_a_repository_records_that_repository() {
+    use skill_store::inventory::Inventory;
+
+    let temp = Temp::new("user-block-git");
+    let store = temp.path.join("store");
+    let skill = write_skill(&temp.path, "widget-screenshot", "one");
+    git(&temp.path, &["init", "--quiet"]);
+    git(
+        &temp.path,
+        &[
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:defrag-au/widget-works.git",
+        ],
+    );
+
+    publish::publish(
+        &skill,
+        &store,
+        &Options {
+            init: true,
+            ..Default::default()
+        },
+    )
+    .expect("publish");
+
+    let inventory = Inventory::read(&store.join("widget-screenshot")).expect("inventory");
+    let version = inventory.versions.get("v1").expect("v1");
+    let user = version.user.as_ref().expect("user block");
+    assert_eq!(
+        user.address.as_deref(),
+        Some("https://github.com/defrag-au/widget-works"),
+        "the address is the repository the store lives in, normalised to a URL"
+    );
+    assert!(
+        !user.name.trim().is_empty(),
+        "OCFL wants a name as well as an address"
+    );
 }
 
 #[test]
@@ -416,6 +529,182 @@ fn a_working_copy_digest_follows_the_edit() {
     assert_ne!(
         first.tree_digest, second.tree_digest,
         "the digest has to track the working tree, or a consumer cannot see drift"
+    );
+}
+
+#[test]
+fn status_sees_drift_in_both_directions() {
+    let temp = Temp::new("status");
+    let store = temp.path.join("store");
+    let worktree = temp.path.join("skills");
+    fs::create_dir_all(&worktree).expect("worktree");
+    fs::write(worktree.join("README.md"), "not a skill\n").expect("readme");
+    let skill = write_skill(&worktree, "widget-screenshot", "one");
+
+    publish::publish(
+        &skill,
+        &store,
+        &Options {
+            init: true,
+            ..Default::default()
+        },
+    )
+    .expect("publish");
+
+    let readings = status::compare(&store, &worktree).expect("status");
+    assert_eq!(readings.len(), 1, "a top-level file is not a skill");
+    assert_eq!(readings[0].state, status::State::Current);
+
+    // An edit, an addition and a deletion that were never published.
+    fs::write(
+        skill.join("SKILL.md"),
+        "---\nname: widget-screenshot\ndescription: A test skill.\n---\n\ntwo\n",
+    )
+    .expect("edit");
+    fs::write(skill.join("references/NEW.md"), "new\n").expect("add");
+    fs::remove_file(skill.join("references/REFERENCE.md")).expect("remove");
+
+    let readings = status::compare(&store, &worktree).expect("status");
+    match &readings[0].state {
+        status::State::Ahead(difference) => {
+            assert_eq!(difference.changed, 1);
+            assert_eq!(difference.added, 1);
+            assert_eq!(difference.removed, 1);
+        }
+        other => panic!("expected ahead, got {other:?}"),
+    }
+
+    // A directory nobody can consume.
+    let unsynced = worktree.join("fleet-ops");
+    fs::create_dir_all(&unsynced).expect("unsynced");
+    fs::write(
+        unsynced.join("SKILL.md"),
+        "---\nname: fleet-ops\ndescription: x\n---\n\nbody\n",
+    )
+    .expect("skill");
+    let readings = status::compare(&store, &worktree).expect("status");
+    assert!(readings
+        .iter()
+        .any(|reading| reading.name == "fleet-ops" && reading.state == status::State::Missing));
+
+    // Publishing clears it, so the check is actionable rather than terminal.
+    publish::publish(&skill, &store, &Options::default()).expect("publish v2");
+    let readings = status::compare(&store, &worktree).expect("status");
+    assert!(readings
+        .iter()
+        .any(|reading| reading.name == "widget-screenshot"
+            && reading.state == status::State::Current));
+
+    // And an object nobody can edit.
+    fs::remove_dir_all(&skill).expect("remove directory");
+    let readings = status::compare(&store, &worktree).expect("status");
+    assert!(readings
+        .iter()
+        .any(|reading| reading.name == "widget-screenshot"
+            && reading.state == status::State::StoreOnly));
+}
+
+#[test]
+fn publish_changed_publishes_only_what_moved_and_is_idempotent() {
+    let temp = Temp::new("publish-changed");
+    let store = temp.path.join("store");
+    let worktree = temp.path.join("skills");
+    fs::create_dir_all(&worktree).expect("worktree");
+    fs::write(worktree.join("README.md"), "not a skill\n").expect("readme");
+    let changed_skill = write_skill(&worktree, "widget-screenshot", "one");
+    let fresh_skill = write_skill(&worktree, "inspect-code", "body");
+
+    publish::publish(
+        &changed_skill,
+        &store,
+        &Options {
+            init: true,
+            ..Default::default()
+        },
+    )
+    .expect("v1");
+
+    fs::write(
+        changed_skill.join("SKILL.md"),
+        "---\nname: widget-screenshot\ndescription: A test skill for widget-screenshot.\n---\n\ntwo\n",
+    )
+    .expect("edit");
+    let changed = publish::publish_changed(&store, &worktree, &Options::default()).expect("loop");
+    let published: Vec<(&str, &str)> = changed
+        .published
+        .iter()
+        .map(|report| (report.id.as_str(), report.version.as_str()))
+        .collect();
+    assert_eq!(
+        published,
+        vec![
+            ("urn:skill:inspect-code", "v1"),
+            ("urn:skill:widget-screenshot", "v2"),
+        ],
+        "a directory with no object is published, and the edited one gets one new version"
+    );
+    assert!(changed.blocked.is_empty());
+
+    let readings = status::compare(&store, &worktree).expect("status");
+    assert!(
+        readings
+            .iter()
+            .all(|reading| reading.state == status::State::Current),
+        "{readings:?}"
+    );
+
+    let again = publish::publish_changed(&store, &worktree, &Options::default()).expect("loop");
+    assert!(
+        again.published.is_empty() && again.blocked.is_empty(),
+        "running it with nothing to do publishes nothing"
+    );
+    assert!(fresh_skill.is_dir());
+}
+
+#[test]
+fn publish_changed_reports_an_object_nobody_can_edit() {
+    let temp = Temp::new("publish-changed-blocked");
+    let store = temp.path.join("store");
+    let worktree = temp.path.join("skills");
+    fs::create_dir_all(&worktree).expect("worktree");
+    let skill = write_skill(&worktree, "widget-screenshot", "one");
+    publish::publish(
+        &skill,
+        &store,
+        &Options {
+            init: true,
+            ..Default::default()
+        },
+    )
+    .expect("v1");
+    fs::remove_dir_all(&skill).expect("remove directory");
+
+    let changed = publish::publish_changed(&store, &worktree, &Options::default()).expect("loop");
+    assert!(changed.published.is_empty());
+    assert_eq!(changed.blocked, vec!["widget-screenshot".to_string()]);
+}
+
+#[test]
+fn publish_changed_refuses_an_explicit_id() {
+    let temp = Temp::new("publish-changed-id");
+    let store = temp.path.join("store");
+    let worktree = temp.path.join("skills");
+    fs::create_dir_all(&worktree).expect("worktree");
+
+    let error = publish::publish_changed(
+        &store,
+        &worktree,
+        &Options {
+            id: Some("urn:skill:other"),
+            init: true,
+            ..Default::default()
+        },
+    )
+    .expect_err("one id cannot name several skills");
+    assert!(error.contains("--id"), "{error}");
+    assert!(
+        !store.join("0=ocfl_1.1").exists(),
+        "a refused call must not leave a store behind"
     );
 }
 

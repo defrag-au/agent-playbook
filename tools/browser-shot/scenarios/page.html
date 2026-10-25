@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>serve fixture</title>
+<!-- An inline empty icon, so the browser does not request /favicon.ico and the
+     acceptance sidecar stays free of a console error that is not a defect. -->
+<link rel="icon" href="data:,">
+<!-- The only thing the acceptance needs: a page that came from a process the
+     scenario started, with a readiness flag so a capture waits on a condition
+     rather than on a delay. The counter makes `wait … frames=` usable too. -->
+<body style="margin:0;background:#101418;color:#e6edf3;font:16px/1.5 monospace">
+  <main style="padding:24px">served by a process this scenario started</main>
+  <script>
+    window.__frames = 0;
+    window.__ready = true;
+    (function tick() {
+      window.__frames += 1;
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>

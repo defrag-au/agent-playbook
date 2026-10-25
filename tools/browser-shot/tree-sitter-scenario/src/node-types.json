@@ -138,6 +138,29 @@
     "fields": {}
   },
   {
+    "type": "goto",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "field",
+          "named": true
+        },
+        {
+          "type": "name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "key",
     "named": true,
     "fields": {},
@@ -314,6 +337,10 @@
           "named": true
         },
         {
+          "type": "goto",
+          "named": true
+        },
+        {
           "type": "key",
           "named": true
         },
@@ -334,7 +361,34 @@
           "named": true
         },
         {
+          "type": "spawn",
+          "named": true
+        },
+        {
           "type": "wait",
+          "named": true
+        },
+        {
+          "type": "wait_for",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "spawn",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "field",
+          "named": true
+        },
+        {
+          "type": "name",
           "named": true
         }
       ]
@@ -378,6 +432,21 @@
         },
         {
           "type": "peer_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "wait_for",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "field",
           "named": true
         }
       ]
@@ -445,6 +514,10 @@
     "named": false
   },
   {
+    "type": "goto",
+    "named": false
+  },
+  {
     "type": "headed",
     "named": false
   },
@@ -477,6 +550,10 @@
     "named": false
   },
   {
+    "type": "spawn",
+    "named": false
+  },
+  {
     "type": "swipe",
     "named": false
   },
@@ -494,6 +571,10 @@
   },
   {
     "type": "wait",
+    "named": false
+  },
+  {
+    "type": "wait_for",
     "named": false
   }
 ]

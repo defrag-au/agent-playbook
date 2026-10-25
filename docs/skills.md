@@ -93,13 +93,15 @@ skills: github:defrag-au/agent-playbook#inspect-code@v1, github:defrag-au/agent-
 ```
 
 ```sh
-playbook skills sync  --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf --target all
-playbook skills check --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf --target all
+playbook skills sync  --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf
+playbook skills check --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf
 ```
 
-That is the "update all of my skills" command. The lock stays beside that manifest — it records
-what *you* installed, not what a repository did — and `--repo` is ignored with a note, because a
-global scope has no repository to write into.
+That is the "update all of my skills" command. No `--target`: a global catalogue is for every
+harness by definition, and its `default_target` (`zed-personal`) names the instructions file rather
+than a skill directory, so `all` is the default there. The lock stays beside that manifest — it
+records what *you* installed, not what a repository did — and `--repo` is ignored with a note,
+because a global scope has no repository to write into.
 
 ## The lock
 
@@ -129,6 +131,50 @@ Move them out of the way, or delete them so the next sync records the delivered 
 That is the first thing a global run meets, because skill directories were hand-installed before
 there was a store. The answer is to delete the copies — the message says which ones are stale —
 not to reach for `--force`, which does not exist.
+
+## Publishing an edit
+
+`skills/<name>/` is the editable source; `.skill-store/<name>/vN/` is the artifact. A version is a
+release, so the two are compared before anything is written, and one command covers the loop:
+
+```sh
+skill-store status           --store .skill-store --worktree skills   # what is owed
+skill-store publish-changed  --store .skill-store --worktree skills   # pay it
+```
+
+`publish-changed` publishes exactly the directories that are `ahead` of their object's head or
+have no object yet. With nothing to do it prints `nothing to publish` and exits `0`, so it is safe
+to run before every commit. `publish <dir> --store …` remains for one skill, and `--message`,
+`--user` and `--address` apply to whatever it writes.
+
+It **refuses** to publish identical content — a version that changes nothing is a mistake, not a
+release — which is why a metadata-only fix cannot be applied retroactively. A version's `user`
+block records the repository the store lives in (name from `git config user.name`, address from
+`origin` as an `https://` URL), so every version published since that landed is spec-clean; older
+ones keep the OCFL warnings they were written with, and clear them when the skill is next versioned.
+
+### The gate
+
+`.github/workflows/skills-check.yaml` is a **reusable** workflow — `workflow_call` — so every
+repository runs the same check against the same tool:
+
+```yaml
+# an authoring repository, with `.skill-store/` beside `skills/`
+jobs:
+  skills:
+    uses: defrag-au/agent-playbook/.github/workflows/skills-check.yaml@main
+```
+
+It runs `skill-store verify` and then `skill-store status`, and fails on `ahead`, `missing` and
+`store-only`. A consumer passes `store: ""` and `manifest: .playbook/project.conf` instead, and it
+runs `playbook skills check` — what the repository committed must still be what its declarations
+resolve to. `tool-repository: ""` makes the *calling* repository the tool, which is how this
+repository checks its own store without a second checkout.
+
+**It detects; it never publishes.** A bot that rewrote `.skill-store/` on a pull request would put
+an unreviewable version on the branch, and a push made with `GITHUB_TOKEN` does not retrigger CI.
+So the fix for a red run is `publish-changed` on the branch, committed with the edit — the same
+reason the version and its diff belong in one commit.
 
 ## Developing against a skill
 
@@ -183,18 +229,19 @@ a directory is the one thing a consumer cannot undo, so it is never the default.
 - **The patch file is not created or ignored for you.** `.playbook/skills.patch` is opt-in: write
   it when you need one and add it to `.gitignore` yourself. `playbook` reads it if it is there and
   cannot edit ignore rules.
-- **A gate on the authoring tree.** Nothing fails when `skills/<name>/` has moved on from the
-  published version. `skill-store export` plus a diff is the manual check; a test that runs it
-  for every object is the obvious next step.
-- **CI.** `playbook skills check` is the command to run, but no repository runs it yet; a
-  `github:` source needs `skill-store` and network in the job.
+- **A private store cannot be delivered.** `skill-store` fetches with a plain `git clone` and no
+  credentials, so a `github:` source resolves only for a public repository. The tool is public; the
+  fleet inventory it reads is not.
+- **The OCFL warnings on old versions are permanent.** Inventories are immutable, so a `v1` written
+  before the `user` block carried an address keeps that warning. Only the next version of that
+  skill clears it; editing an inventory to tidy one would break the guarantee the store exists for.
 - **A home-independent global lock.** The lock records source, version, digest and target — not
   the absolute directory. It assumes the same home it was written in, which is right for a
   personal catalogue and wrong if one is ever shared across machines.
-- **One skill is published nowhere.** `fleet-ops` still sits in `skills/` and is absent from the
-  personal catalogue; it belongs in `fleet`, which has no store yet. The hand-installed copy in
-  `~/.agents/skills` is left alone until it moves.
 - **Two are published but not catalogued.** `widget-screenshot` and `game-spike` are in
   `shared-crates/.skill-store/`, but that store is not on a pushed branch, and one unresolvable
   source aborts the whole sync — so the personal catalogue lists them only once it is. Their
   hand-installed copies are deliberately left behind.
+- **One skill is published but not catalogued.** `fleet-ops` is in `fleet/.skill-store/`; the
+  personal catalogue lists it once that store is on a pushed branch. The hand-installed copy in
+  `~/.agents/skills` is left alone until then.

@@ -92,6 +92,13 @@ reaching it costs an approval whose intent has to be reconstructed from syntax.
     with separate down/up and held modifiers, pointer movement as interpolated steps, touch through
     `Input.dispatchTouchEvent`, and every input step timestamped against the page's own frame
     counter rather than a wall clock. See [*Input*](#input).
+14. **Start the origin the scenario tests, and stop it again.** A scenario that needs a server is two
+    commands and a manual teardown otherwise, and one logical server is usually several processes
+    with only the last holding the port. The layer owns the process **group** it started and
+    terminates it on every exit path — success, assertion failure, error, signal — and refuses to
+    start on a port somebody else holds rather than testing the wrong build. Readiness is its own
+    step (`wait_for port`, `http`, `log`, `exit`), with its own timeout and the process's log tail
+    on failure, because "the build failed" and "the build is slow" are different answers.
 
 ## Must not
 

@@ -8,10 +8,12 @@ pub mod digest;
 pub mod export;
 pub mod fsx;
 pub mod git;
+pub mod identity;
 pub mod inventory;
 pub mod publish;
 pub mod skill;
 pub mod source;
+pub mod status;
 pub mod store;
 pub mod verify;
 
@@ -29,7 +31,9 @@ commands
                                        a `path:` to a plain skill directory exports as `working`
   list <source>                        list the objects in a store, with head and description
   verify <source> [<skill>]            check inventories, digests and content paths
+  status --store <path> --worktree <dir>  compare a store with the directories it publishes
   publish <dir> --store <path>         publish a plain skill directory as a new version
+  publish-changed --store <path> --worktree <dir>  publish every skill that has moved on
   source <source>                      print how a source resolves (for debugging)
 
 source
@@ -42,12 +46,18 @@ source
   A store is either the directory with `0=ocfl_1.1` or a `.skill-store/` directory inside it.
   Omitting `@vN` selects the object's head; a consumer's lock should freeze it.
 
+  Each version records who published it, read from the repository the store lives in: the name
+  from `git config user.name` and the address from `origin`, normalised to a URL. A store outside
+  a git checkout has no address to record and writes no user block at all.
+
 options
   --out <dir>        export destination (required for export)
-  --store <path>     storage root to publish into (required for publish)
+  --store <path>     storage root to publish into (publish, publish-changed, status)
+  --worktree <dir>   directory holding one subdirectory per skill (status, publish-changed)
   --id <uri>         object id (default: urn:skill:<name>)
   --message <text>   version message
-  --user <name>      version user (default: $USER)
+  --user <name>      version user (default: `git config user.name`)
+  --address <url>    version user address (default: the store repository's `origin`)
   --version <vN>     verify or export one version
   --skill <name>     verify one object
   --init             create the storage root if it does not exist
@@ -59,9 +69,11 @@ options
 struct Opts {
     out: Option<String>,
     store: Option<String>,
+    worktree: Option<String>,
     id: Option<String>,
     message: Option<String>,
     user: Option<String>,
+    address: Option<String>,
     skill: Option<String>,
     version: Option<String>,
     offline: bool,
@@ -83,7 +95,9 @@ pub fn run(args: &[String]) -> i32 {
         "export" => cmd_export(&opts),
         "list" => cmd_list(&opts),
         "verify" => cmd_verify(&opts),
+        "status" => cmd_status(&opts),
         "publish" => cmd_publish(&opts),
+        "publish-changed" => cmd_publish_changed(&opts),
         "source" => cmd_source(&opts),
         other => usage(&format!("unknown command `{other}`")),
     }
@@ -93,9 +107,11 @@ fn parse(args: &[String]) -> Result<Opts, String> {
     const VALUE: &[&str] = &[
         "--out",
         "--store",
+        "--worktree",
         "--id",
         "--message",
         "--user",
+        "--address",
         "--skill",
         "--version",
     ];
@@ -115,9 +131,11 @@ fn parse(args: &[String]) -> Result<Opts, String> {
                 match other {
                     "--out" => opts.out = Some(value),
                     "--store" => opts.store = Some(value),
+                    "--worktree" => opts.worktree = Some(value),
                     "--id" => opts.id = Some(value),
                     "--message" => opts.message = Some(value),
                     "--user" => opts.user = Some(value),
+                    "--address" => opts.address = Some(value),
                     "--skill" => opts.skill = Some(value),
                     "--version" => opts.version = Some(value),
                     _ => unreachable!(),
@@ -303,6 +321,82 @@ fn cmd_verify(opts: &Opts) -> i32 {
     }
 }
 
+/// `status` — is the published head still what the authoring directory says?
+///
+/// Read-only, so it is the command a pull request runs. Both directions count as drift: a
+/// directory nobody published, and an object nobody can edit.
+fn cmd_status(opts: &Opts) -> i32 {
+    let Some(store) = &opts.store else {
+        return usage("`status` needs `--store <path>`");
+    };
+    let Some(worktree) = &opts.worktree else {
+        return usage("`status` needs `--worktree <dir>`");
+    };
+    let store = fsx::expand_tilde(store);
+    let worktree = fsx::expand_tilde(worktree);
+
+    let readings = match status::compare(&store, &worktree) {
+        Ok(readings) => readings,
+        Err(error) => return operation(error),
+    };
+    if readings.is_empty() {
+        println!(
+            "no objects in {} and no skills in {}",
+            store.display(),
+            worktree.display()
+        );
+        return 0;
+    }
+
+    let mut drift = Vec::new();
+    for reading in &readings {
+        match &reading.state {
+            status::State::Current => {
+                println!("current     {} {}", reading.name, reading.head);
+            }
+            status::State::Ahead(difference) => {
+                println!(
+                    "ahead       {} {} — {}",
+                    reading.name,
+                    reading.head,
+                    difference.describe()
+                );
+                drift.push(reading.name.clone());
+            }
+            status::State::Missing => {
+                println!("missing     {} — no object", reading.name);
+                drift.push(reading.name.clone());
+            }
+            status::State::StoreOnly => {
+                println!(
+                    "store-only  {} {} — no directory",
+                    reading.name, reading.head
+                );
+                drift.push(reading.name.clone());
+            }
+        }
+    }
+
+    if drift.is_empty() {
+        println!("\nok: {} skill(s) in sync", readings.len());
+        return 0;
+    }
+
+    eprintln!(
+        "\n{} of {} skill(s) out of sync: {}",
+        drift.len(),
+        readings.len(),
+        drift.join(", ")
+    );
+    eprintln!(
+        "ahead or missing → skill-store publish-changed --store {} --worktree {}",
+        store.display(),
+        worktree.display()
+    );
+    eprintln!("store-only → add the directory it is published from, or drop the object");
+    1
+}
+
 fn cmd_publish(opts: &Opts) -> i32 {
     let from = match one_positional(opts, "publish") {
         Ok(from) => from,
@@ -316,6 +410,7 @@ fn cmd_publish(opts: &Opts) -> i32 {
         id: opts.id.as_deref(),
         message: opts.message.as_deref(),
         user: opts.user.as_deref(),
+        address: opts.address.as_deref(),
         init: opts.init,
     };
     match publish::publish(Path::new(&from), &store, &options) {
@@ -330,6 +425,55 @@ fn cmd_publish(opts: &Opts) -> i32 {
                 report.unchanged
             );
             0
+        }
+        Err(error) => operation(error),
+    }
+}
+
+fn cmd_publish_changed(opts: &Opts) -> i32 {
+    if !opts.positional.is_empty() {
+        return usage("`publish-changed` takes no positional arguments — it reads `--worktree`");
+    }
+    let (Some(store), Some(worktree)) = (&opts.store, &opts.worktree) else {
+        return usage("`publish-changed` needs `--store <path>` and `--worktree <dir>`");
+    };
+    let store = fsx::expand_tilde(store);
+    let worktree = fsx::expand_tilde(worktree);
+    let options = publish::Options {
+        id: None,
+        message: opts.message.as_deref(),
+        user: opts.user.as_deref(),
+        address: opts.address.as_deref(),
+        init: opts.init,
+    };
+    match publish::publish_changed(&store, &worktree, &options) {
+        Ok(changed) => {
+            for report in &changed.published {
+                println!(
+                    "published {} {} (+{} ~{} -{} ={})",
+                    report.id,
+                    report.version,
+                    report.added,
+                    report.changed,
+                    report.removed,
+                    report.unchanged
+                );
+            }
+            if changed.published.is_empty() {
+                println!("nothing to publish");
+            }
+            for name in &changed.blocked {
+                eprintln!(
+                    "{name}: an object with no authoring directory — nobody can edit it; add \
+                     {}/{name} or drop the object",
+                    worktree.display()
+                );
+            }
+            if changed.blocked.is_empty() {
+                0
+            } else {
+                1
+            }
         }
         Err(error) => operation(error),
     }

@@ -270,6 +270,11 @@ registry entry.
 | `game-spike` | Move to `shared-crates` (gamekit) or split with `augminted-bots` | It is a procedure over the kit and the reference client; the kit is the durable half |
 | `browser-shot`, `inspect-code`, `crate-research`, `capture-rule`, `fleet-ops` | Stay upstream | They are tool or method procedures, not repo procedures |
 
+Superseded: `fleet-ops` went to `fleet`, which owns the machines it describes, and every one of
+these is now authored in `<repo>/skills/` and published into `<repo>/.skill-store/` rather than
+delivered as a plain directory — see [`skills.md`](skills.md). `browser-shot`, `inspect-code`,
+`crate-research` and `capture-rule` stayed here because the toolkit they describe does.
+
 One thing to verify before moving: **where the harness discovers skills**. The available skills in
 this session are loaded from `~/.agents/skills/`, not from a project directory. If Zed does not
 scan `<repo>/.agents/skills/`, a repo-owned skill needs an install step (copy or symlink) and the
@@ -629,13 +634,18 @@ In short:
   model: copy, record, `check`. Unmanaged directories are refused, never overwritten.
 - **`skills_scope:` decides whether that is a repository or the harnesses.** `repo` (default)
   delivers into the checkout; `global` delivers into `~/.agents/skills` and `~/.claude/skills`
-  and keeps the lock beside the manifest. `--target` takes a list or `all`, so both harnesses are
-  one command — the personal catalogue in `fleet` is where "update all of my skills" lives.
+  and keeps the lock beside the manifest. `--target` takes a list or `all`, and a global catalogue
+  defaults to `all` — its `default_target` names an instructions file, so honouring it would be a
+  false start. The personal catalogue in `fleet` is where "update all of my skills" lives.
 - **`.playbook/skills.patch` is the development override**, so testing an edit does not mean
   publishing a version. It is keyed by skill name; a `path:` to a plain directory exports as
   `working`; `sync` leaves the lock alone for a patched skill; and every affected line says
   `(patched)`. A separate gitignored file rather than a manifest key, because an in-manifest patch
   has to be commented out before every commit and CI would otherwise see a machine path.
+- **`skill-store status` is the drift gate**, read-only: `ahead`, `missing` and `store-only` all
+  exit non-zero, so a pull request can require that an edited skill was published with the edit.
+  `.github/workflows/skills-check.yaml` is the reusable workflow that runs it, and every repository
+  with a store calls it — see [`skills.md`](skills.md#the-gate).
 - **The skill moves next to the tool.** `container-compose` is published into
   `container-compose/.skill-store/` and declared as
   `github:defrag-au/container-compose#container-compose@v1`; this repository's `skills/` no longer
@@ -646,7 +656,11 @@ In short:
 - **Two more moved to `shared-crates`.** `widget-screenshot` and `game-spike` are published into
   `shared-crates/.skill-store/` (`v1`, byte-identical round trip) and declared in that
   repository's manifest for both harnesses; `agent-playbook/skills/` no longer carries them.
-  `fleet-ops` remains here until `fleet` has a store.
+- **`fleet-ops` moved to `fleet`**, published as `v1` into `fleet/.skill-store/` — it describes that
+  repository's machines, and the private inventory it reads lives there. Every object's authoring
+  directory exists beside its store: `container-compose/skills/` and `shared-crates/skills/` were
+  recreated by exporting `v1` back out, because a `status` check against a missing worktree can
+  only ever say `store-only`.
 
 Verified: `cargo test --workspace` green (composer 75 unit + 48 integration, `skill-store` 12
 unit + 11 integration); `cargo clippy --workspace --all-targets --all-features -- -D warnings`
@@ -673,9 +687,30 @@ from a store at `v1`; no `skills.lock` was written; editing the working copy mad
 `stale` on both targets; and removing the patch made the same run fail on the unpushed `github:`
 source, which is what the override exists to stand in for.
 
+`status` was verified against this repository, where it reports what actually happened:
+`ahead browser-shot v1 — 1 changed` (a browser-shot session edited the skill and did not publish)
+and `missing fleet-ops — no object`, with the other three `current`, exiting 1.
+
 Not verified: the `github:` sources resolve only after `damon-inversion` is pushed — the remote's
 `main` is still `ba0355e`, before the inversion. The personal catalogue therefore declares the
 `github:` forms, and the first real run happens after the push.
+
+### The OCFL store, externally validated
+
+`ocfl-py` 2.1.0 (`ocfl-root.py validate --root <store> --validate-objects --check-digests`) reports
+**every object VALID and every storage root VALID** for `agent-playbook`, `shared-crates`,
+`container-compose` and `fleet`. The only findings are warnings: `W008` on the versions written
+before a version recorded a `user` address, and `W007b` on those written in between. Both are
+answers to a SHOULD, and both are now avoided rather than silenced: `publish` reads the identity
+from the repository the store lives in — name from `git config user.name`, address from `origin`
+normalised to `https://` — and records nothing at all when there is no repository to name.
+Inventories are immutable, so an old version keeps the warning it was written with; the next
+version of that skill is clean.
+
+`publish-changed --store … --worktree …` was added so the loop is one command, and it is
+idempotent: with nothing to do it prints `nothing to publish` and exits `0`. `browser-shot` was
+published as `v2` that way. Every object in every store re-exports byte-identical to its
+authoring directory, so `status` reads `current` everywhere.
 
 ## Appendix A — cross-references that break when rules move
 

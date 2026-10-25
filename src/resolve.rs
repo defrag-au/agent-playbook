@@ -65,7 +65,8 @@ fn resolve_project(
             )
         })?,
     };
-    let target = load_target(root, &target_name)?;
+    let (target, target_diagnostics) = load_target(root, &target_name)?;
+    diagnostics.extend(target_diagnostics);
 
     let (all_rules, rule_diagnostics) = load_rules_for(root, &project);
     diagnostics.extend(rule_diagnostics);

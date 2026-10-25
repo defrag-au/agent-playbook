@@ -16,7 +16,8 @@ file       = { line } ;
 line       = blank | comment | run | peer | step ;
 run        = "run" { field } ;
 peer       = "peer" name { flag } { field } ;
-step       = wait | eval | key | pointer | capture | burst | assert | network ;
+step       = wait | eval | key | pointer | capture | burst | assert | network
+           | spawn | wait_for | goto ;
 wait       = "wait" peer-list { field } ;
 eval       = "eval" peer expression { flag } { field } ;
 key        = "key" peer code state { field } ;
@@ -25,6 +26,9 @@ capture    = "capture" peer { field } ;
 burst      = "burst" peer { field } ;
 assert     = "assert" peer expression { field } ;
 network    = "network" peer { field } ;
+spawn      = "spawn" name { field } ;
+wait_for   = "wait_for" { field } ;
+goto       = "goto" peer url ;
 
 peer-list  = name { "," name } ;
 field      = key "=" value ;
@@ -164,6 +168,74 @@ as min/median/max and a per-frame table.
 | `download=500` | download limit in kbps |
 | `upload=500` | upload limit in kbps |
 | `loss=2` | packet loss percentage |
+
+`spawn` — the name is positional. Starts a process the run owns.
+
+| Field | Meaning |
+| --- | --- |
+| `command="…"` | required; one shell command, run as `sh -c` |
+| `port=8787` | the port this process listens on — enables the preflight and `wait_for ready=` |
+| `dir=…` | working directory; defaults to where the tool was run |
+| `env="A=1, B=2"` | comma-separated entries added to the child's environment |
+
+The process starts in its own session, so every descendant joins its process group and one `killpg`
+reaches the tree: `wrangler dev` is a script, a node CLI and `workerd`, and only the last of those
+holds the port. The group is terminated when the run ends, however it ends — success, an assertion
+failure, an error, SIGINT or SIGTERM. **SIGKILL or a crash still leaves it running**; the report
+names the pgid, so `kill -- -<pgid>` cleans it up.
+
+`port=` is checked by binding it before the launch. A port somebody else holds is refused:
+
+```text
+spawn "second": port 8792 is already in use — stop that process, or give this one a different port
+```
+
+That check cannot live in `wait_for`: by then a server that failed to bind has already died and the
+squatter is what answers, so the wait would pass against the wrong build.
+
+stdout and stderr go to `<artifacts>/<name>.log`, truncated at the start of the run. A process that
+dies without being claimed by `wait_for exit=` stops the run at the next step, with its status and
+the last lines of its log.
+
+**A scenario with a `spawn` line runs a command, so treat the file like a script** — one you would
+read before running, the way you would a `Makefile`, not a config file from someone else.
+
+`wait_for` — exactly one of the five variants.
+
+| Variant | Waits until |
+| --- | --- |
+| `ready=game` | the port that spawn declared accepts a connection |
+| `port=8787` | any TCP accept on `host=` (default `127.0.0.1`) at that port |
+| `http="http://…"` | a GET answers `status=` (default 200) |
+| `log=game pattern="…"` | the log contains that substring, case-sensitive, in its first 256 KB |
+| `exit=job code=0` | that process ends, with that status (default 0) |
+
+| Field | Meaning |
+| --- | --- |
+| `host=127.0.0.1` | with `port=` |
+| `status=200` | with `http=` |
+| `pattern="…"` | with `log=`; required |
+| `code=0` | with `exit=` |
+| `timeout=120s` | how long the condition may take; default 30 s |
+
+Every variant fails immediately if the process it names exits while the wait is in progress, and the
+problem carries the last twenty lines of its log. Unlike `wait`, **a failed `wait_for` stops the
+scenario**: everything after it assumed the condition held. It records a `problem` in `run.txt` and
+the run exits 2.
+
+`http=` accepts `http://` only. There is no TLS client in this tool, and silently not verifying a
+certificate would be worse than saying so.
+
+`goto` — `peer` and `url` are positional. Navigates the peer and waits for the load event.
+
+```text
+spawn site command="python3 -m http.server 8791" port=8791
+wait_for ready=site
+goto page "http://127.0.0.1:8791/page.html"
+```
+
+A peer fetches its `url=` before any step runs, so this is how a page served by a process the
+scenario started gets loaded.
 
 ## Examples
 

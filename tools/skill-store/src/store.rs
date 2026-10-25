@@ -172,6 +172,35 @@ pub fn validate_root(path: &Path) -> Result<PathBuf, String> {
     Ok(path.to_path_buf())
 }
 
+/// Confirm that `path` is a storage root, or create one when `init` is given.
+///
+/// Adoption is deliberately refused for a non-empty directory that is not already a store: the
+/// contents would be objects whose layout has to be guessed, and a wrong guess writes a store
+/// that reads plausibly and verifies wrongly.
+pub fn ensure_root(path: &Path, init: bool) -> Result<(), String> {
+    if path.join(DECLARATION).is_file() {
+        return validate_root(path).map(|_| ());
+    }
+    if !init {
+        return Err(format!(
+            "{} is not an OCFL storage root — pass `--init` to create one",
+            path.display()
+        ));
+    }
+    if path.exists() {
+        let mut entries = fs::read_dir(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        if entries.next().is_some() {
+            return Err(format!(
+                "{} is not empty and has no `{DECLARATION}` — refusing to adopt it; use a new or \
+                 empty directory",
+                path.display()
+            ));
+        }
+    }
+    fs::create_dir_all(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    fs::write(path.join(DECLARATION), "ocfl_1.1\n").map_err(|e| format!("{}: {e}", path.display()))
+}
+
 /// The store root a `path:` source names, with `~` expanded.
 pub fn open_path(path: &str, dir: Option<&str>) -> Result<PathBuf, String> {
     resolve_root(&expand_tilde(path), dir)

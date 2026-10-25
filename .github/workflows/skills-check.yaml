@@ -1,0 +1,145 @@
+name: Skills
+
+# The gate for a repository that carries agent skills. An edit under `skills/<name>/` that was
+# never published fails here, because an OCFL version is immutable: that edit exists only on the
+# machine that made it, and every consumer still reads the object's head.
+#
+# Import it rather than copying it, so every repository runs the same check against the same tool:
+#
+#   # authoring repository — `.skill-store/` beside `skills/`
+#   jobs:
+#     skills:
+#       uses: defrag-au/agent-playbook/.github/workflows/skills-check.yaml@main
+#
+#   # consuming repository — the delivered copies, against their lock
+#   jobs:
+#     skills:
+#       uses: defrag-au/agent-playbook/.github/workflows/skills-check.yaml@main
+#       with:
+#         store: ""
+#         manifest: .playbook/project.conf
+#
+#   # the repository that owns the tool — no second checkout
+#   jobs:
+#     skills:
+#       uses: ./.github/workflows/skills-check.yaml
+#       with:
+#         tool-repository: ""
+#
+# It detects; it never publishes. A bot that rewrote `.skill-store/` on a pull request would put an
+# unreviewable version on the branch, and a push made with `GITHUB_TOKEN` does not retrigger CI — so
+# the fix for a red run is `skill-store publish-changed` on the branch, committed with the edit.
+#
+# A *private* store cannot be fetched here: `skill-store` shells out to plain `git clone` with no
+# credentials plumbed through. The store this workflow reads is the checkout in the job.
+on:
+  workflow_call:
+    inputs:
+      store:
+        description: OCFL storage root to check; empty to skip (a consumer that only delivers)
+        type: string
+        default: .skill-store
+      worktree:
+        description: Directory holding one subdirectory per authored skill
+        type: string
+        default: skills
+      manifest:
+        description: Manifest whose skill declarations should be delivered and current; empty to skip
+        type: string
+        default: ""
+      target:
+        description: Target to check the delivery against — a target name, or `all`
+        type: string
+        default: all
+      tool-repository:
+        description: Where the tool comes from; empty means the calling repository is the tool
+        type: string
+        default: defrag-au/agent-playbook
+      tool-ref:
+        description: Ref of the tool to run; pin this when the caller pins its `uses:`
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # CI does not need debug symbols, and dropping them keeps the cache small.
+  CARGO_PROFILE_DEV_DEBUG: 0
+
+jobs:
+  skills:
+    name: Skills
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # One directory for every step, so the tool's own repository and a caller differ only here.
+      # A pull request that changes both a skill and the tool needs the two checked out separately;
+      # a repository that *is* the tool is checked out already.
+      SKILLS_TOOL: ${{ inputs.tool-repository == '' && github.workspace || format('{0}/.agent-playbook', github.workspace) }}
+    steps:
+      - name: Check out the calling repository
+        uses: actions/checkout@v4
+
+      - name: Check out the tool
+        if: inputs.tool-repository != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.tool-repository }}
+          ref: ${{ inputs.tool-ref }}
+          path: .agent-playbook
+
+      # A job that checks nothing must not report success: with both skipped, every step below is
+      # inert and the caller would read a green tick for work that never happened.
+      - name: Refuse a job with nothing to check
+        if: inputs.store == '' && inputs.manifest == ''
+        run: |
+          echo "::error::nothing to check — pass a `store`, a `manifest`, or both"
+          exit 1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Mirrors `defrag-nix`'s `rust-stable`. The flake pins the toolchain and this job
+          # mirrors it; bump both together.
+          toolchain: 1.99.0
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.SKILLS_TOOL }} -> target
+          shared-key: skills-check
+          cache-on-failure: true
+
+      # Only the two binaries this job needs: the workspace also holds `browser-shot`, whose
+      # tree-sitter grammar is minutes of build time for no benefit here.
+      - name: Build skill-store and playbook
+        working-directory: ${{ env.SKILLS_TOOL }}
+        run: cargo build --locked -p skill-store -p agent-playbook
+
+      # Every digest is re-checked, so a store that was hand-edited or truncated fails before the
+      # drift check has a chance to report something confusing about it.
+      - name: Verify the store
+        if: inputs.store != ''
+        run: |
+          "$SKILLS_TOOL/target/debug/skill-store" verify "path:${{ inputs.store }}"
+
+      # The check this workflow exists for. Non-zero on `ahead` (an unpublished edit), `missing`
+      # (a directory nobody can consume) and `store-only` (an object nobody can edit).
+      - name: Check for unpublished skills
+        if: inputs.store != ''
+        run: |
+          "$SKILLS_TOOL/target/debug/skill-store" status \
+            --store "${{ inputs.store }}" \
+            --worktree "${{ inputs.worktree }}"
+
+      # What the consuming repository committed must still be what its declarations resolve to.
+      - name: Check the delivered skills
+        if: inputs.store == '' && inputs.manifest != ''
+        env:
+          SKILL_STORE: ${{ env.SKILLS_TOOL }}/target/debug/skill-store
+        run: |
+          "$SKILLS_TOOL/target/debug/playbook" skills check \
+            --manifest "${{ inputs.manifest }}" \
+            --target "${{ inputs.target }}"

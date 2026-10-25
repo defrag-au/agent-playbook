@@ -11,7 +11,7 @@ use playbook::load::{
     census, expand_tilde, find_manifest, find_root, find_root_with_source, list_targets,
     load_manifest, load_target, RootSource,
 };
-use playbook::model::{Activation, Diagnostic, SkillScope, Target};
+use playbook::model::{Activation, Diagnostic, Project, SkillScope, Target};
 use playbook::render;
 use playbook::resolve;
 use playbook::skills;
@@ -511,13 +511,10 @@ fn run_skills(opts: &Opts, check: bool) -> Result<ExitCode, String> {
     };
     let lock_dir = repo.clone().unwrap_or_else(|| manifest_repo.clone());
 
-    let requested = opts
-        .target
-        .clone()
-        .or_else(|| project.default_target.clone())
-        .unwrap_or_else(|| "zed".to_string());
-    let targets =
+    let requested = requested_target(&root, &project, opts.target.as_deref())?;
+    let (targets, target_diagnostics) =
         resolve_skill_targets(&root, scope, &split_list(&requested), opts.target.is_some())?;
+    report(&target_diagnostics);
     let destinations = skills::destinations(
         &targets,
         scope,
@@ -582,17 +579,55 @@ fn run_skills(opts: &Opts, check: bool) -> Result<ExitCode, String> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// Which targets a run delivers for.
+///
+/// `--target` wins. Otherwise the manifest's `default_target` — **unless** that target has no
+/// directory for this scope. A personal catalogue's `default_target: zed-personal` names the
+/// instructions file, not a skill directory, so the honest default there is every harness rather
+/// than an error that tells the caller to add a key to an overlay that should not have one.
+///
+/// The fallback is global-only on purpose: a repository run silently expanding from one harness to
+/// all of them is a surprise, and the error names the key that fixes it.
+fn requested_target(
+    root: &Path,
+    project: &Project,
+    explicit: Option<&str>,
+) -> Result<String, String> {
+    if let Some(target) = explicit {
+        return Ok(target.to_string());
+    }
+    let default = project
+        .default_target
+        .clone()
+        .unwrap_or_else(|| "zed".to_string());
+    // The overlay's own diagnostics are dropped here on purpose: this only peeks at the two skill
+    // directories, and `resolve_skill_targets` loads the same target again (directly, or through
+    // `all`) and is where they are reported.
+    let (target, _) = load_target(root, &default)?;
+    let dir = match project.skills_scope {
+        SkillScope::Repo => &target.skill_dir,
+        SkillScope::Global => &target.skill_global_dir,
+    };
+    if dir.is_empty() && project.skills_scope == SkillScope::Global {
+        return Ok("all".to_string());
+    }
+    Ok(default)
+}
+
 /// Load the targets a run delivers for.
 ///
 /// `all` expands to every model directory and skips those that do not declare a skill directory
 /// for this scope — that is what makes `--target all` one command for both harnesses. A target
 /// named explicitly must deliver skills, or the caller has said something they did not mean.
+/// The targets a skills run delivers for, with what is wrong with any of their overlays.
+type SkillTargets = (Vec<(String, Target)>, Vec<Diagnostic>);
+
 fn resolve_skill_targets(
     root: &Path,
     scope: SkillScope,
     names: &[String],
     explicit: bool,
-) -> Result<Vec<(String, Target)>, String> {
+) -> Result<SkillTargets, String> {
     let all = names.iter().any(|name| name == "all");
     let wanted = if all {
         list_targets(root)
@@ -605,8 +640,10 @@ fn resolve_skill_targets(
     };
 
     let mut out = Vec::new();
+    let mut diagnostics = Vec::new();
     for name in wanted {
-        let target = load_target(root, &name)?;
+        let (target, target_diagnostics) = load_target(root, &name)?;
+        diagnostics.extend(target_diagnostics);
         let dir = match scope {
             SkillScope::Repo => &target.skill_dir,
             SkillScope::Global => &target.skill_global_dir,
@@ -644,7 +681,7 @@ fn resolve_skill_targets(
             scope.as_str()
         ));
     }
-    Ok(out)
+    Ok((out, diagnostics))
 }
 
 /// Scaffold a repository's `.playbook/` manifest and rules directory.

@@ -198,6 +198,41 @@ The tree-sitter grammar and highlight query live in
 [`tree-sitter-scenario/`](tree-sitter-scenario/README.md). Generated files are checked in; run
 `bunx tree-sitter-cli generate --js-runtime native` there after changing `grammar.js`.
 
+## Starting what the scenario tests
+
+A scenario can run the server it is testing. `spawn` owns a process group and `wait_for` decides
+when it is up; they are separate steps because starting and being ready are separate questions.
+
+```text
+run timeout=90s
+
+peer page url=about:blank viewport=390x844
+
+spawn site command="python3 -m http.server 8791 --bind 127.0.0.1" dir=tools/browser-shot/scenarios port=8791
+wait_for ready=site timeout=20s
+goto page "http://127.0.0.1:8791/page.html"
+assert page "document.title === 'serve fixture'"
+```
+
+The process is killed by its **group** when the run ends, however it ends — that is the point, since
+one logical server is usually several processes and only the last of them holds the port. A process
+that dies on its own stops the run at the next step, and a failed `wait_for` stops it with the last
+twenty lines of that process's log.
+
+Field tables are in [`SCENARIO.md`](SCENARIO.md). A scenario containing `spawn` executes a command,
+so treat the file as you would a script.
+
+`scenarios/` in this directory holds three acceptance runs for the feature:
+
+```sh
+./target/debug/browser-shot run  --scenario tools/browser-shot/scenarios/spawn-serve.dsl
+./target/debug/browser-shot run  --scenario tools/browser-shot/scenarios/spawn-crash.dsl      # exit 2
+./target/debug/browser-shot run  --scenario tools/browser-shot/scenarios/spawn-port-busy.dsl  # exit 1
+lsof -ti tcp:8791 && echo "LEAK: 8791 still bound"   # prints nothing when teardown worked
+```
+
+`python3 -m http.server` there is a throwaway origin for the fixture, not part of the tool.
+
 ## Pointer, modifiers and touch
 
 ```text

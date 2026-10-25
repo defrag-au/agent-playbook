@@ -62,32 +62,35 @@ here, then publish — a version is a release, not a keystroke, and publishing i
 refused.
 
 ```sh
-skill-store publish skills/inspect-code --store .skill-store --message "what changed"
-skill-store verify  path:.skill-store
+skill-store status           --store .skill-store --worktree skills   # what is owed
+skill-store publish-changed  --store .skill-store --worktree skills   # pay it
+skill-store verify           path:.skill-store
 ```
 
-To see whether a publish is owed, export the head and diff it against the source (the export
-refuses a non-empty `--out`, so pick an unused directory):
+`publish-changed` writes one new version for each directory that has moved past its object, and
+publishes a directory that has no object at all. With nothing to do it prints `nothing to publish`
+and exits `0`. Never hand-edit `.skill-store/` — a version is immutable, so an edit there is a
+store that verifies wrongly rather than an edit. `skill-store publish <dir> …` remains for one
+skill at a time.
 
-```sh
-skill-store export 'path:.#inspect-code@v1' --out .tmp/check-inspect-code
-diff -r .tmp/check-inspect-code/skill skills/inspect-code
-```
+A red CI run means the same thing: `.github/workflows/skills-check.yaml` runs `status`, so an edit
+that was never published fails the pull request that made it. Fix it with `publish-changed`, in the
+same commit.
 
 An edit here does not need a publish to be seen somewhere. A consuming manifest's
 `.playbook/skills.patch` maps a skill name to this directory, and `playbook skills sync` delivers
 the working copy as `working` — no version, no store entry. See
 [`docs/skills.md`](../docs/skills.md#developing-against-a-skill).
 
-`fleet-ops` is still here but belongs in `fleet`, and moves when that repository gets a store.
-`widget-screenshot` and `game-spike` left for `shared-crates/.skill-store/` — the storybook and
-`macroquad-gamekit` live there.
+`fleet-ops` left for `fleet/.skill-store/` — it describes that repository's machines, and the
+private inventory it reads lives there. `widget-screenshot` and `game-spike` left for
+`shared-crates/.skill-store/` — the storybook and `macroquad-gamekit` live there.
 
 Delivering the global set is wired: the personal catalogue is
 `fleet/personal/.playbook/project.conf`, with `skills_scope: global` and one `playbook skills sync
---target all`. It lists only the skills that are published; `widget-screenshot`, `game-spike` and
-`fleet-ops` are not, so the hand-installed copies in `~/.agents/skills` are left alone until they
-move to the repository that owns them.
+--target all`. It lists only the skills that are published; `widget-screenshot` and `game-spike`
+are not yet, so the hand-installed copies in `~/.agents/skills` are left alone until that store is
+on a pushed branch.
 
 ## The failure this layout exists to prevent
 

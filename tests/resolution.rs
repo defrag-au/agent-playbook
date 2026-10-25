@@ -1245,6 +1245,29 @@ fn an_unknown_key_is_a_warning_so_typos_are_visible() {
 }
 
 #[test]
+fn a_target_overlay_typo_is_reported_too() {
+    let f = Fixture::new("unknown-target-key");
+    f.rule("core/a.md", &rule_fm("a", "core", "always", ""), "A.")
+        .write(
+            "models/t/overlay.conf",
+            "target: t\nmodel: m\nharness: h\nskill_directory: .agents/skills\n",
+        );
+
+    // `load_target` collected this warning and discarded the collection, so a typo'd `skill_dir`
+    // delivered nothing and said nothing about it.
+    let resolved = f.resolve();
+    assert!(!resolved.has_errors(), "an unknown key must not be fatal");
+    assert!(
+        resolved
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("skill_directory")),
+        "expected an unknown-key warning for the overlay, got {:?}",
+        resolved.diagnostics
+    );
+}
+
+#[test]
 fn root_discovery_accepts_an_explicit_path_and_rejects_a_non_root() {
     let root = playbook::load::find_root(Some(Path::new(env!("CARGO_MANIFEST_DIR"))));
     assert!(root.is_ok());

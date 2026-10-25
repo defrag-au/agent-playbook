@@ -102,12 +102,14 @@ Rules that fail loudly rather than guessing:
 skill-store export <source> --out <dir>       # one version → envelope
 skill-store list <source>                     # every object, with head and description
 skill-store verify <source> [<skill>]         # inventories, digests, content paths
+skill-store status --store <dir> --worktree <dir>   # is the head still what the directory says?
 skill-store publish <dir> --store <path>      # plain directory → a new version
+skill-store publish-changed --store <dir> --worktree <dir>  # publish every skill that moved
 skill-store source <source>                   # how a source resolves (debugging)
 ```
 
-Options: `--out`, `--store`, `--id`, `--message`, `--user`, `--skill`, `--version`, `--init`,
-`--offline`, `-h`.
+Options: `--out`, `--store`, `--worktree`, `--id`, `--message`, `--user`, `--address`, `--skill`,
+`--version`, `--init`, `--offline`, `-h`.
 
 Exit codes: `0` success, `1` an operation failed, `2` a usage error (bad source, missing flag).
 
@@ -116,6 +118,53 @@ version. That is what a development override points at: the envelope is the same
 `version: working` and the digest taken over the copied tree. `working` is not a version directory
 and the source grammar rejects `@working`, so nothing can pin one; the next `publish` is what
 makes an edit permanent.
+
+## Is a publish owed?
+
+`status` is the read-only half of `publish`, and the command a pull request runs:
+
+```sh
+skill-store status --store .skill-store --worktree skills
+```
+
+```text
+current     capture-rule v1
+current     crate-research v1
+ahead       browser-shot v1 — 1 changed
+missing     fleet-ops — no object
+store-only  orphan v2 — no directory
+```
+
+It exits non-zero on anything but `current`, and both directions count. `ahead` is an edit nobody
+published — the version is immutable, so that work exists only on the machine that made it.
+`missing` is a directory nobody can consume. `store-only` is an object nobody can edit, which is
+what a repository looks like when it inherited a store without the directory it is published
+from.
+
+It compares bytes against the head's `state` and `manifest` directly, so it never writes and needs
+no export directory.
+
+## Publishing everything that moved
+
+`status` tells you a publish is owed; `publish-changed` does it, for every skill at once:
+
+```sh
+skill-store publish-changed --store .skill-store --worktree skills
+```
+
+```text
+published urn:skill:browser-shot v2 (+0 ~1 -0 =1)
+nothing to publish
+```
+
+- It publishes exactly the skills that are `ahead` or `missing`, so an unchanged skill is never
+  given an empty version — and running it twice publishes once.
+- With nothing to do it prints `nothing to publish` and exits `0`, which is what makes it safe as
+  a routine step before a commit and as a CI check.
+- A `store-only` object is reported and fails the command: there is no directory to publish from,
+  so it is the one drift this cannot repair.
+- `--message`, `--user` and `--address` apply to every version it writes. `--id` is refused — one
+  id cannot name several skills.
 
 ## Authoring and publishing
 
@@ -137,6 +186,13 @@ directory name. Publishing content identical to the head is refused: a version t
 nothing is a mistake, not a release. `.git` and `.DS_Store` are skipped; a symlink anywhere in
 the tree is refused, because OCFL forbids them in a storage hierarchy and a skill containing one
 is not portable.
+
+No `user` block is invented. OCFL wants one (W007b) and, when present, wants it to carry an
+address (W008) that begins with a scheme (W009) — so the block records the **repository the store
+lives in**: the name from `git config user.name`, the address from `origin`, normalised to
+`https://`. `--user` and `--address` override both. A store outside a git checkout has no address
+to give and records nothing, which is why its inventories carry W007b: a warning is the honest
+answer where a value would be invented.
 
 Then verify and publish the repository as usual — the store is committed with the code, which is
 what makes `github:defrag-au/container-compose#container-compose@v1` resolvable.

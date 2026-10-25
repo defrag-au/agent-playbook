@@ -13,17 +13,20 @@ use chrono::{SecondsFormat, Utc};
 
 use crate::digest::{self, Algorithm};
 use crate::fsx::walk_files;
+use crate::identity;
 use crate::inventory::{
     self, Inventory, User, Version, DECLARATION as OBJECT_DECLARATION, TYPE_1_1,
 };
 use crate::skill;
-use crate::store::{validate_root, DECLARATION as STORE_DECLARATION};
+use crate::status::{self, State};
+use crate::store::ensure_root;
 
 #[derive(Default)]
 pub struct Options<'a> {
     pub id: Option<&'a str>,
     pub message: Option<&'a str>,
     pub user: Option<&'a str>,
+    pub address: Option<&'a str>,
     pub init: bool,
 }
 
@@ -48,7 +51,40 @@ pub fn publish(from: &Path, store: &Path, options: &Options<'_>) -> Result<Repor
         return Err("`--id` cannot be empty".to_string());
     }
 
-    ensure_store(store, options.init)?;
+    ensure_root(store, options.init)?;
+
+    // The `user` block is resolved here, before anything is written: a publish that cannot record
+    // the identity it was asked for must fail having written nothing, rather than leave a version
+    // directory with no inventory beside it.
+    //
+    // OCFL wants a version's `user` block to be present and, when it is, to carry an address
+    // (W007b, W008, W009). The identity is read from the repository the store lives in, so nothing
+    // is invented — and a store outside a git checkout records no block at all, rather than a name
+    // with no address to go with it.
+    let discovered = identity::discover(store);
+    let address = options
+        .address
+        .map(ToString::to_string)
+        .or_else(|| discovered.as_ref().map(|id| id.address.clone()));
+    // A name with no address is exactly W008, so a caller who asked for a user block and gave
+    // nothing to put in its address half is told, rather than having the flag quietly dropped.
+    if options.user.is_some() && address.is_none() {
+        return Err(
+            "`--user` records a user block, and OCFL wants one to carry an address — pass \
+             `--address`, or publish from a repository with an `origin`"
+                .to_string(),
+        );
+    }
+    let user = address.map(|address| User {
+        name: options
+            .user
+            .map(ToString::to_string)
+            .or_else(|| discovered.as_ref().map(|id| id.name.clone()))
+            .or_else(|| std::env::var("USER").ok())
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or_else(|| "skill-store".to_string()),
+        address: Some(address),
+    });
 
     let existing = inventory::discover(store)?
         .into_iter()
@@ -178,22 +214,13 @@ pub fn publish(from: &Path, store: &Path, options: &Options<'_>) -> Result<Repor
             .insert(digest.clone(), vec![content_path]);
     }
 
-    let user = options
-        .user
-        .map(ToString::to_string)
-        .or_else(|| std::env::var("USER").ok())
-        .filter(|name| !name.trim().is_empty())
-        .unwrap_or_else(|| "skill-store".to_string());
     inventory.versions.insert(
         report.version.clone(),
         Version {
             created: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
             state: new_state,
             message: options.message.map(ToString::to_string),
-            user: Some(User {
-                name: user,
-                address: None,
-            }),
+            user,
         },
     );
     inventory.head = report.version.clone();
@@ -206,29 +233,57 @@ pub fn publish(from: &Path, store: &Path, options: &Options<'_>) -> Result<Repor
     Ok(report)
 }
 
-fn ensure_store(store: &Path, init: bool) -> Result<(), String> {
-    if store.join(STORE_DECLARATION).is_file() {
-        return validate_root(store).map(|_| ());
+/// The result of publishing everything that has moved on.
+#[derive(Debug, Default)]
+pub struct Changed {
+    /// One report per skill that was published.
+    pub published: Vec<Report>,
+    /// Skills whose object has no authoring directory. Publishing cannot fix those: there is
+    /// nothing to publish from.
+    pub blocked: Vec<String>,
+}
+
+/// Publish every skill in `worktree` that is `ahead` of its object or has no object yet.
+///
+/// This is the whole loop as one command: a version is a release, so the authoring directory and
+/// the store are compared first and only the skills that differ are published. Running it when
+/// nothing has changed publishes nothing and succeeds, which is what makes it safe as a routine
+/// step before a commit.
+///
+/// An object with no directory is not an error here, because it is not something this command can
+/// repair — it is reported in [`Changed::blocked`] so the caller can fail on it with the reason.
+pub fn publish_changed(
+    store: &Path,
+    worktree: &Path,
+    options: &Options<'_>,
+) -> Result<Changed, String> {
+    if options.id.is_some() {
+        return Err(
+            "`publish-changed` publishes each skill under its own name — drop `--id`".to_string(),
+        );
     }
-    if !init {
-        return Err(format!(
-            "{} is not an OCFL storage root — pass `--init` to create one",
-            store.display()
-        ));
-    }
-    if store.exists() {
-        let mut entries = fs::read_dir(store).map_err(|e| format!("{}: {e}", store.display()))?;
-        if entries.next().is_some() {
-            return Err(format!(
-                "{} is not empty and has no `{STORE_DECLARATION}` — refusing to adopt it; use a \
-                 new or empty directory",
-                store.display()
-            ));
+    ensure_root(store, options.init)?;
+
+    let per_skill = Options {
+        id: None,
+        message: options.message,
+        user: options.user,
+        address: options.address,
+        init: false,
+    };
+
+    let mut changed = Changed::default();
+    for reading in status::compare(store, worktree)? {
+        match reading.state {
+            State::Current => {}
+            State::Ahead(_) | State::Missing => {
+                let report = publish(&worktree.join(&reading.name), store, &per_skill)?;
+                changed.published.push(report);
+            }
+            State::StoreOnly => changed.blocked.push(reading.name),
         }
     }
-    fs::create_dir_all(store).map_err(|e| format!("{}: {e}", store.display()))?;
-    fs::write(store.join(STORE_DECLARATION), "ocfl_1.1\n")
-        .map_err(|e| format!("{}: {e}", store.display()))
+    Ok(changed)
 }
 
 fn invert(state: &BTreeMap<String, String>) -> BTreeMap<String, Vec<String>> {

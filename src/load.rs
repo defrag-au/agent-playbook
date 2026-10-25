@@ -259,7 +259,13 @@ fn real(path: &Path) -> PathBuf {
     fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
-pub fn load_target(root: &Path, name: &str) -> Result<Target, String> {
+/// Load a target's overlay, with what is wrong with it.
+///
+/// The diagnostics are returned beside the target rather than dropped: an unknown key here is a
+/// setting that reads as absent, and a typo'd `skill_dir` delivers skills to a directory nobody
+/// reads with nothing to show for it. This function used to collect them and discard the collection,
+/// which read as protection and was none.
+pub fn load_target(root: &Path, name: &str) -> Result<(Target, Vec<Diagnostic>), String> {
     let path = root.join("models").join(name).join("overlay.conf");
     if !path.is_file() {
         return Err(format!(
@@ -273,7 +279,7 @@ pub fn load_target(root: &Path, name: &str) -> Result<Target, String> {
 
     let list = |key: &str| conf.get(key).map(|v| split_list(v)).unwrap_or_default();
 
-    Ok(Target {
+    let target = Target {
         name: name.to_string(),
         model: conf.get("model").cloned().unwrap_or_default(),
         harness: conf.get("harness").cloned().unwrap_or_default(),
@@ -304,7 +310,8 @@ pub fn load_target(root: &Path, name: &str) -> Result<Target, String> {
             .filter(|s| !s.is_empty())
             .unwrap_or_default(),
         instruction_files: list("instruction_files"),
-    })
+    };
+    Ok((target, diagnostics))
 }
 
 fn warn_unknown_keys(
@@ -613,7 +620,7 @@ pub fn census(root: &Path) -> Result<Vec<RuleCensus>, String> {
 pub fn included_by_some_target(root: &Path, rule: &Rule) -> bool {
     list_targets(root).into_iter().any(|name| {
         load_target(root, &name)
-            .map(|t| {
+            .map(|(t, _)| {
                 t.include
                     .iter()
                     .any(|i| i == &rule.id || rule.rel.starts_with(i.as_str()))
