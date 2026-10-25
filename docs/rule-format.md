@@ -1,10 +1,10 @@
 # Rule format
 
 Every rule is one markdown file with a **flat** frontmatter header. Flat is a hard
-requirement, not a style preference: the composer is POSIX `sh` with no YAML parser, so a
-rule must be readable by `awk` looking for `key: value` at the start of a line. Nesting,
-multi-line strings and block sequences are not available. If a rule needs structure beyond
-this, it needs to be a reference file instead.
+requirement, not a style preference: the composer is std-only Rust with a flat parser, so a
+rule must be readable as `key: value` at the start of a line. Nesting, multi-line strings and
+block sequences are not available. If a rule needs structure beyond this, it needs to be a
+reference file instead.
 
 ```markdown
 ---
@@ -113,8 +113,33 @@ session.
 | `ecosystem:defrag` | The project declares `ecosystems: defrag` |
 | `renders:egui` | The project declares `renders: egui` |
 | `renders:macroquad` | The project declares `renders: macroquad` — its game clients draw with macroquad |
-| `project:shared-crates` | The project is `shared-crates` |
+| `project:shared-crates` | The project is `shared-crates` — a legacy registry entry, or a repository manifest whose `project:` is `shared-crates` |
 | `manual` | Never automatically. A target must name the rule's id in its `include:` |
+
+## Repository-owned projects
+
+A repository can declare its own identity in `<repo>/.playbook/project.conf` and keep its rules in
+`<repo>/.playbook/rules/`. The manifest carries the same flat keys as a registry
+`projects/<name>/project.conf`, minus `path:` — the manifest's directory **is** the repository:
+
+```conf
+project: shared-crates
+org: defrag
+ecosystems: defrag
+renders: egui, macroquad
+languages: rust
+default_target: claude-code
+```
+
+A rule in `.playbook/rules/` must declare `layer: project` and `activation: project:<name>`, where
+`<name>` is the manifest's `project:`. The composer checks both, so a rule copied from another
+repository — or a manifest renamed without its rules — is an error rather than a rule that never
+loads.
+
+`playbook init` creates the manifest and a `rules/README.md`. `playbook list`, `install` and `check`
+discover the manifest by walking up from the working directory, so no `--project` is needed.
+`--manifest <path>` names one explicitly when the manifest lives outside the directory being
+written to (the personal instructions file in the fleet repository is the worked case).
 
 `org` and `ecosystem` answer different questions, and a rule belongs to whichever one it is
 actually true of:

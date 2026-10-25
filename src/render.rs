@@ -27,11 +27,24 @@ pub fn render(resolved: &Resolved) -> String {
     // says the same thing everywhere. Which *revision* a block came from is a separate question —
     // the flake knows its own rev and could bake it in, at the cost of a bump making every
     // installed block stale by design.
+    // The provenance names where a reader edits the project's own rules. A repository-owned
+    // manifest is at `.playbook/project.conf`; a legacy registry entry is under `projects/`.
+    // Keeping the legacy wording byte-identical means the inversion does not make every installed
+    // block stale before its repository has a manifest.
+    let source = match &resolved.project.repo {
+        Some(_) => format!(
+            "`.playbook/project.conf` + `models/{}`",
+            resolved.target.name
+        ),
+        None => format!(
+            "agent-playbook (`projects/{}` + `models/{}`)",
+            resolved.project.name, resolved.target.name
+        ),
+    };
     out.push_str(&format!(
-        "Generated from agent-playbook (`projects/{}` + `models/{}`).\n\
+        "Generated from {source}.\n\
          Each rule's source file is named in the comment above its heading.\n\
-         To change a rule, change the rule — not this block.\n",
-        resolved.project.name, resolved.target.name
+         To change a rule, change the rule — not this block.\n"
     ));
 
     if !resolved.emphasis.is_empty() {

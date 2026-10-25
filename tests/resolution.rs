@@ -9,10 +9,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use playbook::load::{census, has_errors, list_projects, load_rules};
+use playbook::init;
+use playbook::load::{census, find_manifest, has_errors, list_projects, load_manifest, load_rules};
 use playbook::model::{Activation, Layer};
 use playbook::render;
-use playbook::resolve::resolve;
+use playbook::resolve::{resolve, resolve_repo};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -391,6 +392,219 @@ impl Drop for Fixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
     }
+}
+
+/// A shared tree plus a repository that owns its own `.playbook/`.
+struct LocalFixture {
+    base: PathBuf,
+    root: PathBuf,
+    repo: PathBuf,
+}
+
+impl LocalFixture {
+    fn new(name: &str) -> Self {
+        let base = std::env::temp_dir().join(format!(
+            "agent-playbook-local-{}-{name}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&base);
+        let root = base.join("playbook");
+        let repo = base.join("repo");
+        fs::create_dir_all(root.join("rules").join("core")).expect("root rules");
+        fs::create_dir_all(root.join("models").join("t")).expect("root models");
+        fs::create_dir_all(repo.join(".playbook").join("rules")).expect("repo rules");
+
+        let fixture = LocalFixture { base, root, repo };
+        fixture.write_root(
+            "rules/core/base.md",
+            "---\nid: base\ntitle: base\nlayer: core\nactivation: always\n---\n\n## Directive\n\nBase rule.\n",
+        );
+        fixture.write_root("models/t/overlay.conf", "target: t\nmodel: m\nharness: h\n");
+        fixture.write_repo(
+            ".playbook/project.conf",
+            "project: demo\norg: acme\nlanguages: rust\n",
+        );
+        fixture
+    }
+
+    fn write_root(&self, rel: &str, content: &str) {
+        let path = self.root.join(rel);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create root parent");
+        }
+        fs::write(path, content).expect("write root file");
+    }
+
+    fn write_repo(&self, rel: &str, content: &str) {
+        let path = self.repo.join(rel);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create repo parent");
+        }
+        fs::write(path, content).expect("write repo file");
+    }
+
+    fn rule(&self, id: &str, activation: &str) {
+        self.rule_with_layer(id, "project", activation);
+    }
+
+    fn rule_with_layer(&self, id: &str, layer: &str, activation: &str) {
+        self.write_repo(
+            &format!(".playbook/rules/{id}.md"),
+            &format!(
+                "---\nid: {id}\ntitle: {id}\nlayer: {layer}\nactivation: {activation}\n---\n\n\
+                 ## Directive\n\nA local rule.\n"
+            ),
+        );
+    }
+
+    fn resolve(&self) -> playbook::resolve::Resolved {
+        resolve_repo(&self.root, &self.repo, Some("t")).expect("resolve repository")
+    }
+}
+
+impl Drop for LocalFixture {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.base);
+    }
+}
+
+#[test]
+fn find_manifest_walks_up_to_the_repository_root() {
+    let f = LocalFixture::new("manifest-walk");
+    let nested = f.repo.join("crates").join("deep");
+    fs::create_dir_all(&nested).expect("nested dir");
+
+    let (repo, manifest) = find_manifest(&nested).expect("manifest");
+    assert_eq!(repo, fs::canonicalize(&f.repo).expect("canonical repo"));
+    assert!(manifest.ends_with("project.conf"));
+}
+
+#[test]
+fn a_repository_manifest_resolves_shared_and_local_rules() {
+    let f = LocalFixture::new("resolve-local");
+    f.rule("local", "project: demo");
+
+    let resolved = f.resolve();
+    let ids: Vec<&str> = resolved.rules.iter().map(|r| r.id.as_str()).collect();
+    assert!(ids.contains(&"base"), "shared rule missing: {ids:?}");
+    assert!(ids.contains(&"local"), "local rule missing: {ids:?}");
+
+    let local = resolved
+        .rules
+        .iter()
+        .find(|rule| rule.id == "local")
+        .expect("local rule");
+    assert_eq!(local.rel, ".playbook/rules/local.md");
+    assert!(!resolved.has_errors());
+}
+
+#[test]
+fn a_local_rule_naming_another_project_is_an_error() {
+    let f = LocalFixture::new("wrong-project");
+    f.rule("elsewhere", "project: another-repo");
+
+    let resolved = f.resolve();
+    assert!(
+        resolved.has_errors(),
+        "a rule for another project must be fatal"
+    );
+    let messages: Vec<String> = resolved
+        .diagnostics
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    assert!(
+        messages
+            .iter()
+            .any(|m| m.contains("must activate for `project:demo`")),
+        "{messages:#?}"
+    );
+}
+
+#[test]
+fn a_local_rule_must_be_project_layer() {
+    let f = LocalFixture::new("wrong-layer");
+    f.rule_with_layer("core-rule", "core", "project: demo");
+
+    let resolved = f.resolve();
+    assert!(resolved.has_errors());
+    let messages: Vec<String> = resolved
+        .diagnostics
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    assert!(
+        messages
+            .iter()
+            .any(|m| m.contains("must declare `layer: project`")),
+        "{messages:#?}"
+    );
+}
+
+#[test]
+fn a_manifest_without_project_is_an_error() {
+    let f = LocalFixture::new("no-project");
+    f.write_repo(".playbook/project.conf", "org: acme\n");
+
+    let error = load_manifest(&f.repo).expect_err("a nameless manifest");
+    assert!(error.contains("`project:` is required"), "{error}");
+}
+
+#[test]
+fn a_manifest_path_key_is_reported_as_ignored() {
+    let f = LocalFixture::new("manifest-path");
+    f.write_repo(
+        ".playbook/project.conf",
+        "project: demo\npath: ~/code/elsewhere\n",
+    );
+
+    let (_, diagnostics) = load_manifest(&f.repo).expect("manifest");
+    let messages: Vec<String> = diagnostics.iter().map(ToString::to_string).collect();
+    assert!(
+        messages.iter().any(|m| m.contains("`path:` is ignored")),
+        "{messages:#?}"
+    );
+}
+
+#[test]
+fn a_repository_block_names_the_manifest_not_the_registry() {
+    let f = LocalFixture::new("provenance");
+    f.rule("local", "project: demo");
+
+    let block = render::render(&f.resolve());
+    assert!(block.contains("`.playbook/project.conf`"), "{block}");
+    assert!(!block.contains("projects/demo"), "{block}");
+}
+
+#[test]
+fn a_registry_block_keeps_its_registry_provenance() {
+    // The inversion must not make every installed block stale before its repository has a
+    // manifest. The legacy wording is asserted byte-for-byte.
+    let resolved = resolve(&repo_root(), "shared-crates", Some("zed")).expect("resolve");
+    let block = render::render(&resolved);
+    assert!(
+        block.contains("Generated from agent-playbook (`projects/shared-crates` + `models/zed`)."),
+        "{block}"
+    );
+}
+
+#[test]
+fn init_scaffolds_a_manifest_and_rules_directory() {
+    let f = LocalFixture::new("init");
+    let target = f.repo.join("new-project");
+    fs::create_dir_all(&target).expect("new repo");
+
+    let created = init::scaffold(&target, "new-project", "zed").expect("scaffold");
+    assert!(!created.is_empty());
+
+    let manifest = fs::read_to_string(target.join(".playbook/project.conf")).expect("manifest");
+    assert!(manifest.contains("project: new-project"));
+    assert!(manifest.contains("default_target: zed"));
+    assert!(target.join(".playbook/rules").is_dir());
+    assert!(target.join(".playbook/rules/README.md").is_file());
+
+    let error = init::scaffold(&target, "again", "zed").expect_err("refuses to overwrite");
+    assert!(error.contains("already exists"), "{error}");
 }
 
 fn rule_fm(id: &str, layer: &str, activation: &str, extra: &str) -> String {

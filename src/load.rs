@@ -5,7 +5,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::frontmatter::{parse_conf, split_document, split_list, Split};
-use crate::model::{split_sections, Diagnostic, Layer, Project, Rule, Section, Severity, Target};
+use crate::model::{
+    split_sections, Activation, Diagnostic, Layer, Project, Rule, Section, Severity, Target,
+};
 
 const PROJECT_KEYS: &[&str] = &[
     "project",
@@ -125,13 +127,15 @@ fn packaged_root() -> Option<PathBuf> {
 }
 
 fn looks_like_root(dir: &Path) -> bool {
-    dir.join("rules").is_dir() && dir.join("models").is_dir() && dir.join("projects").is_dir()
+    // `projects/` is deliberately not required: a shared tree can be just the rules and the
+    // target overlays, and a consumer repository's own manifest lives in its `.playbook/`.
+    dir.join("rules").is_dir() && dir.join("models").is_dir()
 }
 
 fn validate_root(dir: &Path) -> Result<PathBuf, String> {
     if !looks_like_root(dir) {
         return Err(format!(
-            "{} is not a playbook root (expected rules/, models/ and projects/)",
+            "{} is not a playbook root (expected rules/ and models/)",
             dir.display()
         ));
     }
@@ -196,7 +200,77 @@ pub fn load_project(root: &Path, name: &str) -> Result<Project, String> {
             .get("default_target")
             .cloned()
             .filter(|s| !s.is_empty()),
+        // A registry entry names a checkout by path; it has no manifest of its own.
+        repo: None,
     })
+}
+
+/// The nearest `.playbook/project.conf` at or above `start`, with its repository root.
+///
+/// Walking up is what makes a command run from a subdirectory resolve. The first match wins: a
+/// nested `.playbook/` is a nested project, not a fallback to the parent.
+pub fn find_manifest(start: &Path) -> Option<(PathBuf, PathBuf)> {
+    let start = real(start);
+    for ancestor in start.ancestors() {
+        let manifest = ancestor.join(".playbook").join("project.conf");
+        if manifest.is_file() {
+            return Some((ancestor.to_path_buf(), manifest));
+        }
+    }
+    None
+}
+
+/// Read `<repo>/.playbook/project.conf`.
+///
+/// The manifest's directory **is** the repository: there is no `path:` to disagree with. The keys
+/// are the same as a registry `project.conf` minus `path`, plus whatever the project declares
+/// about itself.
+pub fn load_manifest(repo: &Path) -> Result<(Project, Vec<Diagnostic>), String> {
+    let path = repo.join(".playbook").join("project.conf");
+    if !path.is_file() {
+        return Err(format!(
+            "no project manifest at {} — run `playbook init` to create one",
+            path.display()
+        ));
+    }
+    let conf = parse_conf(&read(&path)?);
+    let mut diagnostics = Vec::new();
+    warn_unknown_keys(&conf, PROJECT_KEYS, &path, &mut diagnostics);
+
+    if conf.get("path").is_some_and(|value| !value.is_empty()) {
+        diagnostics.push(Diagnostic::warning(format!(
+            "{}: `path:` is ignored in a repository manifest — its directory is the repository",
+            path.display()
+        )));
+    }
+
+    let name = conf
+        .get("project")
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| format!("{}: `project:` is required", path.display()))?;
+    let list = |key: &str| {
+        conf.get(key)
+            .map(|value| split_list(value))
+            .unwrap_or_default()
+    };
+
+    Ok((
+        Project {
+            name,
+            path: repo.to_string_lossy().into_owned(),
+            org: conf.get("org").cloned().filter(|value| !value.is_empty()),
+            ecosystems: list("ecosystems"),
+            renders: list("renders"),
+            languages: list("languages"),
+            default_target: conf
+                .get("default_target")
+                .cloned()
+                .filter(|value| !value.is_empty()),
+            repo: Some(repo.to_path_buf()),
+        },
+        diagnostics,
+    ))
 }
 
 /// `~/x` to `$HOME/x`. A project names its checkout the way a person writes it, which is with a
@@ -297,26 +371,83 @@ fn warn_unknown_keys(
 }
 
 /// Read every rule under `rules/` and `projects/*/rules/`.
+///
+/// This is the legacy registry view. It still exists so `playbook rules` and the test suite can
+/// census the whole tree during the inversion; a resolved set uses [`load_rules_for`].
 pub fn load_rules(root: &Path) -> (Vec<Rule>, Vec<Diagnostic>) {
     let mut files = Vec::new();
-    collect_markdown(&root.join("rules"), &mut files);
+    collect_markdown(&root.join("rules"), root, &mut files);
     for project in list_projects(root) {
         collect_markdown(
             &root.join("projects").join(&project).join("rules"),
+            root,
             &mut files,
         );
     }
-    files.sort();
+    load_rule_files(files)
+}
+
+/// The rules that apply to `project`: the shared tree, plus the project's own.
+///
+/// A repository-owned project reads `<repo>/.playbook/rules`. A legacy registry project reads
+/// `<root>/projects/<name>/rules`. A repository-owned rule is validated here, because this is the
+/// first place that knows both the rule and the manifest it claims.
+pub fn load_rules_for(root: &Path, project: &Project) -> (Vec<Rule>, Vec<Diagnostic>) {
+    let mut files = Vec::new();
+    collect_markdown(&root.join("rules"), root, &mut files);
+    match &project.repo {
+        Some(repo) => {
+            collect_markdown(&repo.join(".playbook").join("rules"), repo, &mut files);
+        }
+        None => {
+            collect_markdown(
+                &root.join("projects").join(&project.name).join("rules"),
+                root,
+                &mut files,
+            );
+        }
+    }
+
+    let (rules, mut diagnostics) = load_rule_files(files);
+    if project.repo.is_some() {
+        let expected = Activation::Project(project.name.clone());
+        for rule in &rules {
+            if rule.rel.starts_with(".playbook/") {
+                if rule.layer != Layer::Project {
+                    diagnostics.push(Diagnostic::error(format!(
+                        "{}: a repository-owned rule must declare `layer: project` (found `{}`)",
+                        rule.rel, rule.layer
+                    )));
+                }
+                if rule.activation != expected {
+                    diagnostics.push(Diagnostic::error(format!(
+                        "{}: a rule in `{}` must activate for `{}` (found `{}`)",
+                        rule.rel,
+                        project.name,
+                        expected.as_str(),
+                        rule.activation.as_str()
+                    )));
+                }
+            } else if matches!(rule.activation, Activation::Project(_)) {
+                diagnostics.push(Diagnostic::warning(format!(
+                    "{}: a shared rule activates for a single project; move it to that repo's \
+                     `.playbook/rules/`",
+                    rule.rel
+                )));
+            }
+        }
+    }
+    (rules, diagnostics)
+}
+
+/// Parse and duplicate-check a set of rule files, each paired with the path it is known by.
+fn load_rule_files(mut files: Vec<(PathBuf, String)>) -> (Vec<Rule>, Vec<Diagnostic>) {
+    files.sort_by(|a, b| a.1.cmp(&b.1));
 
     let mut rules = Vec::new();
     let mut diagnostics = Vec::new();
 
-    for path in files {
-        let rel = path
-            .strip_prefix(root)
-            .unwrap_or(&path)
-            .to_string_lossy()
-            .into_owned();
+    for (path, rel) in files {
         // Both arms carry diagnostics: a rule can parse successfully *and* have a problem
         // worth reporting (an unknown key, an empty body). Discarding them on the Ok arm is
         // how a typo'd key becomes a silently missing setting.
@@ -341,7 +472,11 @@ pub fn load_rules(root: &Path) -> (Vec<Rule>, Vec<Diagnostic>) {
     (rules, diagnostics)
 }
 
-fn collect_markdown(dir: &Path, out: &mut Vec<PathBuf>) {
+/// Markdown files under `dir`, paired with the path they are known by in a generated block.
+///
+/// The label is relative to `base`, so a shared rule reads `rules/core/x.md` and a repo-owned rule
+/// reads `.playbook/rules/x.md`.
+fn collect_markdown(dir: &Path, base: &Path, out: &mut Vec<(PathBuf, String)>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
@@ -349,12 +484,17 @@ fn collect_markdown(dir: &Path, out: &mut Vec<PathBuf>) {
     paths.sort();
     for path in paths {
         if path.is_dir() {
-            collect_markdown(&path, out);
+            collect_markdown(&path, base, out);
         } else if path.extension().map(|e| e == "md").unwrap_or(false) {
             if path.file_name().map(|n| n == "README.md").unwrap_or(false) {
                 continue;
             }
-            out.push(path);
+            let rel = path
+                .strip_prefix(base)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .into_owned();
+            out.push((path, rel));
         }
     }
 }

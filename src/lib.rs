@@ -4,6 +4,7 @@
 //! `docs/rule-format.md`. This crate is the single implementation of both.
 
 pub mod frontmatter;
+pub mod init;
 pub mod install;
 pub mod load;
 pub mod model;

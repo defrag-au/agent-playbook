@@ -301,6 +301,13 @@ pub struct Project {
     pub renders: Vec<String>,
     pub languages: Vec<String>,
     pub default_target: Option<String>,
+    /// Where a repository-owned manifest and its `rules/` live.
+    ///
+    /// `None` for the legacy registry entries under `projects/`, which carry no checkout of their
+    /// own inside the playbook. `Some(repo)` for a project declared by `<repo>/.playbook/`.
+    /// `path` is kept for diagnostics and for the legacy `path:` key; it is not used to discover
+    /// a repository any more.
+    pub repo: Option<PathBuf>,
 }
 
 /// A consumer of rules — usually a model+harness pair.
@@ -404,6 +411,7 @@ mod tests {
             renders: Vec::new(),
             languages: vec!["rust".into()],
             default_target: Some("claude-code".into()),
+            repo: None,
         }
     }
 
