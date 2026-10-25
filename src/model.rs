@@ -300,6 +300,11 @@ pub struct Project {
     pub renders: Vec<String>,
     pub languages: Vec<String>,
     pub default_target: Option<String>,
+    /// Skill sources this repository delivers into its own skill directory, in the order the
+    /// manifest declares them. A source is whatever `skill-store` accepts —
+    /// `github:owner/repo#skill@v1` or `path:~/…` — and `playbook skills sync` records what it
+    /// delivered in `.playbook/skills.lock`.
+    pub skills: Vec<String>,
     /// Where this project's manifest and its `.playbook/rules/` live.
     ///
     /// The manifest's directory **is** the repository, so there is no separate `path:` to
@@ -329,6 +334,11 @@ pub struct Target {
     /// Files under `memory/`, emitted after the rules.
     pub memory: Vec<String>,
     pub default_file: String,
+    /// The directory, relative to the repository, that this target's harness reads skills from.
+    ///
+    /// `skills` are delivered per harness rather than per model: an egui widget and a macroquad
+    /// game have the same skill needs, and the two harnesses disagree about where to put them.
+    pub skill_dir: String,
     /// The harness's instruction-file priority order, most significant first.
     ///
     /// Only meaningful for harnesses that read a single file — see
@@ -408,6 +418,7 @@ mod tests {
             renders: Vec::new(),
             languages: vec!["rust".into()],
             default_target: Some("claude-code".into()),
+            skills: Vec::new(),
             repo: PathBuf::new(),
         }
     }

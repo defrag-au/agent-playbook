@@ -1,0 +1,15 @@
+[package]
+name = "skill-store"
+version = "0.1.0"
+edition = "2021"
+description = "An OCFL store for agent skills: publish a version, export it to a plain tree"
+license = "MIT"
+
+# This crate is deliberately separate from the composer. `playbook` stays std-only and
+# makes no network calls; the OCFL inventory is JSON and the digests are SHA-2, so the
+# store reader is the one place those dependencies live. See README.md.
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }

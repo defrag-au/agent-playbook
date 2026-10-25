@@ -607,6 +607,47 @@ Verification after the cutover: `cargo fmt --all`, `cargo clippy --workspace --a
 twelve repositories against both targets and for the personal file. The composer's suite is 56
 unit tests, 2 reference tests and 48 resolution tests.
 
+## 12. Skills get the same inversion, 2026-10-25
+
+The rule inversion left one class of cross-repository knowledge in this repository: `skills/`.
+A skill is a copy in `~/.agents/skills/` with no version, no digest and no provenance, so "which
+`inspect-code` is this session running?" had no answer — and three of the six installed copies
+were already stale (`capture-rule` still described `--project`; `crate-research` and
+`inspect-code` did not mention `at-crate`).
+
+See [`skills.md`](skills.md) and [`tools/skill-store/README.md`](../tools/skill-store/README.md).
+In short:
+
+- **Artifact ≠ delivery.** The store is the artifact — one OCFL object per skill, immutable `vN`
+  versions, `sha512` content addressing, an inventory digest sidecar. The export is the delivery:
+  a plain `skill/` tree plus a flat `export.conf`.
+- **The source grammar is Nix's**, not a new scheme: `github:owner/repo[/ref][?rev=&dir=]#skill@vN`.
+  A bare `https://` is rejected because in a flake reference it means a tarball.
+- **`skill-store` is a sibling binary**, not part of the composer, so `playbook` stays std-only,
+  offline and dependency-free. `playbook skills sync` calls it and reads the envelope.
+- **`skills:` in `.playbook/project.conf` + `.playbook/skills.lock`** repeat the managed-block
+  model: copy, record, `check`. Unmanaged directories are refused, never overwritten.
+- **The skill moves next to the tool.** `container-compose` is published into
+  `container-compose/.skill-store/` and declared as
+  `github:defrag-au/container-compose#container-compose@v1`; this repository's `skills/` no longer
+  carries it.
+- **This repository keeps only the skills about its own toolkit** — `inspect-code`,
+  `capture-rule`, `crate-research`, `browser-shot` — authored in `skills/` and published into
+  `.skill-store/` at the root, so `github:defrag-au/agent-playbook#inspect-code@v1` resolves.
+  `widget-screenshot` and `game-spike` belong to `shared-crates` (the storybook and
+  `macroquad-gamekit`), and `fleet-ops` to `fleet`; each moves when that repository gets a store.
+
+Verified: `cargo test --workspace` green (composer 63 unit + 48 integration, `skill-store` 12
+unit + 8 integration); `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+clean; all eight current skills published as `v1` and re-exported byte-identical to `skills/`;
+`.skill-store/` verifies as 4 objects with each `v1` exporting byte-identical to its authoring
+directory; and a `sync` → `check` → tamper → `check` (stale) → `sync` → `check` (ok) loop against
+a real store.
+
+Not verified: the `github:defrag-au/container-compose` source resolves only after `.skill-store/`
+is committed and pushed; and no global/personal catalogue exists yet, so `~/.agents/skills/` is
+still populated by hand.
+
 ## Appendix A — cross-references that break when rules move
 
 | Reference | Where | Fix |

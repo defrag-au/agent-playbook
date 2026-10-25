@@ -1,0 +1,25 @@
+{
+  "id": "urn:skill:crate-research",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v1",
+  "manifest": {
+    "d9d51c4bdb6775496c15156afb833fcf97be74f7b8f1e1214703527bad2f480051cc0be8258372f9c6501bb0da32f89803358436fa4ca639da258405dd54215b": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-25T06:00:44Z",
+      "state": {
+        "d9d51c4bdb6775496c15156afb833fcf97be74f7b8f1e1214703527bad2f480051cc0be8258372f9c6501bb0da32f89803358436fa4ca639da258405dd54215b": [
+          "SKILL.md"
+        ]
+      },
+      "message": "first published version",
+      "user": {
+        "name": "damo"
+      }
+    }
+  }
+}

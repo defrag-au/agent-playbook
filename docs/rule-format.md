@@ -129,6 +129,7 @@ ecosystems: defrag
 renders: egui, macroquad
 languages: rust
 default_target: claude-code
+skills: github:defrag-au/shared-crates#widget-screenshot@v1
 ```
 
 A rule in `.playbook/rules/` must declare `layer: project` and `activation: project:<name>`, where
@@ -140,6 +141,10 @@ loads.
 discover the manifest by walking up from the working directory, so no `--project` is needed.
 `--manifest <path>` names one explicitly when the manifest lives outside the directory being
 written to (the personal instructions file in the fleet repository is the worked case).
+
+`skills:` is the one key that is not about rule resolution: it lists OCFL skill sources that
+`playbook skills sync` delivers into the harness's project directory. Comma-separated, order
+preserved. See [`skills.md`](skills.md).
 
 `org` and `ecosystem` answer different questions, and a rule belongs to whichever one it is
 actually true of:

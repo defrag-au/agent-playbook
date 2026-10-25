@@ -1,0 +1,25 @@
+{
+  "id": "urn:skill:inspect-code",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v1",
+  "manifest": {
+    "031be33f8c9bc2bee106f6f2bd6f3a8f7c895c89f1fd1c8b6fc68715e12b405982608897504dedf82228cfef0f7a55d66f346522196122453df120c1b04f5923": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-25T06:00:45Z",
+      "state": {
+        "031be33f8c9bc2bee106f6f2bd6f3a8f7c895c89f1fd1c8b6fc68715e12b405982608897504dedf82228cfef0f7a55d66f346522196122453df120c1b04f5923": [
+          "SKILL.md"
+        ]
+      },
+      "message": "first published version",
+      "user": {
+        "name": "damo"
+      }
+    }
+  }
+}

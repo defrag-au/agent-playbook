@@ -91,27 +91,32 @@ src/              resolution engine + CLI
   render.rs         the managed block
   install.rs        splice and check
   init.rs           scaffolding a consumer's `.playbook/`
+  skills.rs         delivering OCFL-stored skills into a repository
   main.rs           the CLI
-tools/            the read-only agent toolkit: five binaries, six crates
+tools/            the agent toolkit, plus the skill store
   at-core/          the output contract, path containment and text reading, shared
   at-peek/          the working tree — stat, slice, search
   at-crate/         installed crate source and build output — where, installed, files, slice, search, out
   at-recall/        history and state — state, log, diff, pr
   at-reach/         a private fleet tree — root, hosts, probe
   at-describe/      the catalogue, which opens nothing
+  browser-shot/     browser captures, scenarios and frame bursts
+  skill-store/      OCFL publish and export for skills (writes, and fetches)
+  zed-thread-tools/ thread auditing, recovery and a TUI
 tests/            spec tests for the resolution model
 rules/            one file per standing constraint, flat frontmatter
   core/           model-, language- and org-agnostic
   rust/           activated for Rust repositories
   org/defrag/     activated for defrag-org repositories
-skills/           on-demand procedures, real SKILL.md files with descriptions
+skills/           authoring tree: one directory per skill, published into `.skill-store/`
+.skill-store/     the OCFL store — one immutable version per published skill
 memory/           environment facts and durable preferences
 references/       crate cheat sheets and API notes
   crates/         one file per crate@version
 models/           compose-time overlays: generic, claude-code, deepseek-flash, zed
                   (models/zed-personal writes the personal instructions file)
 templates/        scaffolds for new rules, skills, projects and overlays
-docs/             precedence model, rule format, migration inventory, inspection and browser tools
+docs/             precedence model, rule format, skills delivery, migration inventory, inspection and browser tools
 dist/             generated output (gitignored)
 ```
 
@@ -142,7 +147,15 @@ playbook check --target claude-code
 
 # Every shared rule, and the activation that reaches it.
 playbook rules
+
+# Deliver the skills this repository declares, into its harness's project directory.
+playbook skills sync  --target zed
+playbook skills check --target zed
 ```
+
+`skills sync` exports each declared source through `skill-store` and records the version and tree
+digest in `.playbook/skills.lock`; `skills check` re-exports and compares, byte for byte. See
+[`docs/skills.md`](docs/skills.md).
 
 A repository that has no manifest yet gets one with `playbook init`, which writes
 `.playbook/project.conf` and an empty `.playbook/rules/`:

@@ -71,6 +71,7 @@ default_file: CLAUDE.md
 | `addenda` | Files in `models/<target>/addenda/`, appended after the memory layer |
 | `memory` | Files in `memory/`, emitted after the rules and before the addenda |
 | `default_file` | What `playbook install` writes into when `--file` is not given |
+| `skill_dir` | Where `playbook skills sync` delivers a repository's declared skills, relative to the repository. Absent means the target does not deliver skills — a model overlay usually does not |
 | `instruction_files` | The harness's instruction-file priority order, most significant first. Used to warn when an existing file outranks the one being written |
 
 Full semantics in [`../docs/precedence.md`](../docs/precedence.md).

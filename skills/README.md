@@ -27,16 +27,59 @@ has a trigger, so it is a skill.
 
 ## Installing
 
-Copy the directory, or symlink it:
+A skill a repository needs is delivered from an **OCFL store**, not copied by hand. The store
+lives next to the tool the skill operates — `container-compose/.skill-store/` — and the
+repository declares what it wants:
 
-```sh
-cp -R skills/crate-research ~/.agents/skills/            # global
-cp -R skills/widget-screenshot <repo>/.agents/skills/    # project-local
+```conf
+# <repo>/.playbook/project.conf
+skills: github:defrag-au/container-compose#container-compose@v1
 ```
 
-Prefer project-local when the skill only makes sense in one repo. `widget-screenshot` needs
-the storybook and Brave, so it is a candidate for `shared-crates/.agents/skills/` rather than
-the global directory.
+```sh
+playbook skills sync  --target zed      # export, copy into .agents/skills/, record the lock
+playbook skills check --target zed      # what CI runs
+```
+
+The version and the exported tree's digest go into `.playbook/skills.lock`, and a directory that
+the lock does not name is refused rather than overwritten. `skill-store` publishes a plain
+directory as a version:
+
+```sh
+skill-store publish <repo>/<skill> --store <repo>/.skill-store --init
+skill-store verify  path:<repo>/.skill-store
+```
+
+This directory holds the skills whose subject **is** this repository's toolkit — `at-peek` and
+`at-crate` for `inspect-code`, the thread tools for `crate-research`, the composer for
+`capture-rule`. They are published into [`.skill-store/`](../.skill-store) at the repository root,
+which is what `github:defrag-au/agent-playbook#inspect-code@v1` resolves to.
+
+## Authoring here, publishing there
+
+`skills/<name>/` is the editable source; `.skill-store/<name>/vN/` is the published artifact. Edit
+here, then publish — a version is a release, not a keystroke, and publishing identical content is
+refused.
+
+```sh
+skill-store publish skills/inspect-code --store .skill-store --message "what changed"
+skill-store verify  path:.skill-store
+```
+
+To see whether a publish is owed, export the head and diff it against the source (the export
+refuses a non-empty `--out`, so pick an unused directory):
+
+```sh
+skill-store export 'path:.#inspect-code@v1' --out .tmp/check-inspect-code
+diff -r .tmp/check-inspect-code/skill skills/inspect-code
+```
+
+`widget-screenshot`, `game-spike` and `fleet-ops` are still here but belong elsewhere — the
+storybook and `macroquad-gamekit` live in `shared-crates`, and the fleet inventory lives in
+`fleet`. They move when those repositories get a store.
+
+Delivering the global set is not wired yet: `playbook skills` delivers into a repository's project
+directory, and `~/.agents/skills/` is still populated by hand until the personal catalogue lands.
 
 ## The failure this layout exists to prevent
 

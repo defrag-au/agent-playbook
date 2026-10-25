@@ -7,11 +7,13 @@ use std::process::ExitCode;
 use playbook::init;
 use playbook::install::{self, Outcome};
 use playbook::load::{
-    census, expand_tilde, find_manifest, find_root, find_root_with_source, RootSource,
+    census, expand_tilde, find_manifest, find_root, find_root_with_source, load_manifest,
+    load_target, RootSource,
 };
 use playbook::model::{Activation, Diagnostic};
 use playbook::render;
 use playbook::resolve;
+use playbook::skills;
 
 const USAGE: &str = "\
 playbook — resolve and render agent rules for a project + target
@@ -24,6 +26,7 @@ commands
   install    write the block into a repository's agent file
   check      exit 1 if a repository's block is stale
   init       scaffold a repository's .playbook/ manifest and rules directory
+  skills     deliver the skills a repository declares: `skills sync`, `skills check`
   root       print the rule tree being resolved against, and how it was found
   rules      list every shared rule, and the activation that reaches it
 
@@ -34,6 +37,8 @@ options
   --repo <path>      repository root (install, check, init; default: the working directory)
   --file <name>      filename within the repo (default: the target's default_file)
   --out <file>       write to a file instead of stdout (compose)
+  --offline          skills: use the skill-store cache without fetching
+  --prune            skills sync: remove a delivered skill no longer declared
   --root <dir>       playbook root (default: found from the working directory, then
                      beside the installed binary — `playbook root` says which)
   -h, --help         this
@@ -44,6 +49,8 @@ examples
   playbook check                     # from inside the repository: neither is needed
   playbook check --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf --repo ~/.config/zed
   playbook init --name montager
+  playbook skills sync --target claude-code
+  playbook skills check --target claude-code   # what CI would run
   playbook root
 ";
 
@@ -56,6 +63,8 @@ struct Opts {
     file: Option<String>,
     out: Option<String>,
     root: Option<String>,
+    offline: bool,
+    prune: bool,
 }
 
 fn main() -> ExitCode {
@@ -67,6 +76,15 @@ fn main() -> ExitCode {
     }
 
     let command = args[0].clone();
+    if command == "skills" {
+        return match cmd_skills(&args[1..]) {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::from(2)
+            }
+        };
+    }
     let opts = match parse_opts(&args[1..]) {
         Ok(o) => o,
         Err(e) => {
@@ -111,6 +129,16 @@ fn parse_opts(args: &[String]) -> Result<Opts, String> {
     let mut i = 0;
     while i < args.len() {
         let key = args[i].as_str();
+        if key == "--offline" {
+            opts.offline = true;
+            i += 1;
+            continue;
+        }
+        if key == "--prune" {
+            opts.prune = true;
+            i += 1;
+            continue;
+        }
         if !VALUE_OPTS.contains(&key) {
             return Err(format!("unknown option `{key}`"));
         }
@@ -430,6 +458,91 @@ fn cmd_install(opts: &Opts, check: bool) -> Result<ExitCode, String> {
             Ok(ExitCode::from(1))
         }
     }
+}
+
+/// `playbook skills sync|check` — deliver the skills a repository declares.
+///
+/// Deliberately not the same resolution `install` performs: the rule tree is not read at all, so a
+/// repository whose rules fail to resolve can still receive its skills. The manifest supplies the
+/// sources and the target supplies the directory.
+fn cmd_skills(args: &[String]) -> Result<ExitCode, String> {
+    let Some(verb) = args.first() else {
+        return Err(
+            "`skills` needs a verb — `playbook skills sync` or `playbook skills check`".to_string(),
+        );
+    };
+    let opts = parse_opts(&args[1..])?;
+    match verb.as_str() {
+        "sync" => run_skills(&opts, false),
+        "check" => run_skills(&opts, true),
+        other => Err(format!(
+            "unknown `skills` verb `{other}` — expected `sync` or `check`"
+        )),
+    }
+}
+
+fn run_skills(opts: &Opts, check: bool) -> Result<ExitCode, String> {
+    let (root, source) = root_of_with_source(opts)?;
+    note_root(&root, source);
+    let anchor = anchor(opts)?;
+    let manifest_repo = choose_manifest(opts, &anchor)?;
+    let repo = output_repo(opts, manifest_repo.clone());
+
+    let (project, diagnostics) = load_manifest(&manifest_repo)?;
+    report(&diagnostics);
+    let target_name = opts
+        .target
+        .clone()
+        .or_else(|| project.default_target.clone())
+        .unwrap_or_else(|| "zed".to_string());
+    let target = load_target(&root, &target_name)?;
+    if target.skill_dir.is_empty() {
+        return Err(format!(
+            "target `{target_name}` does not deliver skills — add `skill_dir:` to {}",
+            root.join("models")
+                .join(&target_name)
+                .join("overlay.conf")
+                .display()
+        ));
+    }
+
+    let result = if check {
+        skills::check(&repo, &project, &target, opts.offline)?
+    } else {
+        skills::sync(&repo, &project, &target, opts.offline, opts.prune)?
+    };
+
+    for line in &result.lines {
+        println!("{}: {} — {}", line.verdict.as_str(), line.name, line.detail);
+    }
+    for warning in &result.warnings {
+        eprintln!("warning: {warning}");
+    }
+    if result.lines.is_empty() && result.warnings.is_empty() {
+        println!(
+            "no skills declared in {}",
+            manifest_repo.join(".playbook/project.conf").display()
+        );
+    }
+
+    if check && !result.ok() {
+        // The manifest may live outside the directory its trees are delivered into, and an
+        // offline check is only reproducible offline — both have to survive into the hint.
+        let mut command = format!("playbook skills sync --target {target_name}");
+        if let Some(manifest) = &opts.manifest {
+            command.push_str(&format!(" --manifest {manifest}"));
+        }
+        if opts.repo.is_some() {
+            command.push_str(&format!(" --repo {}", repo.display()));
+        }
+        if opts.offline {
+            command.push_str(" --offline");
+        }
+        eprintln!("\nrun: {command}");
+        return Ok(ExitCode::from(1));
+    }
+
+    Ok(ExitCode::SUCCESS)
 }
 
 /// Scaffold a repository's `.playbook/` manifest and rules directory.

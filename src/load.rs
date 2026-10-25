@@ -17,6 +17,7 @@ const PROJECT_KEYS: &[&str] = &[
     "renders",
     "languages",
     "default_target",
+    "skills",
 ];
 const TARGET_KEYS: &[&str] = &[
     "target",
@@ -30,6 +31,7 @@ const TARGET_KEYS: &[&str] = &[
     "addenda",
     "memory",
     "default_file",
+    "skill_dir",
     "instruction_files",
 ];
 const RULE_KEYS: &[&str] = &[
@@ -224,6 +226,7 @@ pub fn load_manifest(repo: &Path) -> Result<(Project, Vec<Diagnostic>), String> 
                 .get("default_target")
                 .cloned()
                 .filter(|value| !value.is_empty()),
+            skills: list("skills"),
             repo: repo.to_path_buf(),
         },
         diagnostics,
@@ -283,6 +286,11 @@ pub fn load_target(root: &Path, name: &str) -> Result<Target, String> {
             .cloned()
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "AGENTS.md".to_string()),
+        skill_dir: conf
+            .get("skill_dir")
+            .cloned()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_default(),
         instruction_files: list("instruction_files"),
     })
 }

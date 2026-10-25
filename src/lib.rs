@@ -10,3 +10,4 @@ pub mod load;
 pub mod model;
 pub mod render;
 pub mod resolve;
+pub mod skills;
