@@ -17,6 +17,7 @@ Budget: ≤ 200 lines and ≤ 8 KB per file. The test suite enforces a 10 KB cei
 
 | Crate | Version | File | Read first |
 | --- | --- | --- | --- |
+| cef | 156.2.0 | `cef-156.2.md` | `## Boot a browser process` |
 | chrono | 0.4.45 | `chrono-0.4.md` | `## Parse an RFC 3339 timestamp` |
 | clap | 4.6.7 | `clap-4.6.md` | `## Derive a parser` |
 | headless_chrome | 1.0.22 | `headless_chrome-1.0.22.md` | `## Launch a browser and own it` |

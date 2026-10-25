@@ -1,0 +1,41 @@
+{
+  "id": "urn:skill:crate-research",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v2",
+  "manifest": {
+    "71040814f92112556bdf41a6248fa836847b2ea21b42a04685871427d23cc167e30269b89b6ddbd65b0ef9fa584e510ceca51ac288fc987a385fff02ee6a3ab1": [
+      "v2/content/SKILL.md"
+    ],
+    "d9d51c4bdb6775496c15156afb833fcf97be74f7b8f1e1214703527bad2f480051cc0be8258372f9c6501bb0da32f89803358436fa4ca639da258405dd54215b": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-25T06:00:44Z",
+      "state": {
+        "d9d51c4bdb6775496c15156afb833fcf97be74f7b8f1e1214703527bad2f480051cc0be8258372f9c6501bb0da32f89803358436fa4ca639da258405dd54215b": [
+          "SKILL.md"
+        ]
+      },
+      "message": "first published version",
+      "user": {
+        "name": "damo"
+      }
+    },
+    "v2": {
+      "created": "2026-10-25T11:25:52Z",
+      "state": {
+        "71040814f92112556bdf41a6248fa836847b2ea21b42a04685871427d23cc167e30269b89b6ddbd65b0ef9fa584e510ceca51ac288fc987a385fff02ee6a3ab1": [
+          "SKILL.md"
+        ]
+      },
+      "message": "cargo info first, the cost rules, the catalogue step and the recovery procedure — merged from the copy the store never got",
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}
