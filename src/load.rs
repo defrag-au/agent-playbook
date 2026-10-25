@@ -6,7 +6,8 @@ use std::path::{Path, PathBuf};
 
 use crate::frontmatter::{parse_conf, split_document, split_list, Split};
 use crate::model::{
-    split_sections, Activation, Diagnostic, Layer, Project, Rule, Section, Severity, Target,
+    split_sections, Activation, Diagnostic, Layer, Project, Rule, Section, Severity, SkillScope,
+    Target,
 };
 
 const PROJECT_KEYS: &[&str] = &[
@@ -18,6 +19,7 @@ const PROJECT_KEYS: &[&str] = &[
     "languages",
     "default_target",
     "skills",
+    "skills_scope",
 ];
 const TARGET_KEYS: &[&str] = &[
     "target",
@@ -32,6 +34,7 @@ const TARGET_KEYS: &[&str] = &[
     "memory",
     "default_file",
     "skill_dir",
+    "skill_global_dir",
     "instruction_files",
 ];
 const RULE_KEYS: &[&str] = &[
@@ -209,6 +212,9 @@ pub fn load_manifest(repo: &Path) -> Result<(Project, Vec<Diagnostic>), String> 
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
         .ok_or_else(|| format!("{}: `project:` is required", path.display()))?;
+    let skills_scope =
+        SkillScope::parse(conf.get("skills_scope").map(String::as_str).unwrap_or(""))
+            .map_err(|error| format!("{}: {error}", path.display()))?;
     let list = |key: &str| {
         conf.get(key)
             .map(|value| split_list(value))
@@ -227,6 +233,7 @@ pub fn load_manifest(repo: &Path) -> Result<(Project, Vec<Diagnostic>), String> 
                 .cloned()
                 .filter(|value| !value.is_empty()),
             skills: list("skills"),
+            skills_scope,
             repo: repo.to_path_buf(),
         },
         diagnostics,
@@ -288,6 +295,11 @@ pub fn load_target(root: &Path, name: &str) -> Result<Target, String> {
             .unwrap_or_else(|| "AGENTS.md".to_string()),
         skill_dir: conf
             .get("skill_dir")
+            .cloned()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_default(),
+        skill_global_dir: conf
+            .get("skill_global_dir")
             .cloned()
             .filter(|s| !s.is_empty())
             .unwrap_or_default(),

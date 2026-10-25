@@ -287,6 +287,40 @@ fn trim_blank(lines: &[&str]) -> String {
     lines[start..=end].join("\n")
 }
 
+/// Where a manifest's `skills:` are delivered.
+///
+/// A repository delivers into its own tree; a personal catalogue delivers into the harness's
+/// global directory. It is a property of the manifest because the manifest is the thing that
+/// knows what it is — a repo-scoped run can never write outside the checkout it was pointed at,
+/// and a global run can never write into `fleet`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SkillScope {
+    /// `<repo>/<target.skill_dir>` — the default.
+    #[default]
+    Repo,
+    /// `<target.skill_global_dir>`, e.g. `~/.agents/skills`.
+    Global,
+}
+
+impl SkillScope {
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value.trim() {
+            "" | "repo" => Ok(Self::Repo),
+            "global" => Ok(Self::Global),
+            other => Err(format!(
+                "unknown skills scope `{other}` — expected `repo` or `global`"
+            )),
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Repo => "repo",
+            Self::Global => "global",
+        }
+    }
+}
+
 /// A repository that consumes rules, as declared by its own `.playbook/project.conf`.
 #[derive(Debug, Clone, Default)]
 pub struct Project {
@@ -305,6 +339,9 @@ pub struct Project {
     /// `github:owner/repo#skill@v1` or `path:~/…` — and `playbook skills sync` records what it
     /// delivered in `.playbook/skills.lock`.
     pub skills: Vec<String>,
+    /// Whether `skills:` is delivered into this repository or into the harness's global
+    /// directory. See [`SkillScope`].
+    pub skills_scope: SkillScope,
     /// Where this project's manifest and its `.playbook/rules/` live.
     ///
     /// The manifest's directory **is** the repository, so there is no separate `path:` to
@@ -339,6 +376,13 @@ pub struct Target {
     /// `skills` are delivered per harness rather than per model: an egui widget and a macroquad
     /// game have the same skill needs, and the two harnesses disagree about where to put them.
     pub skill_dir: String,
+    /// The same directory for a **global** install, which is absolute or `~/…`.
+    ///
+    /// This is where a personal catalogue lands: Zed reads `~/.agents/skills`, Claude Code reads
+    /// `~/.claude/skills`, and they are not the same place. Absent means the target does not
+    /// deliver global skills — a model overlay usually does not, and the personal target does
+    /// not either until the catalogue has a store to read from.
+    pub skill_global_dir: String,
     /// The harness's instruction-file priority order, most significant first.
     ///
     /// Only meaningful for harnesses that read a single file — see
@@ -419,6 +463,7 @@ mod tests {
             languages: vec!["rust".into()],
             default_target: Some("claude-code".into()),
             skills: Vec::new(),
+            skills_scope: SkillScope::Repo,
             repo: PathBuf::new(),
         }
     }

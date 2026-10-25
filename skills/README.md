@@ -74,12 +74,20 @@ skill-store export 'path:.#inspect-code@v1' --out .tmp/check-inspect-code
 diff -r .tmp/check-inspect-code/skill skills/inspect-code
 ```
 
-`widget-screenshot`, `game-spike` and `fleet-ops` are still here but belong elsewhere — the
-storybook and `macroquad-gamekit` live in `shared-crates`, and the fleet inventory lives in
-`fleet`. They move when those repositories get a store.
+An edit here does not need a publish to be seen somewhere. A consuming manifest's
+`.playbook/skills.patch` maps a skill name to this directory, and `playbook skills sync` delivers
+the working copy as `working` — no version, no store entry. See
+[`docs/skills.md`](../docs/skills.md#developing-against-a-skill).
 
-Delivering the global set is not wired yet: `playbook skills` delivers into a repository's project
-directory, and `~/.agents/skills/` is still populated by hand until the personal catalogue lands.
+`fleet-ops` is still here but belongs in `fleet`, and moves when that repository gets a store.
+`widget-screenshot` and `game-spike` left for `shared-crates/.skill-store/` — the storybook and
+`macroquad-gamekit` live there.
+
+Delivering the global set is wired: the personal catalogue is
+`fleet/personal/.playbook/project.conf`, with `skills_scope: global` and one `playbook skills sync
+--target all`. It lists only the skills that are published; `widget-screenshot`, `game-spike` and
+`fleet-ops` are not, so the hand-installed copies in `~/.agents/skills` are left alone until they
+move to the repository that owns them.
 
 ## The failure this layout exists to prevent
 

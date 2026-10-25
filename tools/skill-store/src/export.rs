@@ -20,6 +20,7 @@ use crate::inventory::Inventory;
 use crate::skill;
 use crate::store::Store;
 
+#[derive(Debug)]
 pub struct Report {
     pub name: String,
     pub id: String,
@@ -27,6 +28,10 @@ pub struct Report {
     pub files: usize,
     pub tree_digest: String,
 }
+
+/// The version label a working copy exports under. Not an OCFL version directory: there is no
+/// inventory, and `@working` is rejected by the source grammar, so a lock can never pin one.
+pub const WORKING_VERSION: &str = "working";
 
 pub fn export(
     store: &Store,
@@ -120,6 +125,72 @@ pub fn export(
         id: inventory.id,
         version,
         files,
+        tree_digest,
+    })
+}
+
+/// Export a plain skill directory — a working copy, not a published version.
+///
+/// This is what a `path:` development override resolves to: `SKILL.md` plus whatever it
+/// references, with no inventory and no immutable version. The version is [`WORKING_VERSION`],
+/// and the tree digest is over exactly what was copied, so a consumer can still tell when the
+/// copy it delivered has drifted.
+///
+/// `expected` is the selector from the source, when one was written: a working tree that names a
+/// different skill is a mistake, not something to deliver under the wrong name.
+pub fn export_working(
+    source: &str,
+    dir: &Path,
+    expected: Option<&str>,
+    out: &Path,
+) -> Result<Report, String> {
+    let meta = skill::read_skill_md(&dir.join("SKILL.md"), None)?;
+    if let Some(expected) = expected {
+        if meta.name != expected {
+            return Err(format!(
+                "{}: `name: {}` does not match the selector `{expected}`",
+                dir.display(),
+                meta.name
+            ));
+        }
+    }
+
+    let files = fsx::walk_files(dir)?;
+    if files.is_empty() {
+        return Err(format!("{}: the skill tree is empty", dir.display()));
+    }
+
+    prepare_out(out)?;
+    let tree = out.join("skill");
+    fs::create_dir_all(&tree).map_err(|e| format!("{}: {e}", tree.display()))?;
+    for (relative, path) in &files {
+        safe_relative(relative)?;
+        let destination = tree.join(relative);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        }
+        fs::copy(path, &destination)
+            .map_err(|e| format!("{} → {}: {e}", path.display(), destination.display()))?;
+    }
+
+    let tree_digest = digest::tree_hex(&tree)?;
+    let id = format!("urn:skill:{}", meta.name);
+    let count = files.len();
+    let pairs: Vec<(&str, String)> = vec![
+        ("name", meta.name.clone()),
+        ("id", id.clone()),
+        ("version", WORKING_VERSION.to_string()),
+        ("source", source.to_string()),
+        ("tree_digest", tree_digest.clone()),
+        ("files", count.to_string()),
+    ];
+    fsx::write_flat(&out.join("export.conf"), &pairs)?;
+
+    Ok(Report {
+        name: meta.name,
+        id,
+        version: WORKING_VERSION.to_string(),
+        files: count,
         tree_digest,
     })
 }

@@ -72,6 +72,7 @@ default_file: CLAUDE.md
 | `memory` | Files in `memory/`, emitted after the rules and before the addenda |
 | `default_file` | What `playbook install` writes into when `--file` is not given |
 | `skill_dir` | Where `playbook skills sync` delivers a repository's declared skills, relative to the repository. Absent means the target does not deliver skills — a model overlay usually does not |
+| `skill_global_dir` | The same for a **global** install: absolute or `~/…`. Absent means the target has no global skill directory, so `skills_scope: global` skips it and `--target all` passes it over |
 | `instruction_files` | The harness's instruction-file priority order, most significant first. Used to warn when an existing file outranks the one being written |
 
 Full semantics in [`../docs/precedence.md`](../docs/precedence.md).

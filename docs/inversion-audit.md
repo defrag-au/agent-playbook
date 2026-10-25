@@ -627,6 +627,15 @@ In short:
   offline and dependency-free. `playbook skills sync` calls it and reads the envelope.
 - **`skills:` in `.playbook/project.conf` + `.playbook/skills.lock`** repeat the managed-block
   model: copy, record, `check`. Unmanaged directories are refused, never overwritten.
+- **`skills_scope:` decides whether that is a repository or the harnesses.** `repo` (default)
+  delivers into the checkout; `global` delivers into `~/.agents/skills` and `~/.claude/skills`
+  and keeps the lock beside the manifest. `--target` takes a list or `all`, so both harnesses are
+  one command — the personal catalogue in `fleet` is where "update all of my skills" lives.
+- **`.playbook/skills.patch` is the development override**, so testing an edit does not mean
+  publishing a version. It is keyed by skill name; a `path:` to a plain directory exports as
+  `working`; `sync` leaves the lock alone for a patched skill; and every affected line says
+  `(patched)`. A separate gitignored file rather than a manifest key, because an in-manifest patch
+  has to be commented out before every commit and CI would otherwise see a machine path.
 - **The skill moves next to the tool.** `container-compose` is published into
   `container-compose/.skill-store/` and declared as
   `github:defrag-au/container-compose#container-compose@v1`; this repository's `skills/` no longer
@@ -634,19 +643,39 @@ In short:
 - **This repository keeps only the skills about its own toolkit** — `inspect-code`,
   `capture-rule`, `crate-research`, `browser-shot` — authored in `skills/` and published into
   `.skill-store/` at the root, so `github:defrag-au/agent-playbook#inspect-code@v1` resolves.
-  `widget-screenshot` and `game-spike` belong to `shared-crates` (the storybook and
-  `macroquad-gamekit`), and `fleet-ops` to `fleet`; each moves when that repository gets a store.
+- **Two more moved to `shared-crates`.** `widget-screenshot` and `game-spike` are published into
+  `shared-crates/.skill-store/` (`v1`, byte-identical round trip) and declared in that
+  repository's manifest for both harnesses; `agent-playbook/skills/` no longer carries them.
+  `fleet-ops` remains here until `fleet` has a store.
 
-Verified: `cargo test --workspace` green (composer 63 unit + 48 integration, `skill-store` 12
-unit + 8 integration); `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+Verified: `cargo test --workspace` green (composer 75 unit + 48 integration, `skill-store` 12
+unit + 11 integration); `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 clean; all eight current skills published as `v1` and re-exported byte-identical to `skills/`;
 `.skill-store/` verifies as 4 objects with each `v1` exporting byte-identical to its authoring
 directory; and a `sync` → `check` → tamper → `check` (stale) → `sync` → `check` (ok) loop against
 a real store.
 
-Not verified: the `github:defrag-au/container-compose` source resolves only after `.skill-store/`
-is committed and pushed; and no global/personal catalogue exists yet, so `~/.agents/skills/` is
-still populated by hand.
+Global delivery was verified against a **fake `HOME`** so the real `~/.agents/skills` was never
+touched: five sources delivered to both harnesses, the lock recording `claude-code,zed`, `check`
+ok, one target's copy tampered → that target alone went stale and the run exited 1, `sync`
+restored it. Removing the lock produced the first-run refusal with ten unmanaged directories, each
+labelled identical-to-v1 or stale-copy.
+
+`shared-crates` delivery was verified with `path:` sources in place of its `github:` ones: both
+skills to `.agents/skills` and `.claude/skills`, `check` ok. The delivered trees and the lock were
+then removed and the manifest restored, because that store is not on a pushed branch and a lock
+naming `/Users/damo/…` does not belong in an org repository — the first sync after the push
+produces both.
+
+The patch was verified end to end against the personal catalogue: five skills delivered from local
+paths with `(patched)` on every line, four of them plain directories exported as `working` and one
+from a store at `v1`; no `skills.lock` was written; editing the working copy made `check` report
+`stale` on both targets; and removing the patch made the same run fail on the unpushed `github:`
+source, which is what the override exists to stand in for.
+
+Not verified: the `github:` sources resolve only after `damon-inversion` is pushed — the remote's
+`main` is still `ba0355e`, before the inversion. The personal catalogue therefore declares the
+`github:` forms, and the first real run happens after the push.
 
 ## Appendix A — cross-references that break when rules move
 

@@ -151,11 +151,16 @@ playbook rules
 # Deliver the skills this repository declares, into its harness's project directory.
 playbook skills sync  --target zed
 playbook skills check --target zed
+playbook skills sync  --target all            # both harnesses, or every one that has a directory
 ```
 
-`skills sync` exports each declared source through `skill-store` and records the version and tree
-digest in `.playbook/skills.lock`; `skills check` re-exports and compares, byte for byte. See
-[`docs/skills.md`](docs/skills.md).
+`skills sync` exports each declared source through `skill-store` and records the version, tree
+digest and target in `.playbook/skills.lock`; `skills check` re-exports and compares, byte for
+byte. A manifest with `skills_scope: global` delivers into `~/.agents/skills` and
+`~/.claude/skills` instead, with the lock beside the manifest — that is how the personal
+catalogue in `fleet` keeps every harness current in one command. An edit you have not published
+is delivered from a gitignored `.playbook/skills.patch`, and every line it affects says
+`(patched)`. See [`docs/skills.md`](docs/skills.md).
 
 A repository that has no manifest yet gets one with `playbook init`, which writes
 `.playbook/project.conf` and an empty `.playbook/rules/`:

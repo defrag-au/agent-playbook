@@ -111,6 +111,12 @@ Options: `--out`, `--store`, `--id`, `--message`, `--user`, `--skill`, `--versio
 
 Exit codes: `0` success, `1` an operation failed, `2` a usage error (bad source, missing flag).
 
+`export` also accepts a `path:` to a **plain skill directory** — no store, no inventory, no
+version. That is what a development override points at: the envelope is the same, with
+`version: working` and the digest taken over the copied tree. `working` is not a version directory
+and the source grammar rejects `@working`, so nothing can pin one; the next `publish` is what
+makes an edit permanent.
+
 ## Authoring and publishing
 
 The working copy is a plain directory — the same shape an agent reads:

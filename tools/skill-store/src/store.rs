@@ -122,24 +122,32 @@ fn source_ref(source: &Source) -> Option<&str> {
 /// │   ├── 0=ocfl_1.1
 /// │   └── container-compose/…
 /// ```
+/// The storage root at or immediately inside `base`, if there is one.
+///
+/// The inverse of [`resolve_root`] for the caller that has to decide whether a path *is* a store
+/// before trying to open one — a development override points at a plain skill directory instead.
+pub fn find_root(base: &Path) -> Option<PathBuf> {
+    if is_root(base) {
+        return Some(base.to_path_buf());
+    }
+    let nested = base.join(STORE_DIRECTORY);
+    is_root(&nested).then_some(nested)
+}
+
 pub fn resolve_root(base: &Path, dir: Option<&str>) -> Result<PathBuf, String> {
     if let Some(dir) = dir {
         let candidate = base.join(dir);
         return validate_root(&candidate);
     }
-    if is_root(base) {
-        return validate_root(base);
+    match find_root(base) {
+        Some(root) => validate_root(&root),
+        None => Err(format!(
+            "{} is not an OCFL storage root, and neither is {} — expected `{DECLARATION}` in one \
+             of them, or pass `?dir=`",
+            base.display(),
+            base.join(STORE_DIRECTORY).display()
+        )),
     }
-    let nested = base.join(STORE_DIRECTORY);
-    if is_root(&nested) {
-        return validate_root(&nested);
-    }
-    Err(format!(
-        "{} is not an OCFL storage root, and neither is {} — expected `{DECLARATION}` in one of \
-         them, or pass `?dir=`",
-        base.display(),
-        nested.display()
-    ))
 }
 
 fn is_root(path: &Path) -> bool {

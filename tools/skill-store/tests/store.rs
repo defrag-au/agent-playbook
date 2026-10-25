@@ -309,6 +309,11 @@ fn a_git_source_is_fetched_and_can_be_pinned() {
             "user.name=test",
             "-c",
             "user.email=test@example.com",
+            // A fixture commit must not inherit the machine's signing configuration: an agent
+            // shell has no pinentry, so a globally enabled `commit.gpgsign` fails the fetch test
+            // for a reason that has nothing to do with the code under test.
+            "-c",
+            "commit.gpgsign=false",
             "commit",
             "--quiet",
             "-m",
@@ -336,6 +341,82 @@ fn a_git_source_is_fetched_and_can_be_pinned() {
     let opened = Store::open(&source, true).expect("cached");
     assert!(opened.root.ends_with(".skill-store"));
     assert!(opened.root.starts_with(&cache));
+}
+
+#[test]
+fn a_plain_directory_exports_as_a_working_copy() {
+    let temp = Temp::new("working");
+    let skill = write_skill(&temp.path, "widget-screenshot", "one");
+    let out = temp.path.join("export");
+    let source = format!("path:{}", skill.display());
+
+    let report = export::export_working(&source, &skill, Some("widget-screenshot"), &out)
+        .expect("working export");
+    assert_eq!(report.version, "working");
+    assert_eq!(report.files, 2);
+    assert!(report.tree_digest.starts_with("sha256:"));
+
+    let conf = fsx::read_flat(&out.join("export.conf")).expect("export.conf");
+    assert_eq!(conf.get("version").map(String::as_str), Some("working"));
+    assert_eq!(
+        conf.get("source").map(String::as_str),
+        Some(source.as_str())
+    );
+    assert!(
+        !conf.contains_key("inventory_digest"),
+        "a working copy has no inventory to digest"
+    );
+    assert_eq!(
+        fs::read_to_string(out.join("skill/SKILL.md")).expect("exported"),
+        fs::read_to_string(skill.join("SKILL.md")).expect("source")
+    );
+    assert_eq!(
+        fs::read_to_string(out.join("skill/references/REFERENCE.md")).expect("reference"),
+        "reference\n"
+    );
+}
+
+#[test]
+fn a_working_copy_names_its_selector_or_is_refused() {
+    let temp = Temp::new("working-selector");
+    let skill = write_skill(&temp.path, "widget-screenshot", "one");
+    let source = format!("path:{}", skill.display());
+
+    let error = export::export_working(
+        &source,
+        &skill,
+        Some("inspect-code"),
+        &temp.path.join("export"),
+    )
+    .expect_err("selector mismatch");
+    assert!(error.contains("does not match the selector"), "{error}");
+}
+
+#[test]
+fn a_working_copy_digest_follows_the_edit() {
+    let temp = Temp::new("working-digest");
+    let skill = write_skill(&temp.path, "widget-screenshot", "one");
+    let first = export::export_working(
+        &format!("path:{}", skill.display()),
+        &skill,
+        None,
+        &temp.path.join("first"),
+    )
+    .expect("first");
+
+    fs::write(skill.join("references/REFERENCE.md"), "edited\n").expect("edit");
+    let second = export::export_working(
+        &format!("path:{}", skill.display()),
+        &skill,
+        None,
+        &temp.path.join("second"),
+    )
+    .expect("second");
+
+    assert_ne!(
+        first.tree_digest, second.tree_digest,
+        "the digest has to track the working tree, or a consumer cannot see drift"
+    );
 }
 
 fn git(dir: &Path, args: &[&str]) -> String {

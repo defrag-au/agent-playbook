@@ -26,6 +26,7 @@ usage: skill-store <command> [options]
 
 commands
   export <source> --out <dir>          export one version as an envelope (skill/ + export.conf)
+                                       a `path:` to a plain skill directory exports as `working`
   list <source>                        list the objects in a store, with head and description
   verify <source> [<skill>]            check inventories, digests and content paths
   publish <dir> --store <path>         publish a plain skill directory as a new version
@@ -172,18 +173,51 @@ fn cmd_export(opts: &Opts) -> i32 {
     let Some(out) = &opts.out else {
         return usage("`export` needs `--out <dir>`");
     };
-    let (parsed, store) = match open(&source, opts.offline) {
-        Ok(pair) => pair,
+    let out = Path::new(out);
+    let parsed = match source::parse(&source) {
+        Ok(parsed) => parsed,
+        Err(error) => return operation(error),
+    };
+
+    // A `path:` that is not a store but holds a `SKILL.md` is a working copy — what a development
+    // override points at. Everything else has to be a published version.
+    if let source::Locator::Path(dir) = &parsed.locator {
+        if store::find_root(dir).is_none() && dir.join("SKILL.md").is_file() {
+            return match export::export_working(&source, dir, parsed.skill.as_deref(), out) {
+                Ok(report) => {
+                    println!(
+                        "exported {} {} {} → {}/skill ({} files, {})",
+                        report.name,
+                        report.id,
+                        report.version,
+                        out.display(),
+                        report.files,
+                        report.tree_digest
+                    );
+                    0
+                }
+                Err(error) => operation(error),
+            };
+        }
+    }
+
+    let store = match Store::open(&parsed, opts.offline) {
+        Ok(store) => store,
         Err(error) => return operation(error),
     };
     let Some(skill) = &parsed.skill else {
         return usage("`export` needs a skill: `<store>#<skill>[@v<N>]`");
     };
-    match export::export(&store, skill, parsed.version.as_deref(), Path::new(out)) {
+    match export::export(&store, skill, parsed.version.as_deref(), out) {
         Ok(report) => {
             println!(
                 "exported {} {} {} → {}/skill ({} files, {})",
-                report.name, report.id, report.version, out, report.files, report.tree_digest
+                report.name,
+                report.id,
+                report.version,
+                out.display(),
+                report.files,
+                report.tree_digest
             );
             0
         }

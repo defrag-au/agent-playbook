@@ -4,13 +4,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use playbook::frontmatter::split_list;
 use playbook::init;
 use playbook::install::{self, Outcome};
 use playbook::load::{
-    census, expand_tilde, find_manifest, find_root, find_root_with_source, load_manifest,
-    load_target, RootSource,
+    census, expand_tilde, find_manifest, find_root, find_root_with_source, list_targets,
+    load_manifest, load_target, RootSource,
 };
-use playbook::model::{Activation, Diagnostic};
+use playbook::model::{Activation, Diagnostic, SkillScope, Target};
 use playbook::render;
 use playbook::resolve;
 use playbook::skills;
@@ -33,7 +34,9 @@ commands
 options
   --name <name>      project name to write (init; default: the directory name)
   --manifest <path>  a `.playbook/project.conf`, or the directory containing one
-  --target <name>    target under models/ (default: the manifest's default_target)
+  --target <name>    target under models/ (default: the manifest's default_target).
+                     `skills` takes a comma-separated list, or `all` for every harness that
+                     declares a skill directory
   --repo <path>      repository root (install, check, init; default: the working directory)
   --file <name>      filename within the repo (default: the target's default_file)
   --out <file>       write to a file instead of stdout (compose)
@@ -51,6 +54,7 @@ examples
   playbook init --name montager
   playbook skills sync --target claude-code
   playbook skills check --target claude-code   # what CI would run
+  playbook skills sync --target all            # both harnesses at once
   playbook root
 ";
 
@@ -486,34 +490,67 @@ fn run_skills(opts: &Opts, check: bool) -> Result<ExitCode, String> {
     note_root(&root, source);
     let anchor = anchor(opts)?;
     let manifest_repo = choose_manifest(opts, &anchor)?;
-    let repo = output_repo(opts, manifest_repo.clone());
 
     let (project, diagnostics) = load_manifest(&manifest_repo)?;
     report(&diagnostics);
-    let target_name = opts
+
+    // A global scope delivers outside any repository, so `--repo` names nothing it could write
+    // into — say so rather than accepting a flag that has no effect.
+    let scope = project.skills_scope;
+    let repo = match scope {
+        SkillScope::Repo => Some(output_repo(opts, manifest_repo.clone())),
+        SkillScope::Global => {
+            if opts.repo.is_some() {
+                eprintln!(
+                    "note: `--repo` is ignored — `skills_scope: global` delivers into the harness \
+                     directories, and the lock stays beside the manifest"
+                );
+            }
+            None
+        }
+    };
+    let lock_dir = repo.clone().unwrap_or_else(|| manifest_repo.clone());
+
+    let requested = opts
         .target
         .clone()
         .or_else(|| project.default_target.clone())
         .unwrap_or_else(|| "zed".to_string());
-    let target = load_target(&root, &target_name)?;
-    if target.skill_dir.is_empty() {
-        return Err(format!(
-            "target `{target_name}` does not deliver skills — add `skill_dir:` to {}",
-            root.join("models")
-                .join(&target_name)
-                .join("overlay.conf")
-                .display()
-        ));
-    }
+    let targets =
+        resolve_skill_targets(&root, scope, &split_list(&requested), opts.target.is_some())?;
+    let destinations = skills::destinations(
+        &targets,
+        scope,
+        repo.as_deref().unwrap_or_else(|| Path::new(".")),
+    );
 
     let result = if check {
-        skills::check(&repo, &project, &target, opts.offline)?
+        skills::check(&lock_dir, &project, &destinations, opts.offline)?
     } else {
-        skills::sync(&repo, &project, &target, opts.offline, opts.prune)?
+        skills::sync(&lock_dir, &project, &destinations, opts.offline, opts.prune)?
     };
 
-    for line in &result.lines {
-        println!("{}: {} — {}", line.verdict.as_str(), line.name, line.detail);
+    // Grouped by destination, because the directory is the thing the reader acts on and the
+    // alternative is repeating it on every line.
+    for destination in &destinations {
+        let lines: Vec<&skills::Line> = result
+            .lines
+            .iter()
+            .filter(|line| line.target == destination.target)
+            .collect();
+        if lines.is_empty() {
+            continue;
+        }
+        println!("{} — {}", destination.target, destination.root.display());
+        for line in lines {
+            println!(
+                "  {}: {}{} — {}",
+                line.verdict.as_str(),
+                line.name,
+                if line.patched { " (patched)" } else { "" },
+                line.detail
+            );
+        }
     }
     for warning in &result.warnings {
         eprintln!("warning: {warning}");
@@ -528,11 +565,11 @@ fn run_skills(opts: &Opts, check: bool) -> Result<ExitCode, String> {
     if check && !result.ok() {
         // The manifest may live outside the directory its trees are delivered into, and an
         // offline check is only reproducible offline — both have to survive into the hint.
-        let mut command = format!("playbook skills sync --target {target_name}");
+        let mut command = format!("playbook skills sync --target {requested}");
         if let Some(manifest) = &opts.manifest {
             command.push_str(&format!(" --manifest {manifest}"));
         }
-        if opts.repo.is_some() {
+        if let Some(repo) = &repo {
             command.push_str(&format!(" --repo {}", repo.display()));
         }
         if opts.offline {
@@ -543,6 +580,71 @@ fn run_skills(opts: &Opts, check: bool) -> Result<ExitCode, String> {
     }
 
     Ok(ExitCode::SUCCESS)
+}
+
+/// Load the targets a run delivers for.
+///
+/// `all` expands to every model directory and skips those that do not declare a skill directory
+/// for this scope — that is what makes `--target all` one command for both harnesses. A target
+/// named explicitly must deliver skills, or the caller has said something they did not mean.
+fn resolve_skill_targets(
+    root: &Path,
+    scope: SkillScope,
+    names: &[String],
+    explicit: bool,
+) -> Result<Vec<(String, Target)>, String> {
+    let all = names.iter().any(|name| name == "all");
+    let wanted = if all {
+        list_targets(root)
+    } else {
+        names.to_vec()
+    };
+    let key = match scope {
+        SkillScope::Repo => "skill_dir",
+        SkillScope::Global => "skill_global_dir",
+    };
+
+    let mut out = Vec::new();
+    for name in wanted {
+        let target = load_target(root, &name)?;
+        let dir = match scope {
+            SkillScope::Repo => &target.skill_dir,
+            SkillScope::Global => &target.skill_global_dir,
+        };
+        if dir.is_empty() {
+            if all {
+                continue;
+            }
+            // A manifest whose default target is an instructions target (`zed-personal`) is not
+            // misconfigured — it just has no skill directory, and the fix is a flag, not a key.
+            return Err(if explicit {
+                format!(
+                    "target `{name}` does not deliver {} skills — add `{key}:` to {}",
+                    scope.as_str(),
+                    root.join("models")
+                        .join(&name)
+                        .join("overlay.conf")
+                        .display()
+                )
+            } else {
+                format!(
+                    "`{name}` is this manifest's default_target and has no {} skill directory — \
+                     pass `--target all`, or a comma-separated list of harnesses",
+                    scope.as_str()
+                )
+            });
+        }
+        out.push((name, target));
+    }
+
+    if out.is_empty() {
+        return Err(format!(
+            "no target declares a {} skill directory (`{key}:`) — `playbook skills` has nowhere \
+             to deliver",
+            scope.as_str()
+        ));
+    }
+    Ok(out)
 }
 
 /// Scaffold a repository's `.playbook/` manifest and rules directory.
