@@ -3,7 +3,8 @@
 Standing constraints. Always on, applied every turn, never invoked.
 
 One file per rule. Format is in [`../docs/rule-format.md`](../docs/rule-format.md); a rule
-whose frontmatter does not parse is skipped with a warning, so `--list` is the check.
+whose frontmatter does not parse is reported rather than skipped silently, so `playbook list`
+inside a repository is the check.
 
 ## Which layer does a rule belong in?
 
@@ -12,7 +13,7 @@ whose frontmatter does not parse is skipped with a warning, so `--list` is the c
 | `core/` | Would I want this for a Go project written by someone else? | Fix the cause, don't comment out the code |
 | `rust/` | Is it true of Rust the language, or of the Rust tooling I use? | Tooling lives behind the Nix devshell |
 | `org/defrag/` | Is it true across the defrag ecosystem but not of my work generally? | D1 reads are cheap and writes are expensive |
-| `projects/<repo>/` | Is it true of exactly one repository? | archivist's redb cache is single-process |
+| `<repo>/.playbook/rules/` | Is it true of exactly one repository? | archivist's redb cache is single-process |
 
 A rule in `org/defrag/` activates on one of two facts, and the difference matters:
 

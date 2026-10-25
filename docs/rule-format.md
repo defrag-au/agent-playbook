@@ -113,14 +113,14 @@ session.
 | `ecosystem:defrag` | The project declares `ecosystems: defrag` |
 | `renders:egui` | The project declares `renders: egui` |
 | `renders:macroquad` | The project declares `renders: macroquad` — its game clients draw with macroquad |
-| `project:shared-crates` | The project is `shared-crates` — a legacy registry entry, or a repository manifest whose `project:` is `shared-crates` |
+| `project:shared-crates` | A repository manifest whose `project:` is `shared-crates`. Only valid in that repository's own `.playbook/rules/`: a `project:` rule in the shared tree is an error |
 | `manual` | Never automatically. A target must name the rule's id in its `include:` |
 
 ## Repository-owned projects
 
-A repository can declare its own identity in `<repo>/.playbook/project.conf` and keep its rules in
-`<repo>/.playbook/rules/`. The manifest carries the same flat keys as a registry
-`projects/<name>/project.conf`, minus `path:` — the manifest's directory **is** the repository:
+A repository declares its own identity in `<repo>/.playbook/project.conf` and keeps its rules in
+`<repo>/.playbook/rules/`. The manifest is flat `key: value`; there is no `path:` key, because
+the manifest's directory **is** the repository:
 
 ```conf
 project: shared-crates

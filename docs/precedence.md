@@ -59,20 +59,22 @@ the overlay with a comment saying when it was last checked.
 
 ## Worked example
 
-`shared-crates` + `claude-code`. First the activation filter, which is mechanical:
+`shared-crates` + `claude-code`. The manifest declares `org: defrag`, `ecosystems: defrag`,
+`renders: egui, macroquad` and `languages: rust`. First the activation filter, which is
+mechanical:
 
 ```
-core/*           activation: always          → 10 rules
-rules/rust/*     activation: language:rust    →  4 rules   (the project declares rust)
-rules/org/defrag activation: org:defrag       →  7 rules   (the project declares defrag)
-projects/shared-crates/rules/*                →  2 rules   (repo-specific)
-                                              ────────────
-                                                23 rules
+rules/core/*            activation: always            → 13 rules
+rules/rust/*            activation: language:rust     →  5 rules   (the manifest declares rust)
+rules/org/defrag/*      org, ecosystem and renders    → 15 rules
+.playbook/rules/*       the repository's own          →  3 rules   (repo-specific)
+                                                      ────────────
+                                                        36 rules
 ```
 
-Nothing is excluded and nothing is overridden, so `playbook list --project shared-crates`
-shows 23 rows in layer order and no `superseded` section. That is the normal case: the
-precedence machinery is only visible when it has work to do.
+Nothing is excluded and nothing is overridden, so `playbook list` inside `shared-crates` shows
+36 rows in layer order and no `superseded` section. That is the normal case: the precedence
+machinery is only visible when it has work to do.
 
 Then the `claude-code` overlay:
 
@@ -81,11 +83,13 @@ emphasis: working-first, never-make-things-up, test-preservation, verify-before-
 addenda:  no-privately-preamble.md, tool-names.md
 ```
 
-Output: a `## Non-negotiable` block with four rule leads repeated, the 23 rules in layer
+Output: a `## Non-negotiable` block with four rule leads repeated, the 36 rules in layer
 order each under its own heading with an HTML comment naming its source, then the two
 Claude-harness addenda demoted one heading level so they sit under the rules rather than
 competing with them.
 
-`archivist` resolves to 15 — the same 10 core and 4 rust rules, its own single project rule,
-and **no org rules**, because it declares `org: hodlcroft`. `cnft-dev-workers` resolves to 27:
-the same core, rust and org sets, plus six project rules of its own.
+`archivist` resolves to 20 — the same 13 core and 5 rust rules, its own single project rule,
+and one `ecosystem:defrag` rule (`agent-tools`), but **no `org:defrag` rules**, because its
+manifest declares `org: hodlcroft`. `cnft-dev-workers` resolves to 37: the same core, rust and
+org sets filtered by `renders: egui` alone (so the three macroquad rules stay out), plus seven
+rules of its own.

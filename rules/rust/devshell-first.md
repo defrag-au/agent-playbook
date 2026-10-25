@@ -50,9 +50,9 @@ come from the devshell.
 
 **Why not a shell profile.** An earlier version of this advice said to run
 `source ~/.bash_profile && cargo --version`. That picks up an unpinned toolchain and makes the
-failure mode depend on whether the shell was warm. It is recorded in
-`projects/archivist/rules/devshell-commands.md` because the symptom it was written for still
-occurs and a profile is the first place anyone looks.
+failure mode depend on whether the shell was warm. It is recorded in the `archivist` repository's
+own devshell rule because the symptom it was written for still occurs and a profile is the first
+place anyone looks.
 
 **A sandbox has a second failure the devshell cannot fix.** A sandboxed shell also cannot
 write the shared registry cache (`~/.cargo/registry`), so a genuine *first* fetch of a new

@@ -7,8 +7,7 @@ use std::process::ExitCode;
 use playbook::init;
 use playbook::install::{self, Outcome};
 use playbook::load::{
-    census, claiming_project, expand_tilde, find_manifest, find_root, find_root_with_source,
-    included_by_some_target, list_projects, list_targets, load_project, load_target, RootSource,
+    census, expand_tilde, find_manifest, find_root, find_root_with_source, RootSource,
 };
 use playbook::model::{Activation, Diagnostic};
 use playbook::render;
@@ -21,18 +20,17 @@ usage: playbook <command> [options]
 
 commands
   compose    print the managed block
-  list       print the resolution table for a project + target
+  list       print the resolution table for a repository + target
   install    write the block into a repository's agent file
   check      exit 1 if a repository's block is stale
   init       scaffold a repository's .playbook/ manifest and rules directory
   root       print the rule tree being resolved against, and how it was found
-  projects   list known registry projects and targets
-  rules      list every rule, and which projects activate it
+  rules      list every shared rule, and the activation that reaches it
 
 options
-  --project <name>   legacy registry project under projects/; for init, the name to write
+  --name <name>      project name to write (init; default: the directory name)
   --manifest <path>  a `.playbook/project.conf`, or the directory containing one
-  --target <name>    target under models/ (default: the project's default_target)
+  --target <name>    target under models/ (default: the manifest's default_target)
   --repo <path>      repository root (install, check, init; default: the working directory)
   --file <name>      filename within the repo (default: the target's default_file)
   --out <file>       write to a file instead of stdout (compose)
@@ -45,14 +43,13 @@ examples
   playbook install --target zed
   playbook check                     # from inside the repository: neither is needed
   playbook check --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf --repo ~/.config/zed
-  playbook init --project montager
-  playbook list --project shared-crates   # legacy registry entry
+  playbook init --name montager
   playbook root
 ";
 
 #[derive(Default)]
 struct Opts {
-    project: Option<String>,
+    name: Option<String>,
     manifest: Option<String>,
     target: Option<String>,
     repo: Option<String>,
@@ -86,7 +83,6 @@ fn main() -> ExitCode {
         "check" => cmd_install(&opts, true),
         "init" => cmd_init(&opts),
         "root" => cmd_root(&opts),
-        "projects" => cmd_projects(&opts),
         "rules" => cmd_rules(&opts),
         other => Err(format!("unknown command `{other}`")),
     };
@@ -102,7 +98,7 @@ fn main() -> ExitCode {
 
 fn parse_opts(args: &[String]) -> Result<Opts, String> {
     const VALUE_OPTS: &[&str] = &[
-        "--project",
+        "--name",
         "--manifest",
         "--target",
         "--repo",
@@ -123,7 +119,7 @@ fn parse_opts(args: &[String]) -> Result<Opts, String> {
             .cloned()
             .ok_or_else(|| format!("`{key}` needs a value"))?;
         match key {
-            "--project" => opts.project = Some(value),
+            "--name" => opts.name = Some(value),
             "--manifest" => opts.manifest = Some(value),
             "--target" => opts.target = Some(value),
             "--repo" => opts.repo = Some(value),
@@ -166,14 +162,6 @@ fn report(diagnostics: &[Diagnostic]) {
     }
 }
 
-/// Which project a command is about.
-enum ProjectChoice {
-    /// A legacy `projects/<name>/project.conf` entry.
-    Registry(String),
-    /// A repository's own `.playbook/project.conf`.
-    Repo(PathBuf),
-}
-
 /// The directory a repository-scoped command is anchored at.
 ///
 /// `--repo` defaults to the working directory. An explicit `--repo` is never walked away from: it
@@ -190,13 +178,12 @@ fn anchor(opts: &Opts) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// The project a command is about.
+/// The repository whose `.playbook/project.conf` a command resolves.
 ///
-/// An explicit `--manifest` or `--project` wins over discovery. Otherwise a
-/// `.playbook/project.conf` at or above the anchor is used, and a legacy registry entry is found by
-/// the `path:` it claims. `--manifest` is how a manifest can live outside the directory it writes
-/// into (the personal file in `fleet`).
-fn choose_project(root: &Path, opts: &Opts, anchor: &Path) -> Result<ProjectChoice, String> {
+/// `--manifest` names a manifest explicitly, which is how one can live outside the directory it
+/// writes into (the personal file in `fleet`). Otherwise the nearest manifest at or above the
+/// anchor is used.
+fn choose_manifest(opts: &Opts, anchor: &Path) -> Result<PathBuf, String> {
     if let Some(raw) = &opts.manifest {
         let path = expand_tilde(raw);
         let manifest = if path.is_dir() {
@@ -226,46 +213,27 @@ fn choose_project(root: &Path, opts: &Opts, anchor: &Path) -> Result<ProjectChoi
             .parent()
             .and_then(Path::parent)
             .ok_or_else(|| format!("{} is not inside a repository", manifest.display()))?;
-        return Ok(ProjectChoice::Repo(repo.to_path_buf()));
-    }
-
-    if let Some(name) = &opts.project {
-        return Ok(ProjectChoice::Registry(name.clone()));
+        return Ok(repo.to_path_buf());
     }
 
     if let Some((repo, _)) = find_manifest(anchor) {
-        return Ok(ProjectChoice::Repo(repo));
-    }
-
-    if let Some((project, _)) = claiming_project(root, anchor)? {
-        return Ok(ProjectChoice::Registry(project.name));
+        return Ok(repo);
     }
 
     Err(format!(
         "no `.playbook/project.conf` at or above {} — run `playbook init`, or pass `--manifest \
-         <path>` (or `--project <name>` for a legacy registry entry)",
+         <path>`",
         anchor.display()
     ))
-}
-
-fn resolve_choice(
-    root: &Path,
-    choice: &ProjectChoice,
-    target: Option<&str>,
-) -> Result<resolve::Resolved, String> {
-    match choice {
-        ProjectChoice::Registry(name) => resolve::resolve(root, name, target),
-        ProjectChoice::Repo(repo) => resolve::resolve_repo(root, repo, target),
-    }
 }
 
 /// Resolve, report, and stop if anything was fatal.
 fn resolved_or_exit(
     root: &Path,
-    choice: &ProjectChoice,
+    repo: &Path,
     target: Option<&str>,
 ) -> Result<Option<resolve::Resolved>, String> {
-    let resolved = resolve_choice(root, choice, target)?;
+    let resolved = resolve::resolve_repo(root, repo, target)?;
     report(&resolved.diagnostics);
     if resolved.has_errors() {
         return Ok(None);
@@ -275,30 +243,20 @@ fn resolved_or_exit(
 
 /// The repository whose instruction file a command writes or checks.
 ///
-/// An explicit `--repo` is the answer. Otherwise a repository manifest supplies its own root; a
-/// legacy registry entry is matched by its `path:` and, failing that, falls back to the anchor.
-fn output_repo(
-    root: &Path,
-    opts: &Opts,
-    choice: &ProjectChoice,
-    anchor: PathBuf,
-) -> Result<PathBuf, String> {
-    if let Some(path) = &opts.repo {
-        return Ok(expand_tilde(path));
-    }
-    match choice {
-        ProjectChoice::Repo(repo) => Ok(repo.clone()),
-        ProjectChoice::Registry(_) => Ok(claiming_project(root, &anchor)?
-            .map(|(_, dir)| dir)
-            .unwrap_or(anchor)),
-    }
+/// An explicit `--repo` is the answer. Otherwise the manifest's own directory is used, which is
+/// the common case; the personal target passes both because its manifest lives in `fleet`.
+fn output_repo(opts: &Opts, manifest_repo: PathBuf) -> PathBuf {
+    opts.repo
+        .as_deref()
+        .map(expand_tilde)
+        .unwrap_or(manifest_repo)
 }
 
 fn cmd_compose(opts: &Opts) -> Result<ExitCode, String> {
     let root = root_of(opts)?;
     let anchor = anchor(opts)?;
-    let choice = choose_project(&root, opts, &anchor)?;
-    let Some(resolved) = resolved_or_exit(&root, &choice, opts.target.as_deref())? else {
+    let manifest_repo = choose_manifest(opts, &anchor)?;
+    let Some(resolved) = resolved_or_exit(&root, &manifest_repo, opts.target.as_deref())? else {
         return Ok(ExitCode::from(1));
     };
     let block = render::render(&resolved);
@@ -317,8 +275,8 @@ fn cmd_compose(opts: &Opts) -> Result<ExitCode, String> {
 fn cmd_list(opts: &Opts) -> Result<ExitCode, String> {
     let root = root_of(opts)?;
     let anchor = anchor(opts)?;
-    let choice = choose_project(&root, opts, &anchor)?;
-    let Some(resolved) = resolved_or_exit(&root, &choice, opts.target.as_deref())? else {
+    let manifest_repo = choose_manifest(opts, &anchor)?;
+    let Some(resolved) = resolved_or_exit(&root, &manifest_repo, opts.target.as_deref())? else {
         return Ok(ExitCode::from(1));
     };
 
@@ -404,10 +362,10 @@ fn cmd_install(opts: &Opts, check: bool) -> Result<ExitCode, String> {
     let (root, source) = root_of_with_source(opts)?;
     note_root(&root, source);
     let anchor = anchor(opts)?;
-    let choice = choose_project(&root, opts, &anchor)?;
-    let repo = output_repo(&root, opts, &choice, anchor)?;
+    let manifest_repo = choose_manifest(opts, &anchor)?;
+    let repo = output_repo(opts, manifest_repo.clone());
 
-    let Some(resolved) = resolved_or_exit(&root, &choice, opts.target.as_deref())? else {
+    let Some(resolved) = resolved_or_exit(&root, &manifest_repo, opts.target.as_deref())? else {
         return Ok(ExitCode::from(1));
     };
 
@@ -453,18 +411,13 @@ fn cmd_install(opts: &Opts, check: bool) -> Result<ExitCode, String> {
         Outcome::Stale(path, diff) => {
             eprintln!("stale: {} differs from the composed block", path.display());
             eprint!("{diff}");
-            let command = match &choice {
-                ProjectChoice::Registry(name) => format!(
-                    "playbook install --project {name} --target {} --repo {}",
-                    resolved.target.name,
-                    repo.display()
-                ),
-                ProjectChoice::Repo(_) => format!(
-                    "playbook install --target {} --repo {}",
-                    resolved.target.name,
-                    repo.display()
-                ),
-            };
+            // The personal file's manifest lives outside the directory its block is written to,
+            // so a hint that named only `--repo` would fail to find a manifest at all.
+            let mut command = format!("playbook install --target {}", resolved.target.name);
+            if let Some(manifest) = &opts.manifest {
+                command.push_str(&format!(" --manifest {manifest}"));
+            }
+            command.push_str(&format!(" --repo {}", repo.display()));
             eprintln!("\nrun: {command}");
             Ok(ExitCode::from(1))
         }
@@ -485,7 +438,7 @@ fn cmd_init(opts: &Opts) -> Result<ExitCode, String> {
         return Err("`init` creates a manifest; `--manifest` is not applicable".to_string());
     }
     let repo = anchor(opts)?;
-    let name = match &opts.project {
+    let name = match &opts.name {
         Some(name) => name.clone(),
         None => repo
             .file_name()
@@ -517,33 +470,8 @@ fn cmd_root(opts: &Opts) -> Result<ExitCode, String> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn cmd_projects(opts: &Opts) -> Result<ExitCode, String> {
-    let root = root_of(opts)?;
-
-    println!("projects:");
-    for name in list_projects(&root) {
-        let project = load_project(&root, &name)?;
-        println!(
-            "  {:<22} {:<12} {}",
-            name,
-            project.org.unwrap_or_else(|| "-".into()),
-            project.path
-        );
-    }
-
-    println!("\ntargets:");
-    for name in list_targets(&root) {
-        let target = load_target(&root, &name)?;
-        println!(
-            "  {:<22} model={:<14} harness={:<14} file={}",
-            name, target.model, target.harness, target.default_file
-        );
-    }
-    Ok(ExitCode::SUCCESS)
-}
-
-/// Every rule, and which projects it reaches. A rule that activates nowhere is the exact
-/// failure the eight mis-filed skills had — present, plausible, and never loaded.
+/// Every shared rule, and the activation that reaches it. A rule that activates nowhere is the
+/// exact failure the eight mis-filed skills had — present, plausible, and never loaded.
 fn cmd_rules(opts: &Opts) -> Result<ExitCode, String> {
     let root = root_of(opts)?;
     let mut rows = census(&root)?;
@@ -570,25 +498,22 @@ fn cmd_rules(opts: &Opts) -> Result<ExitCode, String> {
         .max(10);
 
     println!(
-        "  {:<layer_width$}  {:<act_width$}  {:<rule_width$}  projects",
+        "  {:<layer_width$}  {:<act_width$}  {:<rule_width$}  reaches",
         "layer", "activation", "rule"
     );
     println!("  {}", "-".repeat(layer_width + act_width + rule_width + 8));
 
     let mut orphans = 0;
     for row in &rows {
-        let reach = if !row.projects.is_empty() {
-            row.projects.join(", ")
+        let reach = if !row.reach.is_empty() {
+            row.reach.clone()
         } else if row.rule.activation == Activation::Manual {
-            if included_by_some_target(&root, &row.rule) {
-                "manual (included by a target)".to_string()
-            } else {
-                orphans += 1;
-                "UNREACHABLE — manual, and no target includes it".to_string()
-            }
+            orphans += 1;
+            "UNREACHABLE — manual, and no target includes it".to_string()
         } else {
             orphans += 1;
-            "ORPHAN — no project activates this rule".to_string()
+            "MISPLACED — a `project:` rule belongs in that repository's `.playbook/rules/`"
+                .to_string()
         };
 
         println!(

@@ -17,7 +17,7 @@ the conversation is a correction that has to be made again next week.
 | A fact about the environment ("cargo is not on PATH here") | `memory/environment.md` |
 | A crate's API surface | `references/crates/` |
 | Something true of one model or harness | `models/<target>/addenda/` |
-| Something true of exactly one repo | `projects/<repo>/rules/` |
+| Something true of exactly one repo | that repository's `.playbook/rules/` |
 
 The most common misfiling is a constraint written as a skill. See `skills/README.md` for why
 that is not a small mistake: a rule stored as a skill may never fire at all.
@@ -55,7 +55,7 @@ Copy `templates/rule.md`. Then:
 
 ```sh
 cargo run -- rules                    # does it activate anywhere, or is it an orphan?
-cargo run -- list --project <name>    # is it in the set you expected, at the right layer?
+cargo run -- list --repo <path>       # is it in the set you expected, at the right layer?
 cargo test                            # the suite parses the whole tree
 ```
 
@@ -65,10 +65,10 @@ visible, because the predecessor skills sat unloaded for months without anyone n
 ## 5. Install it
 
 ```sh
-cargo run -- install --project <name> --repo <path>
-cargo run -- check --project <name> --repo <path>   # what CI would run
+cargo run -- install --target <target> --repo <path>
+cargo run -- check   --target <target> --repo <path>   # what CI would run
 ```
 
 Installing replaces only the managed block, so hand-written content in the repo's file is
-untouched. If the rule should reach a repo that is not yet in `projects/`, add the project
-first — see `templates/project/`.
+untouched. If the repository has no `.playbook/` yet, scaffold it there first with
+`playbook init` — see `templates/project/`.

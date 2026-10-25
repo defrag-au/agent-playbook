@@ -40,7 +40,7 @@ from the `/` menu, which is why leaving them in place was a trap rather than jus
 said to run `source ~/.bash_profile && cargo --version` to find the toolchain, which
 `rules/rust/devshell-first` exists to replace: it picks up an unpinned toolchain and makes the
 failure mode depend on whether the shell was warm. What replaced it is recorded in
-`projects/archivist/rules/devshell-commands.md` under "The advice this replaced", so the fact
+`archivist/.playbook/rules/devshell-commands.md` under "The advice this replaced", so the fact
 that it was ever believed is not lost.
 
 ## Provenance

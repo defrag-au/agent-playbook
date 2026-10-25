@@ -2,14 +2,14 @@
 id: <layer>-<kebab-case-id>
 title: <One line. Becomes the `##` heading in the generated file.>
 layer: <core | language:rust | org | project>
-activation: <always | language:rust | org:defrag | project:<name> | manual>
+activation: <always | language:rust | org:defrag | ecosystem:defrag | renders:egui | renders:macroquad | project:<name> | manual>
 priority: <50>
 overrides: <comma-separated rule ids this supersedes, or leave empty>
 targets: <comma-separated target names, or leave empty for all>
 ---
 
 <!--
-Copy to rules/<layer>/<id>.md, or projects/<repo>/rules/<id>.md.
+Copy to rules/<layer>/<id>.md, or `.playbook/rules/<id>.md` in the repository it applies to.
 
 Delete these comments and every placeholder. A rule with a `<...>` left in it is a rule that
 resolves and reads as if it means something.

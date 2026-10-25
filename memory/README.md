@@ -33,6 +33,6 @@ with a stale fact and a note saying so is read as two facts, and the agent has n
 which one is current.
 
 The one exception is a fact whose *replacement* is unintuitive, where the stale version is
-worth naming so it is not rediscovered. `projects/archivist/rules/devshell-commands.md` does
-this for the profile-sourcing advice — but note that it lives in a **rule**, not here, because
-it is a constraint rather than a fact.
+worth naming so it is not rediscovered. The `archivist` repository's own devshell rule does this
+for the profile-sourcing advice — but note that it lives in a **rule**, not here, because it is a
+constraint rather than a fact.

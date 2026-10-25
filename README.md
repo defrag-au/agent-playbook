@@ -57,8 +57,13 @@ explicitly with an `overrides:` field naming the rule it replaces.
 1. rules/core/                 universal — every model, every language, every repo
 2. rules/<language>/           rust/, and whatever else appears
 3. rules/org/<org>/            defrag/ — ecosystem-wide conventions
-4. projects/<repo>/rules/      this repository only
+4. <repo>/.playbook/rules/     this repository only
 ```
+
+A repository states its own identity in `<repo>/.playbook/project.conf` — its name, org,
+ecosystem, renderers and languages — and owns its rules in `<repo>/.playbook/rules/`. This
+repository never names a consuming repository: it supplies the layers above and the composer
+that reads the consumer's declaration.
 
 A repository's own `<repo>/AGENTS.md` is **not in the chain**, because the composer only ever
 writes between its own markers. Hand-written content in that file cannot conflict with a
@@ -81,10 +86,11 @@ flake.nix         the devshell, and packages: `playbook`, `agent-tools` and `bro
 src/              resolution engine + CLI
   frontmatter.rs    flat `key: value` readers
   model.rs          Rule, Project, Target, Layer, Activation
-  load.rs           finding the root, reading the data tree
+  load.rs           finding the root, reading the data tree and a consumer's manifest
   resolve.rs        the resolution engine
   render.rs         the managed block
   install.rs        splice and check
+  init.rs           scaffolding a consumer's `.playbook/`
   main.rs           the CLI
 tools/            the read-only agent toolkit: five binaries, six crates
   at-core/          the output contract, path containment and text reading, shared
@@ -103,7 +109,7 @@ memory/           environment facts and durable preferences
 references/       crate cheat sheets and API notes
   crates/         one file per crate@version
 models/           compose-time overlays: generic, claude-code, deepseek-flash, zed
-projects/         one directory per repository: project.conf + rules/
+                  (models/zed-personal writes the personal instructions file)
 templates/        scaffolds for new rules, skills, projects and overlays
 docs/             precedence model, rule format, migration inventory, inspection and browser tools
 dist/             generated output (gitignored)
@@ -115,31 +121,56 @@ a model+harness pair. `claude-code/` declares `model: claude`, `harness: claude-
 
 ## Using it
 
+Every repository that consumes the playbook carries its own declaration at
+`.playbook/project.conf`. Run the composer inside that repository; it walks up to the nearest
+manifest, so a subdirectory works too. There is no `--project`: a project is a place, not a
+name in a registry here.
+
 ```sh
-# What would this project's rule set look like?
-playbook list --project shared-crates
+# What does this repository resolve to?
+playbook list
 
 # Print the block, or write it to a file.
-playbook compose --project shared-crates --target claude-code
-playbook compose --project shared-crates --out dist/block.md
+playbook compose --target claude-code
+playbook compose --target claude-code --out dist/block.md
 
 # Write it into the repo, replacing only the managed block.
-playbook install --project shared-crates --repo ~/code/defrag/shared-crates
+playbook install --target claude-code
 
 # Fail if the repo's managed block is stale — the cargo fmt --check of agent rules.
-playbook check --project shared-crates --repo ~/code/defrag/shared-crates
+playbook check --target claude-code
 
-# Every rule, and which projects it reaches. Flags any rule that activates nowhere.
+# Every shared rule, and the activation that reaches it.
 playbook rules
 ```
 
-Run it from anywhere inside the playbook (the root is found by walking up), or pass
+A repository that has no manifest yet gets one with `playbook init`, which writes
+`.playbook/project.conf` and an empty `.playbook/rules/`:
+
+```sh
+cd ~/code/defrag/example
+playbook init --name example --target claude-code
+```
+
+Three commands take paths for consumers whose manifest and output are not in the same place:
+`--manifest <repo>/.playbook/project.conf` names the declaration, `--repo <dir>` names the
+repository whose block is written or checked, and `--root <dir>` names the rule tree. The
+personal instructions file uses the first two — its manifest lives in the fleet repository and
+its output is `~/.config/zed/AGENTS.md`:
+
+```sh
+playbook check \
+  --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf \
+  --repo ~/.config/zed
+```
+
+Run `playbook` from anywhere inside this repository (the root is found by walking up), or pass
 `--root`. `playbook` is also on `PATH` in every defrag devshell — `defrag-nix` wires it in
 alongside the `at-*` toolkit — where it resolves against the rule tree it was packaged with, which
 is what CI wants and what `playbook root` reports:
 
 ```sh
-playbook check --project cnft-dev-workers --repo ~/code/defrag/cnft.dev-workers
+playbook check --target claude-code          # inside ~/code/defrag/cnft.dev-workers
 playbook root     # /nix/store/…-playbook-0.1.0/share/playbook · the packaged copy
 ```
 
@@ -164,7 +195,7 @@ could run on a machine before its devshell existed. It was replaced after it pro
    match". The exclusion feature never worked.
 
 Neither failed loudly, and neither was the kind of thing a script could be tested for
-cheaply. The Rust version has 63 tests, an exhaustive `match` on activation, and a rule that
+cheaply. The Rust version has 106 tests, an exhaustive `match` on activation, and a rule that
 will not compile if a variant is unhandled. The dependency-free property survives — the
 crate has no dependencies at all, so it still builds with no network and no registry cache.
 
@@ -253,10 +284,11 @@ allowlist keeps its promise.
 1. Copy [`templates/rule.md`](templates/rule.md) into the right layer directory.
 2. Fill the frontmatter and write the body. The `id` is the contract — other files
    reference it in `overrides:` and `emphasis:`.
-3. Run `playbook rules` to confirm it activates for the projects you expect, and that it is
+3. Run `playbook rules` to confirm it activates for the repositories you expect, and that it is
    not an orphan.
-4. Run `playbook list --project <name>` for each affected project, then re-install for any
-   repo whose managed block changes.
+4. Run `playbook list` in each affected repository, then re-install for any repo whose managed
+   block changes. A rule that is true of one repository belongs in that repository's
+   `.playbook/rules/`, not here.
 5. `nix develop -c cargo test` — the suite parses the whole tree, so a malformed rule fails
    the build rather than disappearing from a generated file.
 

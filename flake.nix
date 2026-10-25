@@ -58,8 +58,8 @@
       # The composer: reads rules/ for a project and target and writes a repo's block.
       #
       # It carries its own data tree in `share/playbook`, so an installed binary is
-      # self-locating: `rules/`, `models/`, `projects/`, `memory/` and `templates/` are read
-      # relative to the executable when there is no checkout to walk up from. Without this the
+      # self-locating: `rules/`, `models/`, `memory/` and `templates/` are read relative to the
+      # executable when there is no checkout to walk up from. Without this the
       # only root an installed composer could name is the build directory it was compiled in,
       # which is gone by the time anyone runs it — see `find_root` in src/load.rs.
       composerFor =
@@ -72,7 +72,7 @@
           cargoBuildFlags = [ "-p" "agent-playbook" ];
           postInstall = ''
             mkdir -p $out/share/playbook
-            cp -R rules models projects memory templates $out/share/playbook/
+            cp -R rules models memory templates $out/share/playbook/
           '';
         };
 
@@ -207,10 +207,18 @@
         system:
         let
           pkgs = pkgsFor system;
+          rustPlatform = rustPlatformFor pkgs;
         in
         {
           default = pkgs.mkShell {
-            packages = [ (rustToolchainFor system) ];
+            # The composer is part of this repository's own workflow: `playbook list`,
+            # `playbook check` and `playbook init` should work from the checkout without a
+            # `cargo run` wrapper. It is the packaged copy, so `playbook root` names the store
+            # path — use `--root .` to resolve against the working tree.
+            packages = [
+              (rustToolchainFor system)
+              (composerFor rustPlatform)
+            ];
           };
         }
       );

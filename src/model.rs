@@ -287,11 +287,10 @@ fn trim_blank(lines: &[&str]) -> String {
     lines[start..=end].join("\n")
 }
 
-/// A repository the playbook knows about.
+/// A repository that consumes rules, as declared by its own `.playbook/project.conf`.
 #[derive(Debug, Clone, Default)]
 pub struct Project {
     pub name: String,
-    pub path: String,
     pub org: Option<String>,
     /// The conventions and tooling this repository is built with, which is not always the org it
     /// lives under. See [`Activation::Ecosystem`].
@@ -301,13 +300,12 @@ pub struct Project {
     pub renders: Vec<String>,
     pub languages: Vec<String>,
     pub default_target: Option<String>,
-    /// Where a repository-owned manifest and its `rules/` live.
+    /// Where this project's manifest and its `.playbook/rules/` live.
     ///
-    /// `None` for the legacy registry entries under `projects/`, which carry no checkout of their
-    /// own inside the playbook. `Some(repo)` for a project declared by `<repo>/.playbook/`.
-    /// `path` is kept for diagnostics and for the legacy `path:` key; it is not used to discover
-    /// a repository any more.
-    pub repo: Option<PathBuf>,
+    /// The manifest's directory **is** the repository, so there is no separate `path:` to
+    /// disagree with it. The empty path is only the default value used by the activation unit
+    /// tests, which never resolve a rule set.
+    pub repo: PathBuf,
 }
 
 /// A consumer of rules — usually a model+harness pair.
@@ -403,7 +401,6 @@ mod tests {
     fn project() -> Project {
         Project {
             name: "shared-crates".into(),
-            path: "~/code/defrag/shared-crates".into(),
             org: Some("defrag".into()),
             ecosystems: vec!["defrag".into()],
             // Empty on purpose: the fixture is the repo that produces artifacts, not one that
@@ -411,7 +408,7 @@ mod tests {
             renders: Vec::new(),
             languages: vec!["rust".into()],
             default_target: Some("claude-code".into()),
-            repo: None,
+            repo: PathBuf::new(),
         }
     }
 

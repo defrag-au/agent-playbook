@@ -6,8 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::load::{
-    has_errors, load_addendum, load_manifest, load_memory, load_project, load_rules,
-    load_rules_for, load_target,
+    has_errors, load_addendum, load_manifest, load_memory, load_rules_for, load_target,
 };
 use crate::model::{Activation, Diagnostic, Layer, Project, Rule, Section, Target};
 
@@ -38,20 +37,10 @@ impl Resolved {
     }
 }
 
-pub fn resolve(
-    root: &Path,
-    project_name: &str,
-    target_name: Option<&str>,
-) -> Result<Resolved, String> {
-    let project = load_project(root, project_name)?;
-    resolve_project(root, project, target_name, Vec::new())
-}
-
 /// Resolve the project declared by `<repo>/.playbook/project.conf`.
 ///
-/// The manifest is the consumer's declaration of its identity; the shared rules still come from
-/// `root`. This is the inverted entry point: `resolve` remains for the legacy registry until the
-/// last project has a manifest.
+/// The manifest is the consumer's declaration of its identity; the shared rules come from
+/// `root`, and the repository's own rules come from its `.playbook/rules/`.
 pub fn resolve_repo(
     root: &Path,
     repo: &Path,
@@ -78,11 +67,7 @@ fn resolve_project(
     };
     let target = load_target(root, &target_name)?;
 
-    let (all_rules, rule_diagnostics) = if project.repo.is_some() {
-        load_rules_for(root, &project)
-    } else {
-        load_rules(root)
-    };
+    let (all_rules, rule_diagnostics) = load_rules_for(root, &project);
     diagnostics.extend(rule_diagnostics);
 
     // --- include ------------------------------------------------------------

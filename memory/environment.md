@@ -7,16 +7,10 @@ loads for all of them.
 
 ## Where repositories live
 
-| Path | What |
-| --- | --- |
-| `~/code/defrag/shared-crates` | Common Rust crates; home of the egui and macroquad widget libraries |
-| `~/code/defrag/cnft.dev-workers` | Cloudflare Workers ecosystem; D1, WASM |
-| `~/code/defrag/mitos` | — |
-| `~/code/hodlcroft/archivist` | Native binaries, libp2p + axum. Not a worker project |
-| `~/code/defrag/docs-and-strategy` | Design books + strategy hub; published to docs.augmint.bot |
-| `~/code/defrag/agent-playbook` | The rule set these instructions are generated from |
-
-Repositories are laid out as `~/code/<org>/<repo>`.
+Repositories are laid out as `~/code/<org>/<repo>`. Which repository these instructions are being
+resolved for is declared by that repository's own `.playbook/project.conf` — this file deliberately
+carries no inventory of them, because a list of repositories in the personal file is wrong the
+moment one is added, renamed or moved.
 
 ## Tooling on this machine
 

@@ -19,9 +19,14 @@ Each target is a directory with an `overlay.conf` and an optional `addenda/`.
 including repositories the playbook knows nothing about.
 
 ```sh
-playbook install --project personal --target zed-personal --repo ~/.config/zed
-playbook check   --project personal --target zed-personal --repo ~/.config/zed
+playbook install --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf \
+  --target zed-personal --repo ~/.config/zed
+playbook check   --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf \
+  --target zed-personal --repo ~/.config/zed
 ```
+
+The manifest lives in the private `fleet` repository, not in `~/.config/zed`, so `--manifest`
+names it explicitly and `--repo` names the directory the generated file belongs in.
 
 It carries **no rules**, and that is the point. An agent reads the personal file *and* the
 project's file, so the two are meant to be complementary, not overlapping. The universal rules
@@ -96,8 +101,8 @@ reads the first match at the worktree root, so a `CLAUDE.md`-only repo gives **Z
 leaves Claude Code with nothing at all.
 
 ```sh
-playbook install --project shared-crates --target zed         --repo <repo>   # AGENTS.md
-playbook install --project shared-crates --target claude-code --repo <repo>   # CLAUDE.md
+playbook install --target zed         --repo <repo>   # AGENTS.md
+playbook install --target claude-code --repo <repo>   # CLAUDE.md
 ```
 
 Two blocks is not duplication to be avoided: each is generated from the same rule set, and

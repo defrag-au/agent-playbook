@@ -10,10 +10,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use playbook::init;
-use playbook::load::{census, find_manifest, has_errors, list_projects, load_manifest, load_rules};
+use playbook::load::{census, find_manifest, has_errors, load_manifest, load_rules};
 use playbook::model::{Activation, Layer};
 use playbook::render;
-use playbook::resolve::{resolve, resolve_repo};
+use playbook::resolve::resolve_repo;
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -81,43 +81,89 @@ fn every_rule_in_the_tree_parses_and_has_a_body() {
 #[test]
 fn no_rule_is_unreachable() {
     // A rule that activates nowhere is the failure the eight mis-filed skills had:
-    // present, plausible, and never loaded.
+    // present, plausible, and never loaded. There is no project registry to test against any
+    // more, so reachable means "a repository could declare this activation": an empty `reach` is
+    // a `project:` rule in the shared tree (which belongs in the repository it applies to) or a
+    // `manual` rule no target includes.
     let rows = census(&repo_root()).expect("census");
     let orphans: Vec<&str> = rows
         .iter()
-        .filter(|r| r.projects.is_empty() && r.rule.activation != Activation::Manual)
+        .filter(|r| r.reach.is_empty())
         .map(|r| r.rule.rel.as_str())
         .collect();
     assert!(
         orphans.is_empty(),
-        "rules activate for no project: {orphans:?}"
+        "rules no repository can reach: {orphans:?}"
     );
 }
 
+/// A manifest that declares whatever `reach` names, or `None` for an activation a repository
+/// cannot declare (`manual`, or `project:` in the shared tree).
+fn manifest_declaring(reach: &str) -> Option<String> {
+    if reach == "always" {
+        return Some("project: probe\n".to_string());
+    }
+    let (kind, value) = reach.split_once(':')?;
+    let key = match kind {
+        "language" => "languages",
+        "ecosystem" => "ecosystems",
+        "org" => "org",
+        "renders" => "renders",
+        _ => return None,
+    };
+    Some(format!("project: probe\n{key}: {value}\n"))
+}
+
+/// A manifest that reaches every shared rule: all four activation axes.
+const EVERYTHING: &str =
+    "project: probe\norg: defrag\necosystems: defrag\nrenders: egui, macroquad\nlanguages: rust\n";
+
 #[test]
-fn every_known_project_resolves_without_errors() {
-    for project in list_projects(&repo_root()) {
-        let resolved =
-            resolve(&repo_root(), &project, None).unwrap_or_else(|e| panic!("{project}: {e}"));
-        let messages: Vec<String> = resolved
-            .diagnostics
-            .iter()
-            .map(ToString::to_string)
-            .collect();
+fn every_shared_activation_resolves_for_a_repository_that_declares_it() {
+    // The registry is gone: a repository declares its own identity, so the invariant that
+    // replaces "every known project resolves" is that every activation a shared rule can carry
+    // is one a manifest can state — and stating it resolves cleanly.
+    let rows = census(&repo_root()).expect("census");
+    let mut seen: Vec<String> = Vec::new();
+    for row in &rows {
+        if row.reach.is_empty() || seen.contains(&row.reach) {
+            continue;
+        }
+        let Some(conf) = manifest_declaring(&row.reach) else {
+            continue;
+        };
+        let repo = ManifestedRepo::new(&format!("reach-{}", seen.len()), &conf);
+        let resolved = repo.resolve();
         assert!(
             !resolved.has_errors(),
-            "{project} resolved with errors:\n{}",
-            messages.join("\n")
+            "`{}` did not resolve:\n{}",
+            row.reach,
+            resolved
+                .diagnostics
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("\n")
         );
-        // `personal` is the one project that legitimately carries no rules — see
-        // `the_personal_target_carries_no_rules_and_the_memory_layer`.
-        if project != "personal" {
-            assert!(
-                !resolved.rules.is_empty(),
-                "{project} resolved to zero rules"
-            );
-        }
+        assert!(
+            !resolved.rules.is_empty(),
+            "`{}` resolved to zero rules",
+            row.reach
+        );
+        seen.push(row.reach.clone());
     }
+    assert!(!seen.is_empty(), "the census found no reachable activation");
+}
+
+#[test]
+fn the_package_carries_no_repository_registry() {
+    // The inversion's own invariant: this package resolves rules for a repository it is told
+    // about. A `projects/` directory reappearing means knowledge of consumers is creeping back
+    // into the package, which is the thing the manifest model removed.
+    assert!(
+        !repo_root().join("projects").exists(),
+        "the package must not carry a projects/ registry"
+    );
 }
 
 #[test]
@@ -126,7 +172,9 @@ fn an_empty_override_list_drops_nothing() {
     // that split kept from drop treated every rule as part of the (empty) drop list, so a
     // project with no overrides resolved to zero rules and reported success. The rule set
     // here has no overrides at all, so every collected rule must survive.
-    let resolved = resolve(&repo_root(), "shared-crates", None).expect("resolve");
+    let repo = ManifestedRepo::new("no-overrides", EVERYTHING);
+    let resolved = repo.resolve();
+    assert!(!resolved.has_errors(), "{:?}", resolved.diagnostics);
     assert!(resolved.superseded.is_empty());
     assert!(
         resolved.rules.len() >= 20,
@@ -137,7 +185,26 @@ fn an_empty_override_list_drops_nothing() {
 
 #[test]
 fn layer_order_is_core_then_language_then_org_then_project() {
-    let resolved = resolve(&repo_root(), "shared-crates", None).expect("resolve");
+    // Synthetic so the test does not depend on which real rules carry which layer. The invariant
+    // is the sort order, not the fixture.
+    let f = LocalFixture::new("layer-order");
+    f.write_root(
+        "rules/rust/rusty.md",
+        &format!(
+            "---\n{}---\n\n## Directive\n\nRust rule.\n",
+            rule_fm("rusty", "language:rust", "language:rust", "")
+        ),
+    );
+    f.write_root(
+        "rules/org/acme/orgy.md",
+        &format!(
+            "---\n{}---\n\n## Directive\n\nOrg rule.\n",
+            rule_fm("orgy", "org", "org:acme", "")
+        ),
+    );
+    f.rule("local", "project: demo");
+
+    let resolved = f.resolve();
     let ranks: Vec<u8> = resolved.rules.iter().map(|r| r.layer.rank()).collect();
     let mut sorted = ranks.clone();
     sorted.sort_unstable();
@@ -147,7 +214,7 @@ fn layer_order_is_core_then_language_then_org_then_project() {
         .rules
         .iter()
         .position(|r| r.layer == Layer::Project)
-        .expect("shared-crates has project rules");
+        .expect("the fixture has a project rule");
     assert!(
         resolved.rules[..first_project]
             .iter()
@@ -166,7 +233,14 @@ fn the_personal_target_carries_no_rules_and_the_memory_layer() {
     //
     // What it carries is the `memory/` layer — facts about the person and the machine that
     // are true regardless of repository, and that no repo's block should hold.
-    let resolved = resolve(&repo_root(), "personal", Some("zed-personal")).expect("resolve");
+    //
+    // The manifest itself lives in the fleet repository; this fixture is the same shape, so the
+    // test does not depend on a checkout outside this one.
+    let repo = ManifestedRepo::new(
+        "personal",
+        "project: personal\norg:\necosystems:\nrenders:\nlanguages:\ndefault_target: zed-personal\n",
+    );
+    let resolved = repo.resolve_with("zed-personal");
     assert!(!resolved.has_errors(), "{:?}", resolved.diagnostics);
     assert!(
         resolved.rules.is_empty(),
@@ -188,116 +262,156 @@ fn an_ecosystem_rule_reaches_a_repo_that_declares_it_and_not_one_that_does_not()
     // The distinction the selector exists for: a repository operated by one org and built with
     // another's conventions. `demo` declares `org: acme` and `ecosystems: defrag`, so the org rule
     // stays out and the ecosystem rule comes in.
-    let f = Fixture::new("ecosystem");
-    f.write(
-        "projects/demo/project.conf",
+    let f = LocalFixture::new("ecosystem");
+    f.write_repo(
+        ".playbook/project.conf",
         "project: demo\norg: acme\necosystems: defrag\nlanguages: rust\n",
-    )
-    .rule(
-        "org/defrag/service.md",
-        &rule_fm("service", "org", "org:defrag", ""),
-        "About the services.",
-    )
-    .rule(
-        "org/defrag/toolkit.md",
-        &rule_fm("toolkit", "org", "ecosystem:defrag", ""),
-        "About the toolchain.",
+    );
+    f.write_root(
+        "rules/org/defrag/service.md",
+        &format!(
+            "---\n{}---\n\n## Directive\n\nAbout the services.\n",
+            rule_fm("service", "org", "org:defrag", "")
+        ),
+    );
+    f.write_root(
+        "rules/org/defrag/toolkit.md",
+        &format!(
+            "---\n{}---\n\n## Directive\n\nAbout the toolchain.\n",
+            rule_fm("toolkit", "org", "ecosystem:defrag", "")
+        ),
     );
 
     let resolved = f.resolve();
     assert!(!resolved.has_errors(), "{:?}", resolved.diagnostics);
-    assert_eq!(ids(&resolved), vec!["toolkit"]);
+    assert_eq!(ids(&resolved), vec!["base", "toolkit"]);
 
     // And the same repo without the declaration gets neither: an ecosystem is a fact a project
     // states, not one inferred from a directory name.
-    f.write(
-        "projects/demo/project.conf",
+    f.write_repo(
+        ".playbook/project.conf",
         "project: demo\norg: acme\nlanguages: rust\n",
     );
-    assert!(ids(&f.resolve()).is_empty());
+    assert_eq!(ids(&f.resolve()), vec!["base"]);
 }
 
 #[test]
-fn the_zed_target_resolves_for_every_project_in_the_ecosystem() {
-    // The zed overlay emphasises a rule that activates on `ecosystem:defrag`, and the composer
-    // treats an emphasis that resolves to nothing as an error — correctly, since it means the
-    // target is being used with a project it does not fit. This is the pair that caught it: the
-    // emphasis is only satisfiable where the rule is in the set, so every project that declares
-    // the ecosystem must be able to use this target, and `personal` (which does not) must not be
-    // expected to.
-    for project in list_projects(&repo_root()) {
-        let resolved = resolve(&repo_root(), &project, Some("zed")).expect("resolve");
-        let in_ecosystem = !resolved.project.ecosystems.is_empty();
-        assert_eq!(
-            resolved.has_errors(),
-            !in_ecosystem,
-            "{project}: zed resolves with errors exactly when it is outside the ecosystem: {:?}",
-            resolved.diagnostics
-        );
-    }
+fn the_zed_target_resolves_for_any_repository() {
+    // The zed overlay applies to a harness, not to an org, so it must not require a rule that
+    // only one ecosystem carries. It used to emphasise `defrag-agent-tools`, and the composer
+    // treats an emphasis that resolves to nothing as an error — correctly, since an unknown id is
+    // usually a typo — so `zed` failed for every repository outside the defrag ecosystem. A
+    // harness target that only works for some of its consumers is the wrong shape.
+    let inside = ManifestedRepo::new(
+        "zed-inside",
+        "project: inside\norg: defrag\necosystems: defrag\nlanguages: rust\n",
+    );
+    let resolved = inside.resolve_with("zed");
+    assert!(
+        !resolved.has_errors(),
+        "zed did not resolve inside the ecosystem:\n{}",
+        resolved
+            .diagnostics
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+
+    let outside = ManifestedRepo::new(
+        "zed-outside",
+        "project: outside\norg: acme\nlanguages: rust\n",
+    );
+    let resolved = outside.resolve_with("zed");
+    assert!(
+        !resolved.has_errors(),
+        "zed did not resolve outside the ecosystem:\n{}",
+        resolved
+            .diagnostics
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    assert!(!resolved.rules.is_empty());
 }
 
 #[test]
 fn repo_targets_do_not_carry_the_memory_layer() {
     // The two files are complementary: memory is personal and loads everywhere, rules are
     // per-repo. A repo block carrying memory would duplicate it in every project.
-    for project in ["shared-crates", "cnft-dev-workers", "archivist"] {
-        let resolved = resolve(&repo_root(), project, None).expect("resolve");
+    let repo = ManifestedRepo::new("repo-targets", EVERYTHING);
+    for target in ["claude-code", "zed", "generic"] {
+        let resolved = repo.resolve_with(target);
         assert!(
             resolved.memory.is_empty(),
-            "{project} carries the memory layer"
+            "{target} carries the memory layer"
         );
     }
 }
 
 #[test]
 fn org_rules_do_not_leak_into_another_org() {
-    // archivist and compositor are hodlcroft, not defrag. The D1 and widget rules are not true of
-    // them, and a flat rule set would have applied them anyway.
+    // A hodlcroft repository built with the defrag toolchain: the org layer must not reach it, the
+    // ecosystem layer must, and its own rule must.
     //
     // The check is on the **activation**, not on the id, and that distinction is the point of the
     // ecosystem selector: `defrag-agent-tools` is named for the ecosystem it is shared across,
     // not for the org that operates the repository, so an id prefix is not a test of anything.
     // What must not leak is anything scoped to `org:defrag`.
-    for project in ["archivist", "compositor"] {
-        let resolved = resolve(&repo_root(), project, None).expect("resolve");
-        let leaked: Vec<&str> = resolved
-            .rules
-            .iter()
-            .filter(|rule| rule.activation == Activation::Org("defrag".into()))
-            .map(|rule| rule.id.as_str())
-            .collect();
-        assert!(
-            leaked.is_empty(),
-            "org:defrag rules reached {project}: {leaked:?}"
-        );
-        assert!(ids(&resolved).contains(&"rust-devshell-first"));
-        // And a rule that is true of it because of the *toolchain* does arrive — same shell, so
-        // the same instruction about what to reach for.
-        assert!(
-            ids(&resolved).contains(&"defrag-agent-tools"),
-            "{project} is on a defrag devshell and should carry the toolkit rule"
-        );
-    }
-    let archivist = resolve(&repo_root(), "archivist", None).expect("resolve");
-    assert!(ids(&archivist).contains(&"archivist-devshell-commands"));
+    let repo = ManifestedRepo::new(
+        "hodlcroft-viewer",
+        "project: viewer\norg: hodlcroft\necosystems: defrag\nlanguages: rust\n",
+    )
+    .rule("viewer-local", "project: viewer");
+
+    let resolved = repo.resolve();
+    let leaked: Vec<&str> = resolved
+        .rules
+        .iter()
+        .filter(|rule| rule.activation == Activation::Org("defrag".into()))
+        .map(|rule| rule.id.as_str())
+        .collect();
+    assert!(
+        leaked.is_empty(),
+        "org:defrag rules reached viewer: {leaked:?}"
+    );
+    assert!(ids(&resolved).contains(&"rust-devshell-first"));
+    // And a rule that is true of it because of the *toolchain* does arrive — same shell, so the
+    // same instruction about what to reach for.
+    assert!(
+        ids(&resolved).contains(&"defrag-agent-tools"),
+        "the repo is on a defrag devshell and should carry the toolkit rule"
+    );
+    assert!(ids(&resolved).contains(&"viewer-local"));
 }
 
 #[test]
 fn project_rules_do_not_leak_between_projects() {
-    let shared = resolve(&repo_root(), "shared-crates", None).expect("resolve");
-    assert!(ids(&shared).contains(&"shared-crates-storybook-registration"));
-    assert!(!ids(&shared).contains(&"cnft-type-placement"));
+    // Every in-workspace rule-bearing repository now owns its rules, so the leak check is on the
+    // local model: a rule in one manifest must not load for a sibling.
+    let f = LocalFixture::new("no-leak");
+    f.rule("only-here", "project: demo");
+    assert!(f.resolve().rules.iter().any(|rule| rule.id == "only-here"));
 
-    let cnft = resolve(&repo_root(), "cnft-dev-workers", None).expect("resolve");
-    assert!(ids(&cnft).contains(&"cnft-type-placement"));
-    assert!(!ids(&cnft).contains(&"shared-crates-storybook-registration"));
+    let sibling = f.sibling("sibling");
+    let other = resolve_repo(&f.root, &sibling, Some("t")).expect("resolve sibling");
+    assert!(
+        !other.rules.iter().any(|rule| rule.id == "only-here"),
+        "a local rule leaked into a sibling repository"
+    );
 }
 
 #[test]
 fn emphasis_resolves_to_real_rules_in_overlay_order() {
-    for project in list_projects(&repo_root()) {
-        let resolved = resolve(&repo_root(), &project, Some("claude-code")).expect("resolve");
+    let repo = ManifestedRepo::new("emphasis", EVERYTHING);
+    for target in ["claude-code", "zed", "generic"] {
+        let resolved = repo.resolve_with(target);
+        assert!(
+            !resolved.has_errors(),
+            "{target}: {:?}",
+            resolved.diagnostics
+        );
         let expected: Vec<&str> = resolved
             .target
             .emphasis
@@ -307,7 +421,7 @@ fn emphasis_resolves_to_real_rules_in_overlay_order() {
         let got: Vec<&str> = resolved.emphasis.iter().map(|r| r.id.as_str()).collect();
         assert_eq!(
             got, expected,
-            "{project}: emphasis order or membership differs"
+            "{target}: emphasis order or membership differs"
         );
     }
 }
@@ -315,13 +429,15 @@ fn emphasis_resolves_to_real_rules_in_overlay_order() {
 #[test]
 fn rendering_is_byte_stable() {
     // `check` diffs the rendered block, so nondeterminism here becomes a false "stale".
-    let resolved = resolve(&repo_root(), "shared-crates", None).expect("resolve");
+    let repo = ManifestedRepo::new("byte-stable", EVERYTHING);
+    let resolved = repo.resolve();
     assert_eq!(render::render(&resolved), render::render(&resolved));
 }
 
 #[test]
 fn the_block_names_every_rule_it_contains() {
-    let resolved = resolve(&repo_root(), "shared-crates", None).expect("resolve");
+    let repo = ManifestedRepo::new("block-names", EVERYTHING);
+    let resolved = repo.resolve();
     let block = render::render(&resolved);
     for rule in &resolved.rules {
         let marker = format!("<!-- rule: {} -->", rule.rel.trim_end_matches(".md"));
@@ -338,8 +454,8 @@ fn the_block_names_every_rule_it_contains() {
 
 #[test]
 fn addenda_are_demoted_below_the_rules() {
-    let resolved = resolve(&repo_root(), "shared-crates", Some("zed")).expect("resolve");
-    let block = render::render(&resolved);
+    let repo = ManifestedRepo::new("addenda", EVERYTHING);
+    let block = render::render(&repo.resolve_with("zed"));
     // The zed addenda carry `#` titles of their own; they must not compete with the
     // document title.
     assert!(block.contains("## Zed mechanics"));
@@ -348,6 +464,11 @@ fn addenda_are_demoted_below_the_rules() {
 
 // --- synthetic playbooks ---------------------------------------------------
 
+/// A synthetic playbook whose own directory is also the consuming repository.
+///
+/// The shared tree is `rules/` and the repository's declaration is `.playbook/project.conf`, which
+/// is exactly the shape a real checkout has — so the precedence tests exercise the same path the
+/// composer takes, without a second directory to keep in step.
 struct Fixture {
     root: PathBuf,
 }
@@ -360,7 +481,7 @@ impl Fixture {
         fs::create_dir_all(&root).expect("create fixture root");
         let fixture = Fixture { root };
         fixture.write(
-            "projects/demo/project.conf",
+            ".playbook/project.conf",
             "project: demo\norg: acme\nlanguages: rust\n",
         );
         fixture.write("models/t/overlay.conf", "target: t\nmodel: m\nharness: h\n");
@@ -384,7 +505,7 @@ impl Fixture {
     }
 
     fn resolve(&self) -> playbook::resolve::Resolved {
-        resolve(&self.root, "demo", Some("t")).expect("resolve")
+        resolve_repo(&self.root, &self.root, Some("t")).expect("resolve")
     }
 }
 
@@ -460,11 +581,73 @@ impl LocalFixture {
     fn resolve(&self) -> playbook::resolve::Resolved {
         resolve_repo(&self.root, &self.repo, Some("t")).expect("resolve repository")
     }
+
+    /// A second repository under the same base, with a manifest of its own.
+    fn sibling(&self, project: &str) -> PathBuf {
+        let repo = self.base.join(project);
+        fs::create_dir_all(repo.join(".playbook").join("rules")).expect("sibling rules");
+        fs::write(
+            repo.join(".playbook").join("project.conf"),
+            format!("project: {project}\n"),
+        )
+        .expect("sibling manifest");
+        repo
+    }
 }
 
 impl Drop for LocalFixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.base);
+    }
+}
+
+/// A throwaway repository manifest, resolved against the **real** shared tree.
+///
+/// `LocalFixture` supplies its own two-rule tree so it can pin resolution; this one exists for the
+/// activation tests, where the point is which real shared rules a manifest reaches.
+struct ManifestedRepo {
+    root: PathBuf,
+}
+
+impl ManifestedRepo {
+    fn new(name: &str, conf: &str) -> Self {
+        let root = std::env::temp_dir().join(format!(
+            "agent-playbook-manifest-{}-{name}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join(".playbook").join("rules")).expect("manifest rules");
+        fs::write(root.join(".playbook").join("project.conf"), conf).expect("manifest");
+        ManifestedRepo { root }
+    }
+
+    fn rule(self, id: &str, activation: &str) -> Self {
+        fs::write(
+            self.root
+                .join(".playbook")
+                .join("rules")
+                .join(format!("{id}.md")),
+            format!(
+                "---\nid: {id}\ntitle: {id}\nlayer: project\nactivation: {activation}\n---\n\n\
+                 ## Directive\n\nA local rule.\n"
+            ),
+        )
+        .expect("local rule");
+        self
+    }
+
+    fn resolve(&self) -> playbook::resolve::Resolved {
+        self.resolve_with("claude-code")
+    }
+
+    fn resolve_with(&self, target: &str) -> playbook::resolve::Resolved {
+        resolve_repo(&repo_root(), &self.root, Some(target)).expect("resolve manifest")
+    }
+}
+
+impl Drop for ManifestedRepo {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.root);
     }
 }
 
@@ -542,6 +725,37 @@ fn a_local_rule_must_be_project_layer() {
 }
 
 #[test]
+fn a_project_rule_in_the_shared_tree_is_an_error() {
+    // A `project:` rule names a repository, so it belongs in that repository's `.playbook/rules/`.
+    // Leaving one in the shared tree is how the package starts carrying knowledge of a consumer
+    // again — and it would activate for nobody, because no shared tree knows which repositories
+    // exist.
+    let f = LocalFixture::new("shared-project-rule");
+    f.write_root(
+        "rules/core/misplaced.md",
+        "---\nid: misplaced\ntitle: misplaced\nlayer: core\nactivation: project:demo\n---\n\n\
+         ## Directive\n\nShould not live in the shared tree.\n",
+    );
+
+    let resolved = f.resolve();
+    assert!(
+        resolved.has_errors(),
+        "a shared `project:` rule must be fatal"
+    );
+    let messages: Vec<String> = resolved
+        .diagnostics
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    assert!(
+        messages
+            .iter()
+            .any(|m| m.contains("a shared rule cannot activate for a single project")),
+        "{messages:#?}"
+    );
+}
+
+#[test]
 fn a_manifest_without_project_is_an_error() {
     let f = LocalFixture::new("no-project");
     f.write_repo(".playbook/project.conf", "org: acme\n");
@@ -574,18 +788,6 @@ fn a_repository_block_names_the_manifest_not_the_registry() {
     let block = render::render(&f.resolve());
     assert!(block.contains("`.playbook/project.conf`"), "{block}");
     assert!(!block.contains("projects/demo"), "{block}");
-}
-
-#[test]
-fn a_registry_block_keeps_its_registry_provenance() {
-    // The inversion must not make every installed block stale before its repository has a
-    // manifest. The legacy wording is asserted byte-for-byte.
-    let resolved = resolve(&repo_root(), "shared-crates", Some("zed")).expect("resolve");
-    let block = render::render(&resolved);
-    assert!(
-        block.contains("Generated from agent-playbook (`projects/shared-crates` + `models/zed`)."),
-        "{block}"
-    );
 }
 
 #[test]
@@ -628,7 +830,7 @@ fn a_higher_layer_overrides_a_lower_one() {
         "Replacement rule.",
     )
     .write(
-        "projects/demo/rules/top.md",
+        ".playbook/rules/top.md",
         &format!(
             "---\n{}---\n\nProject rule that wins.\n",
             rule_fm("top", "project", "project:demo", "overrides: replacement\n")
@@ -1051,38 +1253,14 @@ fn root_discovery_accepts_an_explicit_path_and_rejects_a_non_root() {
 }
 
 #[test]
-fn a_project_is_discovered_from_the_directory_it_claims() {
-    let fixture = Fixture::new("claiming-project");
-    let repo = fixture.root.join("checkout");
-    fs::create_dir_all(repo.join("crates/cli")).expect("create repo");
-    fixture.write(
-        "projects/demo/project.conf",
-        &format!(
-            "project: demo\norg: acme\nlanguages: rust\npath: {}\n",
-            repo.display()
-        ),
-    );
+fn a_directory_without_a_manifest_is_not_discovered() {
+    let dir = std::env::temp_dir().join(format!("agent-playbook-unclaimed-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("nested")).expect("create dir");
 
-    // From the repository root and from below it: the same claim either way, and what comes back
-    // is the repository root rather than the directory the caller happened to be standing in.
-    for dir in [repo.clone(), repo.join("crates"), repo.join("crates/cli")] {
-        let (project, claimed) = playbook::load::claiming_project(&fixture.root, &dir)
-            .expect("read the tree")
-            .expect("a project claims this checkout");
-        assert_eq!(project.name, "demo");
-        assert_eq!(claimed, fs::canonicalize(&repo).expect("canonical repo"));
-    }
-}
+    // Nothing at or above the directory declares a repository, so there is nothing to resolve —
+    // rather than a project guessed from a directory name.
+    assert!(find_manifest(&dir.join("nested")).is_none());
 
-#[test]
-fn a_directory_no_project_claims_is_not_discovered() {
-    let fixture = Fixture::new("unclaimed-project");
-    let elsewhere = fixture.root.join("somewhere-else");
-    fs::create_dir_all(&elsewhere).expect("create dir");
-
-    // The fixture's `demo` declares no `path:`, so the tree claims nothing at all — and a
-    // directory nobody claims must resolve to nothing rather than to the nearest project.
-    assert!(playbook::load::claiming_project(&fixture.root, &elsewhere)
-        .expect("read the tree")
-        .is_none());
+    let _ = fs::remove_dir_all(&dir);
 }

@@ -1,8 +1,9 @@
 # Inversion audit
 
-**Status** — audit and stage 1, 2026-10-25. The dual-mode engine and `playbook init` are
-implemented in the working tree; no consumer repository has been migrated and `projects/` is
-still present.
+**Status** — audit, stages 1–3, 2026-10-25. All twelve repositories and the personal target now own
+their configuration. The twelve have both managed blocks installed and checking; `personal`'s
+manifest is `fleet/personal/.playbook/project.conf` and `~/.config/zed/AGENTS.md` is installed from
+it. Only stage 4 (the cutover) and the deferred skills move remain.
 
 Measured with the composer in this checkout (`cargo run -- rules`, `list`, `check` and `init`),
 and with `at-peek`/`at-recall` over the working tree. `cargo test --workspace` passes,
@@ -328,6 +329,15 @@ says an overlay must not do. Options:
 Recommendation: (2) if the nudge is worth keeping, otherwise (1). Do not choose (4); the error is
 the mechanism that makes `emphasis` honest.
 
+**Resolved 2026-10-25 — option (1): the emphasis was removed.** Option (2) was rejected because a
+second `zed-defrag` target would duplicate `instruction_files`, the addenda list and
+`default_file`, and `overlay.conf` has no inheritance mechanism to keep the two in step — which is
+the drift this repository exists to prevent. The `agent-tools` rule already ships in full in every
+repository that has the toolkit, and the emphasis was provisional by its own comment. If the nudge
+turns out to matter, the shape is emphasis declared by the manifest that owns the claim (option 3),
+not a target beside the harness one. `the_zed_target_resolves_for_any_repository` pins both sides
+of the ecosystem boundary.
+
 ### 5.8 Moving the personal config into `DamonOehlman/fleet`
 
 `personal` is the one target whose output is not inside a repository: it writes
@@ -352,6 +362,8 @@ Fleet is already flat `key: value`, so the manifest format fits unchanged:
 ```conf
 project: personal
 org:
+ecosystems:
+renders:
 languages:
 default_target: zed-personal
 ```
@@ -434,10 +446,15 @@ committed pin.
 Stages 2 and 3 can be done repo by repo. Stage 4 is the point of no return and should not happen
 until every repo checks.
 
-Stage 1 is in the working tree: `find_manifest`/`load_manifest`/`resolve_repo`, `load_rules_for`
+Stage 1 is implemented: `find_manifest`/`load_manifest`/`resolve_repo`, `load_rules_for`
 with local-rule validation, `.playbook/` discovery in `compose`/`list`/`install`/`check`, a
 `--manifest` flag, `playbook init`, and 9 new tests. Legacy `--project` resolution, `playbook
-projects` and `playbook rules` are unchanged, so every installed block still checks byte-for-byte.
+projects` and `playbook rules` are unchanged, so every non-migrated repository's installed block
+still checks byte-for-byte.
+
+Stages 2–3 are complete for all twelve repositories, and `personal` is now declared by
+`fleet/personal/.playbook/project.conf` (§5.8). Stage 4 — deleting the eleven remaining registry
+stubs and the registry commands/tests — is next.
 
 ## 7. Effort
 
@@ -479,18 +496,16 @@ parts that need a human read.
 | # | Decision | Consequence |
 | --- | --- | --- |
 | 1 | Manifest at `.playbook/project.conf` | The existing `projects/<name>/` shape moves into the repo unchanged. |
-| 2 | Personal config moves toward `DamonOehlman/fleet` | The `--manifest` + `--repo` shape (§5.8) is implemented and smoke-tested; the fleet manifest itself has not been added. |
+| 2 | Personal config moves to `DamonOehlman/fleet` | Done: `fleet/personal/.playbook/project.conf`; `~/.config/zed/AGENTS.md` is installed from it and checks. |
 | 3 | Org rules stay upstream | `rules/org/defrag/` remains the source of truth. `defrag-nix` may assemble them into the ingested profile (§5.9); that is a packaging decision, not a second copy. |
 | 4 | Skills deferred | `container-compose`, `widget-screenshot` and `game-spike` stay put for now; the move is a separate discussion. |
 | 5 | `defrag-nix` is the ingestion point | Consumers keep taking `defrag-nix`; the pin lives there. CI gating is a per-repo cost for repos that do not already use Nix. |
+| 6 | `zed` drops its org emphasis | The harness target resolves for any repository. The nudge is redundant with the `agent-tools` rule where it applies; if it is needed, emphasis becomes manifest-owned rather than a second target. |
 
 Still open:
 
-- Whether and when to add `fleet/personal/.playbook/project.conf` and repoint the personal block (§5.8).
 - Whether `defrag-nix` assembles an org profile now or keeps re-exporting the full package (§5.9).
 - The skills discussion (§5.5), deliberately deferred.
-- The `zed` overlay's org-specific emphasis (§5.7): split the target, drop the emphasis, or let the
-  consumer own it. Reproduced in stage 1; it blocks the first non-defrag consumer.
 
 ## 10. What does not move
 
@@ -503,27 +518,125 @@ Still open:
 - `tools/` — the inspectors, browser-shot and the thread tools.
 - `templates/` and `docs/` — the package's own documentation and scaffolds.
 
+## 11. Migration log
+
+| Date | Repo | Manifest | Rules moved | Blocks | Verification |
+| --- | --- | --- | --- | --- | --- |
+| 2026-10-25 | `shared-crates` | org/ecosystems `defrag`, renders `egui, macroquad`, languages `rust`, target `claude-code` | 3: `subdir-devshell`, `gamekit-takes-time-as-an-argument`, `storybook-registration` | `AGENTS.md` (zed) + `CLAUDE.md` (claude-code) | 36 rules; both `check` ok |
+| 2026-10-25 | `cnft-dev-workers` | org/ecosystems `defrag`, renders `egui`, languages `rust`, target `claude-code` | 7: `cross-service-contracts`, `d1-write-economics`, `metadata-resolution-chain`, `ncli`, `type-placement`, `typed-api-responses`, `wasm-safe-serde` | both | 37 rules; both `check` ok |
+| 2026-10-25 | `augminted-bots` | org/ecosystems `defrag`, renders `egui, macroquad`, languages `rust`, target `claude-code` | 2: `browser-capture`, `macroquad-client-bundles` | both | 35 rules; both `check` ok |
+| 2026-10-25 | `defrag-nix` | org/ecosystems `defrag`, no languages, target `claude-code` | 0 | both | 19 rules; both `check` ok |
+| 2026-10-25 | `infra`, `mitos`, `midnight-lab`, `container-compose` | org/ecosystems `defrag`, languages `rust`, target `claude-code` | 0 | both | 24 rules each; both `check` ok |
+| 2026-10-25 | `archivist` | org `hodlcroft`, ecosystem `defrag`, languages `rust`, target `claude-code` | 1: `devshell-commands` | both | 20 rules; both `check` ok |
+| 2026-10-25 | `compositor` | org `hodlcroft`, ecosystem `defrag`, languages `rust`, target `claude-code` | 0 | both | 19 rules; both `check` ok |
+| 2026-10-25 | `montager` | org/ecosystems `defrag`, renders `egui`, languages `rust`, target `claude-code` | 0 | both | 30 rules; both `check` ok |
+| 2026-10-25 | `viewer` (new) | org `hodlcroft`, ecosystem `defrag`, languages `rust`, target `claude-code` | 0 | both (created) | 19 rules; both `check` ok |
+| 2026-10-25 | `personal` (in `fleet`) | no org, ecosystems, renders or languages; target `zed-personal` | 0 | `~/.config/zed/AGENTS.md` | 0 rules, 2 memory sections; `check` ok |
+
+The `archivist` move required two upstream pointer fixes: `rules/rust/devshell-first.md` and
+`memory/README.md` no longer name `projects/archivist/rules/devshell-commands.md`; they name the
+`archivist` repository's own devshell rule instead. `viewer` is not in the registry: it was
+provisioned with `playbook init`, then the manifest was given `org: hodlcroft`,
+`ecosystems: defrag` and `languages: rust`, and both blocks were created.
+
+The `personal` move created `fleet/personal/.playbook/` with `playbook init`, left the activation
+axes empty, and reinstalled `~/.config/zed/AGENTS.md` with
+`--manifest …/fleet/personal/.playbook/project.conf --repo ~/.config/zed`. The block diff is the
+provenance line only — 111 lines before and after — so the composed instructions are unchanged.
+`projects/personal/` was deleted from the playbook, so the old `--project personal` command can no
+longer overwrite the file.
+
+The `archivist`, `compositor` and `montager` blocks were generated from an **older** shared rule
+set. Reinstalling brought them current, so their diffs include the tightened
+`git-is-the-users-domain`, the expanded `agent-tools` rule and the `at-crate` additions — not only
+the provenance line. That is the intended effect of `install`, but it makes their review larger
+than the other repositories'. Archivist's total diff also contains a pre-existing `flake.lock`
+change that this migration did not touch.
+
+The `shared-crates` block diff is the provenance line, the three rule comments moving from
+`projects/shared-crates/rules/…` to `.playbook/rules/…`, and one re-wrapped sentence where the
+`widget-screenshot` link became a code span. No rule body changed. The `cnft-dev-workers` and
+`augminted-bots` diffs are the same shape, plus two link fixes:
+
+- `augminted-bots/.playbook/rules/browser-capture.md` no longer points at
+  `~/code/defrag/agent-playbook/tools/browser-shot/SCENARIO.md`; it points at the `browser-shot`
+  skill, which is where the procedure lives.
+- `cnft-dev-workers/.playbook/rules/typed-api-responses.md` no longer links to
+  `../../../rules/core/typed-json-only.md`; it names the rule as a code span.
+
+The five manifest-only repositories changed only the provenance line in each block.
+
+Three tests were updated for the new source rather than to make a failure go away:
+
+- `layer_order_is_core_then_language_then_org_then_project` is now a synthetic fixture with all
+  four layers. The invariant is unchanged.
+- `project_rules_do_not_leak_between_projects` is now entirely local: a rule in one manifest must
+  not load for a sibling. The registry no longer carries any in-workspace project rules to test.
+- `org_rules_do_not_leak_into_another_org` now uses a synthetic `org: hodlcroft` /
+  `ecosystems: defrag` manifest resolved against the real tree, and asserts the same three things:
+  no `org:defrag` rules, the ecosystem rule arrives, and the repository's own rule arrives.
+
+`projects/<repo>/project.conf` remained for every migrated repository as an empty registry stub
+during stages 2–3. Stage 4 deleted all eleven, and the `projects/` directory with them.
+
+### Stage 4 — the cutover, 2026-10-25
+
+- `list_projects`, `load_project`, `claiming_project` and `Project.path` are gone. `Project.repo`
+  is the directory the manifest was found in, so nothing needs to match a `path:` against anything.
+- `resolve(root, name, target)` is gone; `resolve_repo(root, repo, target)` is the only entry
+  point. `load_rules_for` reads `rules/` and `<repo>/.playbook/rules/`, and a `project:` rule in
+  the shared tree is now an **error** rather than an orphan.
+- `census` computes reach from the activation a manifest could declare, not from a registry.
+  `playbook rules` prints `reaches` and reports 33 rules, 0 unreachable.
+- `playbook projects` was removed, and `--project` was removed (`init` takes `--name`).
+- `flake.nix` no longer copies `projects/` into `share/playbook`.
+- Tests rewritten against the real tree as `ManifestedRepo` fixtures, with the invariant that
+  every activation a shared rule carries is one a manifest can state. Two new gates:
+  `the_package_carries_no_repository_registry` and `a_project_rule_in_the_shared_tree_is_an_error`.
+- Docs updated: `README.md`, `AGENTS.md`, `docs/precedence.md` (worked-example counts corrected to
+  36/20/37), `docs/rule-format.md`, `docs/inventory.md`, `models/README.md`,
+  `models/generic/overlay.conf`, `rules/README.md`, `skills/capture-rule/SKILL.md` and the
+  templates.
+
+The `zed` overlay's `emphasis: defrag-agent-tools` was dropped (decision 6). That changed the zed
+block for all twelve repositories — the `## Non-negotiable` preamble is gone — and each
+`AGENTS.md` was reinstalled. `CLAUDE.md` did not change.
+
+Verification after the cutover: `cargo fmt --all`, `cargo clippy --workspace --all-targets
+--all-features -- -D warnings` and `cargo test --workspace` clean; `playbook check` ok for all
+twelve repositories against both targets and for the personal file. The composer's suite is 56
+unit tests, 2 reference tests and 48 resolution tests.
+
 ## Appendix A — cross-references that break when rules move
 
 | Reference | Where | Fix |
 | --- | --- | --- |
-| `projects/archivist/rules/devshell-commands.md` | `rules/rust/devshell-first.md` rationale | Reword to name the repository, not a path in the playbook |
-| Same | `memory/README.md` | Same |
-| `../../../skills/widget-screenshot/SKILL.md` | `projects/shared-crates/rules/subdir-devshell.md` | Point at the skill by name; the relative path breaks when the rule moves |
-| `~/code/defrag/agent-playbook/tools/browser-shot/SCENARIO.md` | `projects/augminted-bots/rules/browser-capture.md` | Point at the `browser-shot` skill or the installed tool's docs |
-| `~/code/defrag/shared-crates/ui/.../CATALOG.md` | `rules/org/defrag/widget-catalogue-first.md` | Make ecosystem-relative; the rule is org-level by design |
-| `shared-crates/gaming/macroquad-gamekit/CATALOG.md` | `rules/org/defrag/macroquad-traps.md` | Same |
+| `projects/archivist/rules/devshell-commands.md` | `rules/rust/devshell-first.md` rationale | Done — names the `archivist` repository's own rule |
+| Same | `memory/README.md` | Done — same |
+| `../../../skills/widget-screenshot/SKILL.md` | `shared-crates/.playbook/rules/subdir-devshell.md` | Done — replaced with a `widget-screenshot` code span |
+| `~/code/defrag/agent-playbook/tools/browser-shot/SCENARIO.md` | `augminted-bots/.playbook/rules/browser-capture.md` | Done — points at the `browser-shot` skill |
+| `~/code/defrag/shared-crates/ui/.../CATALOG.md` | `rules/org/defrag/widget-catalogue-first.md` | Done — names `ui/egui-widgets/CATALOG.md` in the `shared-crates` repository |
+| `shared-crates/gaming/macroquad-gamekit/CATALOG.md` | `rules/org/defrag/macroquad-traps.md` | Already ecosystem-relative |
 | `~/code/hodlcroft/compositor` | `rules/org/defrag/agent-tools.md` rationale | Keep as an example, or generalise |
-| `projects/<repo>/` in command examples | `README.md`, `AGENTS.md`, `models/README.md`, `models/generic/overlay.conf`, `rules/README.md`, `docs/precedence.md` | Remove `--project`; run in the repo |
+| `projects/<repo>/` in command examples | `README.md`, `AGENTS.md`, `models/README.md`, `models/generic/overlay.conf`, `rules/README.md`, `docs/precedence.md` | Done — `--project` removed; every example runs inside the repository |
 
 ## Appendix B — what was measured
 
-- `playbook rules`: 46 rules, 0 unreachable.
-- `playbook list --project …`: 20 (`archivist`), 35 (`augminted-bots`), 37
+- `playbook rules` (registry view): 33 rules, 0 unreachable after all moves (46 before them).
+  The stubs report 33 (`shared-crates`), 30 (`cnft-dev-workers`), 33 (`augminted-bots`),
+  19 (`archivist`), 19 (`compositor`) and 30 (`montager`). The repositories report 36, 37, 35,
+  20, 19 and 30. The five manifest-only repositories report 19 (`defrag-nix`) and 24 (`infra`,
+  `mitos`, `midnight-lab`, `container-compose`). `viewer` is not in the registry and reports 19.
+- `playbook list --project …` before the migration: 20 (`archivist`), 35 (`augminted-bots`), 37
   (`cnft-dev-workers`), 19 (`compositor`), 24 (`container-compose`), 19 (`defrag-nix`), 24
   (`infra`), 24 (`midnight-lab`), 24 (`mitos`), 30 (`montager`), 0 (`personal`, 2 memory
   sections), 36 (`shared-crates`).
-- `playbook check` for `shared-crates`, `zed` and `claude-code`: both blocks up to date.
+- `playbook check` for all twelve repositories, both targets: ok. The first eight were in sync
+  before the migration; the `archivist`, `compositor` and `montager` blocks were stale and were
+  refreshed.
+- `personal`: 0 rules, 2 memory sections; `~/.config/zed/AGENTS.md` checks against
+  `fleet/personal/.playbook/project.conf`. `projects/personal/` is gone from the playbook, so the
+  registry has no personal entry and `playbook projects` lists only the eleven repository stubs.
 - `at-peek stat` over the 13 project rules: 484 lines total.
 - `at-peek stat` over the three project-specific skills: 463 lines total.
 - `at-peek search "BEGIN agent-playbook"`: 8 repositories in this workspace have a block in both
