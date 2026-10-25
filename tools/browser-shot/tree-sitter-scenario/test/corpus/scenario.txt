@@ -165,3 +165,40 @@ assert a "window.__received === 100" message="all arrive"
       (key_name)
       (value
         (string)))))
+
+==================
+starting a process, waiting for it, and sending a peer to it
+==================
+
+spawn site command="python3 -m http.server" port=8791
+wait_for ready=site timeout=20s
+goto page "http://127.0.0.1:8791/page.html"
+
+---
+
+(source_file
+  (spawn
+    (name
+      (bare_name))
+    (field
+      (key_name)
+      (value
+        (string)))
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (wait_for
+    (field
+      (key_name)
+      (value
+        (bare_value)))
+    (field
+      (key_name)
+      (value
+        (bare_value))))
+  (goto
+    (name
+      (bare_name))
+    (expression
+      (string))))

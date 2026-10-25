@@ -3,7 +3,10 @@
 
 use std::collections::HashMap;
 use std::fs;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -29,17 +32,22 @@ use crate::report::{
 };
 use crate::scenario::{
     parse_viewport, KeyState, LossHookSpec, PeerSpec, Scenario, Step, DEFAULT_SEED, MAX_PEERS,
+    MAX_SPAWNS,
 };
 
 const DEFAULT_BROWSER: &str = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 
 #[cfg(unix)]
 static PEER_PIDS: [AtomicU32; MAX_PEERS] = [const { AtomicU32::new(0) }; MAX_PEERS];
+/// Process **groups**, not pids: a spawned tree is `sh` → whatever it ran → its
+/// children, and the leader exiting does not remove the rest.
+#[cfg(unix)]
+static SPAWN_GROUPS: [AtomicU32; MAX_SPAWNS] = [const { AtomicU32::new(0) }; MAX_SPAWNS];
 #[cfg(unix)]
 static SIGNALS_INSTALLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[cfg(unix)]
-extern "C" fn handle_peer_signal(_: libc::c_int) {
+extern "C" fn handle_child_signal(_: libc::c_int) {
     for slot in &PEER_PIDS {
         let pid = slot.load(Ordering::SeqCst);
         if pid != 0 {
@@ -48,28 +56,51 @@ extern "C" fn handle_peer_signal(_: libc::c_int) {
             }
         }
     }
+    for slot in &SPAWN_GROUPS {
+        let pgid = slot.load(Ordering::SeqCst);
+        if pgid != 0 {
+            // Negative pid: the group. Async-signal-safe, like `kill` above.
+            unsafe {
+                libc::kill(-(pgid as i32), libc::SIGTERM);
+            }
+        }
+    }
     unsafe { libc::_exit(130) };
 }
 
 #[cfg(unix)]
-fn install_peer_signal(index: usize, pid: u32) {
-    PEER_PIDS[index.min(PEER_PIDS.len() - 1)].store(pid, Ordering::SeqCst);
+fn install_signals() {
     if !SIGNALS_INSTALLED.swap(true, Ordering::SeqCst) {
         unsafe {
             libc::signal(
                 libc::SIGINT,
-                handle_peer_signal as *const () as libc::sighandler_t,
+                handle_child_signal as *const () as libc::sighandler_t,
             );
             libc::signal(
                 libc::SIGTERM,
-                handle_peer_signal as *const () as libc::sighandler_t,
+                handle_child_signal as *const () as libc::sighandler_t,
             );
         }
     }
 }
 
+#[cfg(unix)]
+fn install_peer_signal(index: usize, pid: u32) {
+    PEER_PIDS[index.min(PEER_PIDS.len() - 1)].store(pid, Ordering::SeqCst);
+    install_signals();
+}
+
+#[cfg(unix)]
+fn install_spawn_signal(index: usize, pgid: u32) {
+    SPAWN_GROUPS[index.min(SPAWN_GROUPS.len() - 1)].store(pgid, Ordering::SeqCst);
+    install_signals();
+}
+
 #[cfg(not(unix))]
 fn install_peer_signal(_index: usize, _pid: u32) {}
+
+#[cfg(not(unix))]
+fn install_spawn_signal(_index: usize, _pgid: u32) {}
 
 #[derive(Clone)]
 enum WaitKind {
@@ -129,9 +160,15 @@ struct RunReport {
     scenario: String,
     artifacts: String,
     processes: usize,
+    spawned: Vec<SpawnReport>,
     passed: bool,
     peers: Vec<Report>,
     checks: Vec<AssertResult>,
+    /// Failures that are neither a peer's nor an assertion's: a process that
+    /// died, a `wait_for` that timed out. They stop the scenario but still leave
+    /// a report, because the log tail is the point.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    problems: Vec<String>,
     outputs: Vec<String>,
 }
 
@@ -143,6 +180,401 @@ impl Drop for RunProfile {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.path);
     }
+}
+
+#[derive(Clone, Serialize)]
+struct SpawnReport {
+    name: String,
+    command: String,
+    pgid: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    port: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ready_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exit: Option<i32>,
+    log: String,
+}
+
+/// A process the scenario started, and which this tool therefore owns.
+struct Spawned {
+    name: String,
+    command: String,
+    port: Option<u16>,
+    /// Also the process group id: `setsid` makes the shell a session leader, so
+    /// its pid is the group's id and every descendant joins it.
+    pgid: i32,
+    child: Child,
+    log: PathBuf,
+    ready_ms: Option<u64>,
+    exit: Option<i32>,
+    /// Set by `wait_for exit=`, so supervision stops treating it as a server.
+    claimed: bool,
+    started: Instant,
+}
+
+impl Spawned {
+    fn start(
+        index: usize,
+        name: &str,
+        command: &str,
+        port: Option<u16>,
+        dir: Option<&str>,
+        env: Option<&[String]>,
+        artifacts: &Path,
+    ) -> Result<Self> {
+        // A port somebody else holds means either a stale server from an earlier
+        // run or a copy the user started by hand. Either way this process would
+        // fail to bind, and waiting on the port would then pass against the
+        // wrong build. Refuse before launching.
+        if let Some(port) = port {
+            match TcpListener::bind(("127.0.0.1", port)) {
+                Ok(listener) => drop(listener),
+                Err(_) => bail!(
+                    "spawn {name:?}: port {port} is already in use — stop that process, or give this one a different port"
+                ),
+            }
+        }
+
+        let log = artifacts.join(format!("{name}.log"));
+        let file = fs::File::create(&log).with_context(|| format!("open {}", log.display()))?;
+        let errors = file
+            .try_clone()
+            .with_context(|| format!("clone {}", log.display()))?;
+
+        let cwd = match dir {
+            Some(dir) => PathBuf::from(dir),
+            None => std::env::current_dir()?,
+        };
+
+        let mut builder = Command::new("sh");
+        builder
+            .arg("-c")
+            .arg(command)
+            .current_dir(cwd)
+            .stdin(Stdio::null())
+            .stdout(Stdio::from(file))
+            .stderr(Stdio::from(errors));
+        if let Some(env) = env {
+            for entry in env {
+                if let Some((key, value)) = entry.split_once('=') {
+                    builder.env(key, value);
+                }
+            }
+        }
+
+        #[cfg(unix)]
+        unsafe {
+            use std::os::unix::process::CommandExt as _;
+            builder.pre_exec(|| {
+                if libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+
+        let child = builder
+            .spawn()
+            .with_context(|| format!("spawn {name:?}: {command}"))?;
+        let pgid = child.id() as i32;
+        install_spawn_signal(index, child.id());
+        Ok(Self {
+            name: name.to_owned(),
+            command: command.to_owned(),
+            port,
+            pgid,
+            child,
+            log,
+            ready_ms: None,
+            exit: None,
+            claimed: false,
+            started: Instant::now(),
+        })
+    }
+
+    fn report(&self) -> SpawnReport {
+        SpawnReport {
+            name: self.name.clone(),
+            command: self.command.clone(),
+            pgid: self.pgid,
+            port: self.port,
+            ready_ms: self.ready_ms,
+            exit: self.exit,
+            log: self.log.display().to_string(),
+        }
+    }
+}
+
+impl Drop for Spawned {
+    fn drop(&mut self) {
+        if self.exit.is_some() {
+            return;
+        }
+        #[cfg(unix)]
+        unsafe {
+            // The group, not the pid: `sh` may have exec'd, and whatever it ran
+            // may have children of its own.
+            libc::kill(-self.pgid, libc::SIGTERM);
+        }
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(status)) => {
+                    self.exit = Some(status.code().unwrap_or(-1));
+                    break;
+                }
+                Ok(None) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(25));
+                }
+                _ => break,
+            }
+        }
+        #[cfg(unix)]
+        unsafe {
+            // Still needed when the leader went quietly and left children behind.
+            libc::kill(-self.pgid, libc::SIGKILL);
+        }
+        let _ = self.child.try_wait();
+    }
+}
+
+/// What a `wait_for` step is waiting for. Built from the step, which the parser
+/// guarantees names exactly one variant.
+enum WaitTarget<'a> {
+    Ready { name: &'a str },
+    Port { host: &'a str, port: u16 },
+    Http { url: &'a str, status: u16 },
+    Log { name: &'a str, pattern: &'a str },
+    Exit { name: &'a str, code: i32 },
+}
+
+impl WaitTarget<'_> {
+    fn describe(&self) -> String {
+        match self {
+            Self::Ready { name } => format!("{name} to accept a connection"),
+            Self::Port { host, port } => format!("{host}:{port} to accept a connection"),
+            Self::Http { url, status } => format!("{url} to answer {status}"),
+            Self::Log { name, pattern } => format!("{name}.log to contain {pattern:?}"),
+            Self::Exit { name, code } => format!("{name} to exit {code}"),
+        }
+    }
+
+    fn process(&self) -> Option<&str> {
+        match self {
+            Self::Ready { name } | Self::Log { name, .. } | Self::Exit { name, .. } => Some(name),
+            Self::Port { .. } | Self::Http { .. } => None,
+        }
+    }
+
+    fn met(&self, spawned: &[Spawned]) -> bool {
+        match self {
+            Self::Ready { name } => spawned
+                .iter()
+                .find(|process| process.name == *name)
+                .and_then(|process| process.port)
+                .is_some_and(|port| tcp_open("127.0.0.1", port)),
+            Self::Port { host, port } => tcp_open(host, *port),
+            Self::Http { url, status } => http_status(url, *status),
+            Self::Log { name, pattern } => spawned
+                .iter()
+                .find(|process| process.name == *name)
+                .is_some_and(|process| log_contains(&process.log, pattern)),
+            // Handled by the exit branch, which is success rather than failure.
+            Self::Exit { .. } => false,
+        }
+    }
+}
+
+/// Reap every live process. Returns a problem when one that no `wait_for exit=`
+/// claimed has died: that is a server that stopped serving, and every later step
+/// would be a confusing second symptom.
+fn reap_spawned(spawned: &mut [Spawned]) -> Result<Option<String>> {
+    for process in spawned.iter_mut() {
+        if process.exit.is_none() {
+            if let Some(status) = process.child.try_wait()? {
+                process.exit = Some(status.code().unwrap_or(-1));
+            }
+        }
+    }
+    let dead = spawned
+        .iter()
+        .find(|process| process.exit.is_some() && !process.claimed)
+        .map(|process| (process.name.clone(), process.exit.unwrap_or(-1)));
+    Ok(dead.map(|(name, code)| {
+        with_tail(
+            format!("{name} exited {code} between steps"),
+            &name,
+            spawned,
+        )
+    }))
+}
+
+fn wait_for(target: &WaitTarget<'_>, spawned: &mut [Spawned], timeout: Duration) -> Result<()> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        for process in spawned.iter_mut() {
+            if process.exit.is_none() {
+                if let Some(status) = process.child.try_wait()? {
+                    process.exit = Some(status.code().unwrap_or(-1));
+                }
+            }
+        }
+
+        if let WaitTarget::Exit { name, code } = target {
+            if let Some(process) = spawned.iter().find(|process| process.name == *name) {
+                if let Some(actual) = process.exit {
+                    if actual == *code {
+                        return Ok(());
+                    }
+                    let message = format!("{name} exited {actual}, expected {code}");
+                    return Err(anyhow!("{}", with_tail(message, name, spawned)));
+                }
+            }
+        } else {
+            // Before the condition, not after: a server that died must not be
+            // masked by whatever is still answering on its port.
+            for process in spawned.iter() {
+                if let (Some(actual), false) = (process.exit, process.claimed) {
+                    let message = format!(
+                        "{} exited {actual} while waiting for {}",
+                        process.name,
+                        target.describe()
+                    );
+                    return Err(anyhow!("{}", with_tail(message, &process.name, spawned)));
+                }
+            }
+            if target.met(spawned) {
+                return Ok(());
+            }
+        }
+
+        if Instant::now() >= deadline {
+            let message = format!(
+                "timed out after {:.1}s waiting for {}",
+                timeout.as_secs_f64(),
+                target.describe()
+            );
+            let name = target.process().unwrap_or_default();
+            return Err(anyhow!("{}", with_tail(message, name, spawned)));
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+}
+
+/// The message plus the end of that process's log. Without the tail, "exited 1"
+/// is a fact nobody can act on.
+fn with_tail(message: String, name: &str, spawned: &[Spawned]) -> String {
+    let Some(process) = spawned.iter().find(|process| process.name == name) else {
+        return message;
+    };
+    let tail = log_tail(&process.log, 20);
+    if tail.is_empty() {
+        return message;
+    }
+    format!(
+        "{message}\n  last lines of {}:\n    {}",
+        process.log.display(),
+        tail.replace('\n', "\n    ")
+    )
+}
+
+fn tcp_open(host: &str, port: u16) -> bool {
+    let Ok(addresses) = (host, port).to_socket_addrs() else {
+        return false;
+    };
+    addresses
+        .into_iter()
+        .any(|address| TcpStream::connect_timeout(&address, Duration::from_millis(200)).is_ok())
+}
+
+/// A GET, and the status line. HTTP/1.0 so the body is connection-delimited and
+/// there is no chunked encoding to parse; the body is not read.
+fn http_status(url: &str, want: u16) -> bool {
+    let Some(rest) = url.strip_prefix("http://") else {
+        return false;
+    };
+    let (authority, path) = match rest.find('/') {
+        Some(at) => (&rest[..at], &rest[at..]),
+        None => (rest, "/"),
+    };
+    let (host, port) = match authority.rsplit_once(':') {
+        Some((host, port)) => match port.parse::<u16>() {
+            Ok(port) => (host, port),
+            Err(_) => return false,
+        },
+        None => (authority, 80),
+    };
+    let Ok(addresses) = (host, port).to_socket_addrs() else {
+        return false;
+    };
+    for address in addresses {
+        let Ok(mut stream) = TcpStream::connect_timeout(&address, Duration::from_millis(500))
+        else {
+            continue;
+        };
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+        let request =
+            format!("GET {path} HTTP/1.0\r\nHost: {authority}\r\nConnection: close\r\n\r\n");
+        if stream.write_all(request.as_bytes()).is_err() {
+            continue;
+        }
+        let mut response = Vec::new();
+        let mut buffer = [0u8; 256];
+        while response.len() < 4096 {
+            match stream.read(&mut buffer) {
+                Ok(0) | Err(_) => break,
+                Ok(read) => {
+                    response.extend_from_slice(&buffer[..read]);
+                    if response.windows(4).any(|window| window == b"\r\n\r\n") {
+                        break;
+                    }
+                }
+            }
+        }
+        let text = String::from_utf8_lossy(&response);
+        if let Some(status) = text
+            .lines()
+            .next()
+            .and_then(|line| line.split_whitespace().nth(1))
+            .and_then(|code| code.parse::<u16>().ok())
+        {
+            return status == want;
+        }
+    }
+    false
+}
+
+/// Startup lines are at the start, so the search is bounded there rather than
+/// re-reading a log that may have grown to megabytes.
+fn log_contains(path: &Path, pattern: &str) -> bool {
+    const LIMIT: u64 = 256 * 1024;
+    let Ok(mut file) = fs::File::open(path) else {
+        return false;
+    };
+    let mut bytes = Vec::new();
+    let _ = Read::by_ref(&mut file).take(LIMIT).read_to_end(&mut bytes);
+    String::from_utf8_lossy(&bytes).contains(pattern)
+}
+
+fn log_tail(path: &Path, lines: usize) -> String {
+    let Ok(mut file) = fs::File::open(path) else {
+        return String::new();
+    };
+    let length = file.metadata().map(|meta| meta.len()).unwrap_or(0);
+    let _ = file.seek(SeekFrom::Start(length.saturating_sub(64 * 1024)));
+    let mut bytes = Vec::new();
+    let _ = file.read_to_end(&mut bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    let tail = text
+        .lines()
+        .rev()
+        .take(lines)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<Vec<_>>();
+    tail.join("\n")
 }
 
 struct PeerState {
@@ -220,6 +652,10 @@ pub fn run(args: Vec<String>) -> Result<bool> {
     fs::create_dir_all(&artifacts)?;
 
     let timeout = Duration::from_millis(scenario.run.timeout_ms.unwrap_or(30_000));
+    // Declared before the peers so the drop order is browsers first, then the
+    // process groups they were talking to.
+    let mut spawned: Vec<Spawned> = Vec::new();
+    let mut problems: Vec<String> = Vec::new();
     let specs = scenario.peer.clone();
     let of = specs.len();
     let launched: Vec<Result<PeerState>> = std::thread::scope(|scope| {
@@ -249,7 +685,104 @@ pub fn run(args: Vec<String>) -> Result<bool> {
     let mut outputs = Vec::new();
 
     for step in &scenario.step {
+        // A server that died between steps is the failure, and every later step
+        // would only add noise to it.
+        if let Some(problem) = reap_spawned(&mut spawned)? {
+            problems.push(problem);
+            break;
+        }
         match step {
+            Step::Spawn {
+                name,
+                command,
+                port,
+                dir,
+                env,
+            } => {
+                let index = spawned.len();
+                let process = Spawned::start(
+                    index,
+                    name,
+                    command,
+                    *port,
+                    dir.as_deref(),
+                    env.as_deref(),
+                    &artifacts,
+                )?;
+                spawned.push(process);
+            }
+            Step::WaitFor {
+                ready,
+                port,
+                host,
+                http,
+                status,
+                log,
+                pattern,
+                exit,
+                code,
+                timeout_ms,
+            } => {
+                let target = if let Some(name) = ready {
+                    WaitTarget::Ready {
+                        name: name.as_str(),
+                    }
+                } else if let Some(port) = port {
+                    WaitTarget::Port {
+                        host: host.as_deref().unwrap_or("127.0.0.1"),
+                        port: *port,
+                    }
+                } else if let Some(url) = http {
+                    WaitTarget::Http {
+                        url: url.as_str(),
+                        status: status.unwrap_or(200),
+                    }
+                } else if let Some(name) = log {
+                    WaitTarget::Log {
+                        name: name.as_str(),
+                        pattern: pattern.as_deref().unwrap_or_default(),
+                    }
+                } else if let Some(name) = exit {
+                    WaitTarget::Exit {
+                        name: name.as_str(),
+                        code: code.unwrap_or(0),
+                    }
+                } else {
+                    bail!("wait_for needs exactly one of ready, port, http, log or exit");
+                };
+
+                if let WaitTarget::Exit { name, .. } = &target {
+                    if let Some(process) = spawned.iter_mut().find(|process| process.name == *name)
+                    {
+                        // From here a death is the expected outcome, not a fault.
+                        process.claimed = true;
+                    }
+                }
+
+                let step_timeout = timeout_ms.map_or(timeout, Duration::from_millis);
+                if let Err(error) = wait_for(&target, &mut spawned, step_timeout) {
+                    problems.push(format!("wait_for {}: {error:#}", step.summary()));
+                    break;
+                }
+                if let WaitTarget::Ready { name } = &target {
+                    if let Some(process) = spawned.iter_mut().find(|process| process.name == *name)
+                    {
+                        process.ready_ms = Some(process.started.elapsed().as_millis() as u64);
+                    }
+                }
+            }
+            Step::Goto { peer, url } => {
+                let index = peer_index(peer, &names)?;
+                let peer_state = &mut peers[index];
+                peer_state
+                    .tab
+                    .navigate_to(url)
+                    .with_context(|| format!("goto {url}"))?;
+                peer_state
+                    .tab
+                    .wait_until_navigated()
+                    .with_context(|| format!("goto {url}: waiting for the load event"))?;
+            }
             Step::Wait {
                 peer,
                 peers: selected,
@@ -593,6 +1126,11 @@ pub fn run(args: Vec<String>) -> Result<bool> {
         }
     }
 
+    for process in &spawned {
+        outputs.push(process.log.display().to_string());
+    }
+
+    let spawn_reports = spawned.iter().map(Spawned::report).collect::<Vec<_>>();
     let reports = peers
         .iter()
         .map(|peer| {
@@ -601,16 +1139,20 @@ pub fn run(args: Vec<String>) -> Result<bool> {
             peer.report(info, passed)
         })
         .collect::<Vec<_>>();
-    let passed = peers.iter().all(PeerState::passed);
+    let passed = peers.iter().all(PeerState::passed) && problems.is_empty();
     let processes = peers.len();
     drop(peers);
+    // Browsers are gone; now the groups they were talking to.
+    drop(spawned);
     let run_report = RunReport {
         scenario: scenario_path.display().to_string(),
         artifacts: artifacts.display().to_string(),
         processes,
+        spawned: spawn_reports,
         passed,
         peers: reports,
         checks,
+        problems,
         outputs,
     };
 
@@ -1667,6 +2209,22 @@ fn render_run_text(report: &RunReport) -> String {
     let _ = writeln!(out, "scenario  {}", report.scenario);
     let _ = writeln!(out, "artifacts {}", report.artifacts);
     let _ = writeln!(out, "processes {}", report.processes);
+    for process in &report.spawned {
+        let port = process
+            .port
+            .map_or_else(String::new, |port| format!("  port {port}"));
+        let ready = process.ready_ms.map_or_else(String::new, |ms| {
+            format!("  ready {:.1}s", ms as f64 / 1000.0)
+        });
+        let exit = process
+            .exit
+            .map_or_else(String::new, |code| format!("  exit {code}"));
+        let _ = writeln!(
+            out,
+            "spawn {}{port}{ready}{exit}  {}",
+            process.name, process.log
+        );
+    }
     for peer in &report.peers {
         let rate = peer
             .frame_rate
@@ -1707,6 +2265,15 @@ fn render_run_text(report: &RunReport) -> String {
     }
     for output in &report.outputs {
         let _ = writeln!(out, "output   {output}");
+    }
+    for problem in &report.problems {
+        for (index, line) in problem.lines().enumerate() {
+            if index == 0 {
+                let _ = writeln!(out, "problem  {line}");
+            } else {
+                let _ = writeln!(out, "         {line}");
+            }
+        }
     }
     let _ = writeln!(
         out,

@@ -27,16 +27,70 @@ has a trigger, so it is a skill.
 
 ## Installing
 
-Copy the directory, or symlink it:
+A skill a repository needs is delivered from an **OCFL store**, not copied by hand. The store
+lives next to the tool the skill operates — `container-compose/.skill-store/` — and the
+repository declares what it wants:
 
-```sh
-cp -R skills/crate-research ~/.agents/skills/            # global
-cp -R skills/widget-screenshot <repo>/.agents/skills/    # project-local
+```conf
+# <repo>/.playbook/project.conf
+skills: github:defrag-au/container-compose#container-compose@v1
 ```
 
-Prefer project-local when the skill only makes sense in one repo. `widget-screenshot` needs
-the storybook and Brave, so it is a candidate for `shared-crates/.agents/skills/` rather than
-the global directory.
+```sh
+playbook skills sync  --target zed      # export, copy into .agents/skills/, record the lock
+playbook skills check --target zed      # what CI runs
+```
+
+The version and the exported tree's digest go into `.playbook/skills.lock`, and a directory that
+the lock does not name is refused rather than overwritten. `skill-store` publishes a plain
+directory as a version:
+
+```sh
+skill-store publish <repo>/<skill> --store <repo>/.skill-store --init
+skill-store verify  path:<repo>/.skill-store
+```
+
+This directory holds the skills whose subject **is** this repository's toolkit — `at-peek` and
+`at-crate` for `inspect-code`, the thread tools for `crate-research`, the composer for
+`capture-rule`. They are published into [`.skill-store/`](../.skill-store) at the repository root,
+which is what `github:defrag-au/agent-playbook#inspect-code@v1` resolves to.
+
+## Authoring here, publishing there
+
+`skills/<name>/` is the editable source; `.skill-store/<name>/vN/` is the published artifact. Edit
+here, then publish — a version is a release, not a keystroke, and publishing identical content is
+refused.
+
+```sh
+skill-store status           --store .skill-store --worktree skills   # what is owed
+skill-store publish-changed  --store .skill-store --worktree skills   # pay it
+skill-store verify           path:.skill-store
+```
+
+`publish-changed` writes one new version for each directory that has moved past its object, and
+publishes a directory that has no object at all. With nothing to do it prints `nothing to publish`
+and exits `0`. Never hand-edit `.skill-store/` — a version is immutable, so an edit there is a
+store that verifies wrongly rather than an edit. `skill-store publish <dir> …` remains for one
+skill at a time.
+
+A red CI run means the same thing: `.github/workflows/skills-check.yaml` runs `status`, so an edit
+that was never published fails the pull request that made it. Fix it with `publish-changed`, in the
+same commit.
+
+An edit here does not need a publish to be seen somewhere. A consuming manifest's
+`.playbook/skills.patch` maps a skill name to this directory, and `playbook skills sync` delivers
+the working copy as `working` — no version, no store entry. See
+[`docs/skills.md`](../docs/skills.md#developing-against-a-skill).
+
+`fleet-ops` left for `fleet/.skill-store/` — it describes that repository's machines, and the
+private inventory it reads lives there. `widget-screenshot` and `game-spike` left for
+`shared-crates/.skill-store/` — the storybook and `macroquad-gamekit` live there.
+
+Delivering the global set is wired: the personal catalogue is
+`fleet/personal/.playbook/project.conf`, with `skills_scope: global` and one `playbook skills sync
+--target all`. It lists only the skills that are published; `widget-screenshot` and `game-spike`
+are not yet, so the hand-installed copies in `~/.agents/skills` are left alone until that store is
+on a pushed branch.
 
 ## The failure this layout exists to prevent
 

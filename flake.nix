@@ -1,5 +1,5 @@
 {
-  description = "Resolve and render agent rules for a project + target, and the at-* inspection toolkit";
+  description = "Resolve and render agent rules for a project + target, with the at-* inspection toolkit and an OCFL skill store";
 
   # Two inputs, both public. `fenix` is the toolchain every other repository in the org
   # builds with, and pinning the same one here is worth the input it costs: `nix build`,
@@ -58,8 +58,8 @@
       # The composer: reads rules/ for a project and target and writes a repo's block.
       #
       # It carries its own data tree in `share/playbook`, so an installed binary is
-      # self-locating: `rules/`, `models/`, `projects/`, `memory/` and `templates/` are read
-      # relative to the executable when there is no checkout to walk up from. Without this the
+      # self-locating: `rules/`, `models/`, `memory/` and `templates/` are read relative to the
+      # executable when there is no checkout to walk up from. Without this the
       # only root an installed composer could name is the build directory it was compiled in,
       # which is gone by the time anyone runs it — see `find_root` in src/load.rs.
       composerFor =
@@ -72,7 +72,7 @@
           cargoBuildFlags = [ "-p" "agent-playbook" ];
           postInstall = ''
             mkdir -p $out/share/playbook
-            cp -R rules models projects memory templates $out/share/playbook/
+            cp -R rules models memory templates $out/share/playbook/
           '';
         };
 
@@ -155,6 +155,39 @@
           '';
         };
 
+      # The skill store: publishes a plain skill directory as an OCFL version and exports a version
+      # back out as an envelope. Not part of `agent-tools` — that derivation's contract is
+      # read-only binaries with no write path, and this one writes a store and fetches from git.
+      #
+      # `git` is wrapped onto PATH because a `github:` source shells out to it: a nix shell does
+      # not carry git otherwise, and the failure would read as "cannot run git" from a tool whose
+      # whole job is fetching.
+      skillStoreFor =
+        pkgs:
+        (rustPlatformFor pkgs).buildRustPackage {
+          pname = "skill-store";
+          version = (lib.importTOML ./tools/skill-store/Cargo.toml).package.version;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [
+            "-p"
+            "skill-store"
+          ];
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+          # As with `agent-tools`: the workspace root is the composer, so the default install
+          # phase would install `playbook`, and cargoBuildHook's `--target <triple>` puts the
+          # artefact under `target/<triple>/release/`.
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            install -m755 \
+              "$(find target -maxdepth 3 -type f -name skill-store -perm -u+x | head -n1)" \
+              "$out/bin/skill-store"
+            wrapProgram $out/bin/skill-store --prefix PATH : ${pkgs.git}/bin
+            runHook postInstall
+          '';
+        };
+
       # The Zed thread tools. Deliberately separate from `agent-tools`: the audit binary reads a
       # private store outside the worktree, and the recover binary writes to it. Neither belongs in
       # a namespace whose promise is that its entire grammar is safe to allowlist.
@@ -186,13 +219,15 @@
       packages = forAllSystems (
         system:
         let
-          rustPlatform = rustPlatformFor (pkgsFor system);
+          pkgs = pkgsFor system;
+          rustPlatform = rustPlatformFor pkgs;
           playbook = composerFor rustPlatform;
           agent-tools = toolkitFor rustPlatform;
         in
         {
           inherit playbook agent-tools;
           browser-shot = browserShotFor rustPlatform;
+          skill-store = skillStoreFor pkgs;
           zed-thread-tools = zedThreadToolsFor rustPlatform;
           # What this repository is *for*; the toolkit is what it also ships.
           default = playbook;
@@ -207,10 +242,22 @@
         system:
         let
           pkgs = pkgsFor system;
+          rustPlatform = rustPlatformFor pkgs;
         in
         {
           default = pkgs.mkShell {
-            packages = [ (rustToolchainFor system) ];
+            # The composer is part of this repository's own workflow: `playbook list`,
+            # `playbook check` and `playbook init` should work from the checkout without a
+            # `cargo run` wrapper. It is the packaged copy, so `playbook root` names the store
+            # path — use `--root .` to resolve against the working tree.
+            packages = [
+              (rustToolchainFor system)
+              (composerFor rustPlatform)
+              # `skill-store` is here for the same reason the composer is: publishing a skill and
+              # checking an export are this repository's own workflow, and should not need a
+              # `cargo run` wrapper. Wrapped with git, so a `github:` source resolves.
+              (skillStoreFor pkgs)
+            ];
           };
         }
       );

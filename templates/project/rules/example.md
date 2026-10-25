@@ -9,9 +9,9 @@ targets:
 ---
 
 <!--
-Copy to projects/<name>/rules/<id>.md.
+Copy to `.playbook/rules/<id>.md` in the repository it applies to.
 
-Use `activation: project:<name>` even though this file is only ever read for that project —
+Use `activation: project:<name>` even though this file is only ever read for that repository —
 it keeps the rule correct if it is later moved up to a shared layer.
 
 Before writing: could this be true of another repo? If yes, it belongs in rules/ instead, and

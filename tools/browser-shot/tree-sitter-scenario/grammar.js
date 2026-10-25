@@ -21,6 +21,9 @@ module.exports = grammar({
       $.burst,
       $.assert,
       $.network,
+      $.spawn,
+      $.wait_for,
+      $.goto,
       $._blank,
     )),
 
@@ -40,6 +43,9 @@ module.exports = grammar({
     burst: $ => seq('burst', $.name, repeat($.field), $._line_end),
     assert: $ => seq('assert', $.name, $.expression, repeat($.field), $._line_end),
     network: $ => seq('network', $.name, repeat($.field), $._line_end),
+    spawn: $ => seq('spawn', $.name, repeat($.field), $._line_end),
+    wait_for: $ => seq('wait_for', repeat($.field), $._line_end),
+    goto: $ => seq('goto', $.name, $.expression, repeat($.field), $._line_end),
 
     field: $ => seq(field('key', $.key_name), '=', field('value', $.value)),
     key_name: _ => /[A-Za-z_][A-Za-z0-9_]*/,

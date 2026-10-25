@@ -14,12 +14,12 @@ consuming repository yet — see *Not yet done* at the end.
 | `~/.claude/CLAUDE.md` | Global Claude memory | Split: universal rules → `rules/core/`, Claude quirks → `models/claude-code/` |
 | `~/.agents/skills/*` (8 files) | Standing constraints filed as skills | `rules/core/` (5), `rules/rust/` (1), `skills/` (1), superseded (1) |
 | `~/.claude/crate-refs/*.md` (2 files) | Crate cheat sheets | `references/crates/` |
-| `cnft.dev-workers/CLAUDE.md` | Per-repo notes | `projects/cnft-dev-workers/`, `rules/org/defrag/`, `rules/rust/` |
+| `cnft.dev-workers/CLAUDE.md` | Per-repo notes | `cnft.dev-workers/.playbook/rules/`, `rules/org/defrag/`, `rules/rust/` |
 | `cnft.dev-workers/AGENTS.md` | The same notes, plus devshell knowledge | Superseded by the above |
-| `shared-crates/CLAUDE.md` | Per-repo notes | `projects/shared-crates/`, `rules/org/defrag/`, `rules/rust/` |
+| `shared-crates/CLAUDE.md` | Per-repo notes | `shared-crates/.playbook/rules/`, `rules/org/defrag/`, `rules/rust/` |
 | `shared-crates/AGENTS.md` | The same notes, plus devshell knowledge | Superseded by the above |
 | `shared-crates/ui/egui-widgets/CLAUDE.md` | Widget library notes | `rules/org/defrag/egui-icons-only`, `references/` |
-| `archivist/CLAUDE.md` | Per-repo notes | `projects/archivist/` |
+| `archivist/CLAUDE.md` | Per-repo notes | `archivist/.playbook/rules/` |
 
 ## The eight mis-filed skills
 
@@ -58,7 +58,7 @@ it makes the failure mode depend on whether the shell was warm. It is the exact 
 `devshell-first` exists to replace.
 
 It is recorded rather than deleted, in
-`projects/archivist/rules/devshell-commands.md` under "The advice this replaced", because the
+`archivist/.playbook/rules/devshell-commands.md` under "The advice this replaced", because the
 symptom it was written for still occurs: in a sandbox, `nix develop` fails with
 `Operation not permitted`, which *reads* like a missing environment, and a shell profile is
 the first place to look. The correct answer to that symptom is `direnv exec .`, not a profile.
@@ -94,7 +94,7 @@ test — *is this true of more than one repo?* — moved them up to `rules/org/d
 **3. Rules at the wrong layer in the other direction.** `d1-write-economics` and
 `wasm-safe-serde` came from `cnft.dev-workers` and would have been false positives on
 `shared-crates`, which uses neither D1 nor third-party JSON. They were moved down to
-`projects/cnft-dev-workers/rules/`, each with a note saying when to move them back up.
+`cnft.dev-workers/.playbook/rules/`, each with a note saying when to move them back up.
 
 **4. The override that wasn't needed.** An override was drafted for `archivist`'s devshell
 rule, then deleted: `archivist` agrees with `rules/rust/devshell-first` and needs no override,
@@ -115,14 +115,20 @@ the two say different things.
 ## Not migrated
 
 - **Black Flag dark-mode rules.** `/Users/damo/code/defrag/blackflag/CLAUDE.md` is not in this
-  Zed workspace, so its contents were not read. It is a candidate for `projects/blackflag/`
-  when that repo is added. The pointer rule in the global memory is a symptom of the problem
-  this repository solves — one agent file telling an agent to go and read a different one.
+  Zed workspace, so its contents were not read. It is a candidate for
+  `blackflag/.playbook/rules/` when that repo is added. The pointer rule in the global memory is
+  a symptom of the problem this repository solves — one agent file telling an agent to go and
+  read a different one.
 - **`shared-crates/ui/_storybook-egui` conventions.** The screenshot workflow became
   `skills/widget-screenshot`; the registration detail became a project rule. The storybook's
   own `CLAUDE.md` conventions beyond that were not read.
 
-## Not yet done
+## Status at the time of writing
+
+Recorded on 2026-09-21. Superseded on 2026-10-25: every consuming repository now declares its own
+`.playbook/project.conf` and carries both blocks — see
+[`inversion-audit.md`](inversion-audit.md) §11. The list is kept because it says which files were
+host-authoritative before the composer wrote them.
 
 - **Nothing is installed.** No consuming repository has a managed block yet. `playbook check`
   against `shared-crates`, `cnft.dev-workers` and `archivist` currently reports "no
@@ -133,7 +139,8 @@ the two say different things.
   genuinely local — and in the two repos where `AGENTS.md` and `CLAUDE.md` duplicate each
   other, one should become a pointer.
 - **The Zed workspace instructions still carry the old per-project rules.** They were the
-  source material for `projects/*/project.conf` and are now redundant with it.
+  source material for the repositories' `.playbook/project.conf` files and are now redundant
+  with them.
 - **The `deepseek-flash` overlay is provisional.** It was written from the shape of the rule
   set, not from observed failures. See `models/deepseek-flash/overlay.conf`.
 
@@ -145,8 +152,8 @@ the two say different things.
 | 2026-10-18 | `rules/org/defrag/macroquad-traps` | The `fight-macroquad` card pass in augminted-bots hit ten macroquad behaviours that fail silently with a wrong picture. The worst: the game was upside down in the window while twenty captures and a twenty-seed soak were clean, because all of them drew into render targets. The user found it on first play. |
 | 2026-10-18 | `rules/org/defrag/look-at-the-game` | The same pass was done by capturing exact moments and fixing what they showed: the zoomed card's missing title, the vanished spaces in shrunk names, a sheen that tinted instead of glinting. The text report beside each capture was added afterwards, as a second check on text. |
 | 2026-10-18 | `rules/org/defrag/rules-emit-events` | `deck-fight` feeds three clients. Wrong pile counts were fixed in the engine each time (`PileOp::Stripped`, the killing card's discard), so no client had to guess. |
-| 2026-10-18 | `projects/shared-crates/rules/gamekit-takes-time-as-an-argument` | Exact-moment captures (`--at 1.25`) work only because nothing in the kit reads the clock. Written when the review harness moved into the kit. |
-| 2026-10-18 | `projects/cnft-dev-workers/rules/metadata-resolution-chain` | The IIIF worker's first EVM adapter read the image URL from the collection-ownership DO, coupling a renderer to an ownership projection and failing for any collection the ownership worker had not imported. The Cardano chain (`asset-metadata` → `assets-resolve` → Koios) was the shape to copy. |
+| 2026-10-18 | `shared-crates/.playbook/rules/gamekit-takes-time-as-an-argument` | Exact-moment captures (`--at 1.25`) work only because nothing in the kit reads the clock. Written when the review harness moved into the kit. |
+| 2026-10-18 | `cnft-dev-workers/.playbook/rules/metadata-resolution-chain` | The IIIF worker's first EVM adapter read the image URL from the collection-ownership DO, coupling a renderer to an ownership projection and failing for any collection the ownership worker had not imported. The Cardano chain (`asset-metadata` → `assets-resolve` → Koios) was the shape to copy. |
 | 2026-10-18 | `rules/core/rest-over-graphql` | The Midnight IIIF investigation found that every Midnight indexer is GraphQL — including Blockfrost's preprod and mainnet endpoints — while the node JSON-RPC exposes only whole contract state and no event or path query. The user stated that GraphQL is a poor fit for server comms, especially Cloudflare-based, and asked for alternatives. The rule keeps GraphQL out of the request path: an offline builder or a REST facade, or no arm. |
 | 2026-10-24 | `rules/core/git-is-the-users-domain` (tightened) | An agent staged new flake files in `construct2` with `git add -N` and `git add` so `nix develop` could see them, without being asked. The correction: *“You seem to be using git liberally — which I'd prefer you didn't.”* The index is now explicitly the user's; a flake Nix cannot see is a reason to ask the user to stage it. |
 

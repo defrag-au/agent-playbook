@@ -1,10 +1,10 @@
 # Rule format
 
 Every rule is one markdown file with a **flat** frontmatter header. Flat is a hard
-requirement, not a style preference: the composer is POSIX `sh` with no YAML parser, so a
-rule must be readable by `awk` looking for `key: value` at the start of a line. Nesting,
-multi-line strings and block sequences are not available. If a rule needs structure beyond
-this, it needs to be a reference file instead.
+requirement, not a style preference: the composer is std-only Rust with a flat parser, so a
+rule must be readable as `key: value` at the start of a line. Nesting, multi-line strings and
+block sequences are not available. If a rule needs structure beyond this, it needs to be a
+reference file instead.
 
 ```markdown
 ---
@@ -113,8 +113,41 @@ session.
 | `ecosystem:defrag` | The project declares `ecosystems: defrag` |
 | `renders:egui` | The project declares `renders: egui` |
 | `renders:macroquad` | The project declares `renders: macroquad` — its game clients draw with macroquad |
-| `project:shared-crates` | The project is `shared-crates` |
+| `project:shared-crates` | A repository manifest whose `project:` is `shared-crates`. Only valid in that repository's own `.playbook/rules/`: a `project:` rule in the shared tree is an error |
 | `manual` | Never automatically. A target must name the rule's id in its `include:` |
+
+## Repository-owned projects
+
+A repository declares its own identity in `<repo>/.playbook/project.conf` and keeps its rules in
+`<repo>/.playbook/rules/`. The manifest is flat `key: value`; there is no `path:` key, because
+the manifest's directory **is** the repository:
+
+```conf
+project: shared-crates
+org: defrag
+ecosystems: defrag
+renders: egui, macroquad
+languages: rust
+default_target: claude-code
+skills: github:defrag-au/shared-crates#widget-screenshot@v1
+```
+
+A rule in `.playbook/rules/` must declare `layer: project` and `activation: project:<name>`, where
+`<name>` is the manifest's `project:`. The composer checks both, so a rule copied from another
+repository — or a manifest renamed without its rules — is an error rather than a rule that never
+loads.
+
+`playbook init` creates the manifest and a `rules/README.md`. `playbook list`, `install` and `check`
+discover the manifest by walking up from the working directory, so no `--project` is needed.
+`--manifest <path>` names one explicitly when the manifest lives outside the directory being
+written to (the personal instructions file in the fleet repository is the worked case).
+
+`skills:` and `skills_scope:` are the keys that are not about rule resolution. `skills:` lists OCFL
+sources that `playbook skills sync` delivers, comma-separated, order preserved. `skills_scope:`
+chooses where: `repo` (the default) is the target's `skill_dir` inside this repository, `global`
+is the harness's own directory — which is how the personal catalogue in `fleet` works. An
+unpublished edit is not a manifest key: it goes in a gitignored `.playbook/skills.patch`. See
+[`skills.md`](skills.md).
 
 `org` and `ecosystem` answer different questions, and a rule belongs to whichever one it is
 actually true of:

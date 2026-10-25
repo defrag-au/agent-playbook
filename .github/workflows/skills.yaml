@@ -1,0 +1,19 @@
+name: Skills
+
+# This repository owns the skill tool, so it checks its own store with its own build: the called
+# workflow skips the second checkout and builds from this one.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  skills:
+    uses: ./.github/workflows/skills-check.yaml
+    with:
+      tool-repository: ""

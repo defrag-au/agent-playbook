@@ -19,9 +19,14 @@ Each target is a directory with an `overlay.conf` and an optional `addenda/`.
 including repositories the playbook knows nothing about.
 
 ```sh
-playbook install --project personal --target zed-personal --repo ~/.config/zed
-playbook check   --project personal --target zed-personal --repo ~/.config/zed
+playbook install --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf \
+  --target zed-personal --repo ~/.config/zed
+playbook check   --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf \
+  --target zed-personal --repo ~/.config/zed
 ```
+
+The manifest lives in the private `fleet` repository, not in `~/.config/zed`, so `--manifest`
+names it explicitly and `--repo` names the directory the generated file belongs in.
 
 It carries **no rules**, and that is the point. An agent reads the personal file *and* the
 project's file, so the two are meant to be complementary, not overlapping. The universal rules
@@ -66,6 +71,8 @@ default_file: CLAUDE.md
 | `addenda` | Files in `models/<target>/addenda/`, appended after the memory layer |
 | `memory` | Files in `memory/`, emitted after the rules and before the addenda |
 | `default_file` | What `playbook install` writes into when `--file` is not given |
+| `skill_dir` | Where `playbook skills sync` delivers a repository's declared skills, relative to the repository. Absent means the target does not deliver skills — a model overlay usually does not |
+| `skill_global_dir` | The same for a **global** install: absolute or `~/…`. Absent means the target has no global skill directory, so `skills_scope: global` skips it and `--target all` passes it over |
 | `instruction_files` | The harness's instruction-file priority order, most significant first. Used to warn when an existing file outranks the one being written |
 
 Full semantics in [`../docs/precedence.md`](../docs/precedence.md).
@@ -96,8 +103,8 @@ reads the first match at the worktree root, so a `CLAUDE.md`-only repo gives **Z
 leaves Claude Code with nothing at all.
 
 ```sh
-playbook install --project shared-crates --target zed         --repo <repo>   # AGENTS.md
-playbook install --project shared-crates --target claude-code --repo <repo>   # CLAUDE.md
+playbook install --target zed         --repo <repo>   # AGENTS.md
+playbook install --target claude-code --repo <repo>   # CLAUDE.md
 ```
 
 Two blocks is not duplication to be avoided: each is generated from the same rule set, and

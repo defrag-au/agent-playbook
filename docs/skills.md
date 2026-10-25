@@ -1,0 +1,247 @@
+# Skills: the store, the declaration, the lock
+
+A skill is a procedure an agent loads on a trigger rather than on every turn. The rule set is
+delivered by being written into an agent file; a skill is delivered by being **copied into a
+directory the harness reads**. That difference is why skills have their own tool and their own
+manifest key.
+
+Two artifacts, deliberately separate:
+
+| | Artifact | Delivery |
+| --- | --- | --- |
+| What | An OCFL store — one object per skill, immutable versions, digests | A plain directory an agent reads |
+| Tool | `skill-store` | `playbook skills sync` |
+| Changes | Only when a version is published | Whenever a repository is provisioned |
+
+Nothing is installed by being published, and nothing is published by being installed.
+[`tools/skill-store/README.md`](../tools/skill-store/README.md) is the store's reference —
+layout, source grammar, the export envelope. This page is the consumer's.
+
+## Declaring a skill
+
+A repository states what it wants in its own `.playbook/project.conf`:
+
+```conf
+skills: github:defrag-au/container-compose#container-compose@v1
+```
+
+The source grammar is Nix's, because that is the grammar everyone already has muscle memory for:
+`<store>#<skill>[@v<N>]`, where `<store>` is `github:owner/repo`, `git+https://…` or `path:<dir>`.
+`@vN` names an OCFL version directory exactly; omitting it selects the object's head, which is
+why a consumer records the resolved version in the lock rather than in the manifest.
+
+A list is comma-separated, and order is the order the manifest declares them. A source may not
+contain whitespace — the lock is line-oriented.
+
+**The skill lives next to the tool it operates.** `container-compose` ships in
+`container-compose/.skill-store/`, because that is the repository whose behaviour the procedure
+describes. `widget-screenshot` and `game-spike` ship in `shared-crates/.skill-store/` — the
+storybook and `macroquad-gamekit`. The skills whose subject is this repository's toolkit —
+`inspect-code`, `capture-rule`, `crate-research`, `browser-shot` — are authored in `skills/` and
+published into `.skill-store/` at the root, which is what
+`github:defrag-au/agent-playbook#inspect-code@v1` resolves to. `skills/` is the editable copy;
+`.skill-store/` is the artifact.
+
+## Scope: this repository, or the harnesses
+
+`skills_scope:` decides where the trees go. It is a property of the manifest because the manifest
+knows what it is — a repository is not a personal catalogue.
+
+| `skills_scope:` | Destination | Lock |
+| --- | --- | --- |
+| `repo` (default) | `<repo>/<target.skill_dir>` | `<repo>/.playbook/skills.lock` |
+| `global` | `<target.skill_global_dir>` (`~/.agents/skills`, `~/.claude/skills`) | beside the manifest |
+
+A global scope cannot write into the repository its manifest happens to sit in, and a repo scope
+cannot write outside the checkout it was pointed at.
+
+## Delivering it
+
+```sh
+playbook skills sync  --target zed
+playbook skills check --target zed
+playbook skills sync  --target all        # every harness that declares a directory
+playbook skills sync  --target zed,claude-code
+```
+
+`--target` is the target's own overlay, and the directory comes from there:
+
+| Target | `skill_dir` | `skill_global_dir` | What the harness reads |
+| --- | --- | --- | --- |
+| `zed` | `.agents/skills` | `~/.agents/skills` | project, then global |
+| `claude-code` | `.claude/skills` | `~/.claude/skills` | project, then global |
+| `generic` | `.agents/skills` | `~/.agents/skills` | harness-neutral |
+
+`skills` are delivered per **harness**, not per model: an egui widget and a macroquad game have
+the same skill needs, and the two harnesses disagree about where to put them. A model overlay
+(`deepseek-flash`) declares neither key and is skipped by `all`; naming it explicitly is an error,
+which is the honest answer. `generic` names the same directories as `zed`, so `all` delivers once
+and names the concrete harness.
+
+`sync` exports every declared skill through `skill-store` first, then copies. A failing export
+therefore leaves the filesystem exactly as it was rather than half-delivered.
+
+## The personal catalogue
+
+A global set is a manifest that is not a repository. It lives beside the personal instructions
+manifest in `fleet`:
+
+```conf
+# ~/code/DamonOehlman/fleet/personal/.playbook/project.conf
+skills_scope: global
+skills: github:defrag-au/agent-playbook#inspect-code@v1, github:defrag-au/agent-playbook#crate-research@v1
+```
+
+```sh
+playbook skills sync  --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf
+playbook skills check --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf
+```
+
+That is the "update all of my skills" command. No `--target`: a global catalogue is for every
+harness by definition, and its `default_target` (`zed-personal`) names the instructions file rather
+than a skill directory, so `all` is the default there. The lock stays beside that manifest — it
+records what *you* installed, not what a repository did — and `--repo` is ignored with a note,
+because a global scope has no repository to write into.
+
+## The lock
+
+`.playbook/skills.lock` records what was delivered:
+
+```conf
+# Generated by `playbook skills sync` — do not edit.
+# <skill>: <source> <version> <tree digest> <targets>
+container-compose: github:defrag-au/container-compose#container-compose@v1 v1 sha256:327ec269… claude-code,zed
+```
+
+The `tree_digest` is the export envelope's, computed by `skill-store` over the sorted
+`(logical path, file digest)` pairs — so it identifies the tree, not the version that produced it.
+`targets` is what the lock is precise about: a zed run must not claim a directory only Claude Code
+has. A run that covers fewer targets than last time keeps the ones it did not touch.
+
+**The lock is the manifest, per target.** A directory under a skill root that the lock does not
+name for *that* target is unmanaged, and `sync` refuses rather than overwriting it:
+
+```
+refusing to overwrite 2 unmanaged skill directories:
+  ~/.agents/skills/capture-rule (differs from the published version — it is a stale copy)
+  ~/.agents/skills/browser-shot (identical to v1 — deleting it loses nothing)
+Move them out of the way, or delete them so the next sync records the delivered version.
+```
+
+That is the first thing a global run meets, because skill directories were hand-installed before
+there was a store. The answer is to delete the copies — the message says which ones are stale —
+not to reach for `--force`, which does not exist.
+
+## Publishing an edit
+
+`skills/<name>/` is the editable source; `.skill-store/<name>/vN/` is the artifact. A version is a
+release, so the two are compared before anything is written, and one command covers the loop:
+
+```sh
+skill-store status           --store .skill-store --worktree skills   # what is owed
+skill-store publish-changed  --store .skill-store --worktree skills   # pay it
+```
+
+`publish-changed` publishes exactly the directories that are `ahead` of their object's head or
+have no object yet. With nothing to do it prints `nothing to publish` and exits `0`, so it is safe
+to run before every commit. `publish <dir> --store …` remains for one skill, and `--message`,
+`--user` and `--address` apply to whatever it writes.
+
+It **refuses** to publish identical content — a version that changes nothing is a mistake, not a
+release — which is why a metadata-only fix cannot be applied retroactively. A version's `user`
+block records the repository the store lives in (name from `git config user.name`, address from
+`origin` as an `https://` URL), so every version published since that landed is spec-clean; older
+ones keep the OCFL warnings they were written with, and clear them when the skill is next versioned.
+
+### The gate
+
+`.github/workflows/skills-check.yaml` is a **reusable** workflow — `workflow_call` — so every
+repository runs the same check against the same tool:
+
+```yaml
+# an authoring repository, with `.skill-store/` beside `skills/`
+jobs:
+  skills:
+    uses: defrag-au/agent-playbook/.github/workflows/skills-check.yaml@main
+```
+
+It runs `skill-store verify` and then `skill-store status`, and fails on `ahead`, `missing` and
+`store-only`. A consumer passes `store: ""` and `manifest: .playbook/project.conf` instead, and it
+runs `playbook skills check` — what the repository committed must still be what its declarations
+resolve to. `tool-repository: ""` makes the *calling* repository the tool, which is how this
+repository checks its own store without a second checkout.
+
+**It detects; it never publishes.** A bot that rewrote `.skill-store/` on a pull request would put
+an unreviewable version on the branch, and a push made with `GITHUB_TOKEN` does not retrigger CI.
+So the fix for a red run is `publish-changed` on the branch, committed with the edit — the same
+reason the version and its diff belong in one commit.
+
+## Developing against a skill
+
+A published version is immutable, so testing an edit would otherwise mean publishing `v2` — noise
+in the store, and a version nobody asked for. `.playbook/skills.patch` is the override, keyed by
+skill name:
+
+```conf
+# .playbook/skills.patch — gitignored, never committed
+inspect-code: path:~/code/defrag/agent-playbook/skills/inspect-code
+container-compose: path:~/code/defrag/container-compose#container-compose@v2
+```
+
+The first form points at a **working copy**: a plain directory with a `SKILL.md`, no store and no
+version. `skill-store export` plans it as `working`, with a digest over the tree, so `check` still
+sees an edit. The second is any ordinary source, which is how a branch is tried —
+`git+https://…?ref=branch#skill`.
+
+- The name is the identity, and it must be declared in `skills:`. A patch that applies to nothing
+  is an **error**, not a silent no-op — otherwise the caller believes a skill was overridden and
+  it was not.
+- Every affected line says `(patched)`, and one warning names them all. A green `check` never
+  quietly means "tested against a local copy".
+- **`sync` does not write the lock for a patched skill.** The lock records published deliveries and
+  a working copy is not one, so the previous entry survives untouched; a skill that was only ever
+  patched has no entry at all. Drop the patch and `check` reports stale — which is the truth.
+- `working` is not a version directory, and the source grammar rejects `@working`, so nothing can
+  pin one.
+
+Why a separate file rather than a `[patch]`-style key in the manifest, as Cargo does? Because an
+in-manifest patch has to be commented out before every commit, which is a habit rather than a
+guarantee, and a committed `path:~/code/…` is true on one machine. CI has no patch file, so it
+cannot see an override at all.
+
+## What `check` compares, and why it is exact
+
+`check` re-exports each source and compares three things:
+
+1. the lock's `tree_digest` against the envelope's — has the source moved?
+2. the delivered tree against the exported tree, file by file — was the copy edited?
+3. the lock against the declarations — is anything orphaned?
+
+It compares **bytes**, not digests, because the composer has no hashing dependency and does not
+want one: the point of `playbook` is that it builds and runs when a repository's toolchain is what
+is broken. `--offline` reaches the `skill-store` cache instead of the network.
+
+A skill removed from `skills:` is reported and left in place; `sync --prune` removes it. Deleting
+a directory is the one thing a consumer cannot undo, so it is never the default.
+
+## What is not built yet
+
+- **The patch file is not created or ignored for you.** `.playbook/skills.patch` is opt-in: write
+  it when you need one and add it to `.gitignore` yourself. `playbook` reads it if it is there and
+  cannot edit ignore rules.
+- **A private store cannot be delivered.** `skill-store` fetches with a plain `git clone` and no
+  credentials, so a `github:` source resolves only for a public repository. The tool is public; the
+  fleet inventory it reads is not.
+- **The OCFL warnings on old versions are permanent.** Inventories are immutable, so a `v1` written
+  before the `user` block carried an address keeps that warning. Only the next version of that
+  skill clears it; editing an inventory to tidy one would break the guarantee the store exists for.
+- **A home-independent global lock.** The lock records source, version, digest and target — not
+  the absolute directory. It assumes the same home it was written in, which is right for a
+  personal catalogue and wrong if one is ever shared across machines.
+- **Two are published but not catalogued.** `widget-screenshot` and `game-spike` are in
+  `shared-crates/.skill-store/`, but that store is not on a pushed branch, and one unresolvable
+  source aborts the whole sync — so the personal catalogue lists them only once it is. Their
+  hand-installed copies are deliberately left behind.
+- **One skill is published but not catalogued.** `fleet-ops` is in `fleet/.skill-store/`; the
+  personal catalogue lists it once that store is on a pushed branch. The hand-installed copy in
+  `~/.agents/skills` is left alone until then.

@@ -24,8 +24,9 @@ repo paths and rebuild commands, so it belongs in a **private** repository, for 
     README.md
 ```
 
-That tree is data. `at-reach` only reads it. The public repository ships the tool, the schema,
-a fictional example in `examples/fleet/`, and the `fleet-ops` skill. Do not commit a real
+That tree is data. `at-reach` only reads it. The public repository ships the tool and the schema,
+with a fictional example in `examples/fleet/`; the `fleet-ops` skill lives in the fleet repository
+itself, in `skills/fleet-ops/`, published into `fleet/.skill-store/`. Do not commit a real
 inventory here, and do not put one in a public host-config repository either.
 
 The inventory is **discovery, not authorization**. Knowing a host exists does not grant access;

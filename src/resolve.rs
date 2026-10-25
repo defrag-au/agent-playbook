@@ -5,7 +5,9 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::load::{has_errors, load_addendum, load_memory, load_project, load_rules, load_target};
+use crate::load::{
+    has_errors, load_addendum, load_manifest, load_memory, load_rules_for, load_target,
+};
 use crate::model::{Activation, Diagnostic, Layer, Project, Rule, Section, Target};
 
 pub struct Resolved {
@@ -35,22 +37,39 @@ impl Resolved {
     }
 }
 
-pub fn resolve(
+/// Resolve the project declared by `<repo>/.playbook/project.conf`.
+///
+/// The manifest is the consumer's declaration of its identity; the shared rules come from
+/// `root`, and the repository's own rules come from its `.playbook/rules/`.
+pub fn resolve_repo(
     root: &Path,
-    project_name: &str,
+    repo: &Path,
     target_name: Option<&str>,
 ) -> Result<Resolved, String> {
-    let project = load_project(root, project_name)?;
+    let (project, diagnostics) = load_manifest(repo)?;
+    resolve_project(root, project, target_name, diagnostics)
+}
+
+fn resolve_project(
+    root: &Path,
+    project: Project,
+    target_name: Option<&str>,
+    mut diagnostics: Vec<Diagnostic>,
+) -> Result<Resolved, String> {
     let target_name = match target_name {
         Some(t) => t.to_string(),
-        None => project
-            .default_target
-            .clone()
-            .ok_or_else(|| format!("no --target given and {project_name} has no default_target"))?,
+        None => project.default_target.clone().ok_or_else(|| {
+            format!(
+                "no --target given and {} has no default_target",
+                project.name
+            )
+        })?,
     };
-    let target = load_target(root, &target_name)?;
+    let (target, target_diagnostics) = load_target(root, &target_name)?;
+    diagnostics.extend(target_diagnostics);
 
-    let (all_rules, mut diagnostics) = load_rules(root);
+    let (all_rules, rule_diagnostics) = load_rules_for(root, &project);
+    diagnostics.extend(rule_diagnostics);
 
     // --- include ------------------------------------------------------------
     let mut kept: Vec<Rule> = Vec::new();
@@ -169,7 +188,8 @@ pub fn resolve(
 
     if kept.is_empty() && memory.is_empty() && addenda.is_empty() {
         diagnostics.push(Diagnostic::warning(format!(
-            "project `{project_name}` + target `{target_name}` resolves to nothing at all"
+            "project `{}` + target `{target_name}` resolves to nothing at all",
+            project.name
         )));
     }
 

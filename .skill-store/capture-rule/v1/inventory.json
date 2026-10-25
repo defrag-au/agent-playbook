@@ -1,0 +1,25 @@
+{
+  "id": "urn:skill:capture-rule",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v1",
+  "manifest": {
+    "47b202582974e7ab326741fe80d018375c15501871b00d60e5cea20969c50a71699c4998b9b776667bfa1b8e05868be237d37be4fe4d80d0dc0b697dfd1cb35c": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-25T06:00:43Z",
+      "state": {
+        "47b202582974e7ab326741fe80d018375c15501871b00d60e5cea20969c50a71699c4998b9b776667bfa1b8e05868be237d37be4fe4d80d0dc0b697dfd1cb35c": [
+          "SKILL.md"
+        ]
+      },
+      "message": "first published version",
+      "user": {
+        "name": "damo"
+      }
+    }
+  }
+}

@@ -12,8 +12,8 @@ targets:
 
 **Before writing any widget, read the catalogue.**
 
-- `~/code/defrag/shared-crates/ui/egui-widgets/CATALOG.md` — ~100 widgets, one line each
-- `~/code/defrag/shared-crates/ui/macroquad-widgets/CATALOG.md` — the macroquad set
+- `ui/egui-widgets/CATALOG.md` in the `shared-crates` repository — ~100 widgets, one line each
+- `ui/macroquad-widgets/CATALOG.md` in `shared-crates` — the macroquad set
 
 Read the whole file. **Do not grep instead.**
 

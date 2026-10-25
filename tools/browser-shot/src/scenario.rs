@@ -3,7 +3,7 @@
 //! `Scenario::load` chooses by extension and validates once, so `run` and `check`
 //! cannot disagree about what a valid scenario is.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -25,6 +25,8 @@ macro_rules! bail_at {
 pub(crate) const DEFAULT_SEED: u32 = 0x9e37_79b9;
 /// The signal handler keeps one slot per process. Keep this in step with the array in `runner.rs`.
 pub(crate) const MAX_PEERS: usize = 8;
+/// Spawned process groups share the same fixed-size signal table.
+pub(crate) const MAX_SPAWNS: usize = 8;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Scenario {
@@ -149,6 +151,42 @@ pub(crate) enum Step {
         upload_kbps: Option<u64>,
         loss_percent: Option<f64>,
     },
+    /// Start a process the scenario owns. The tool kills its whole process group
+    /// when the run ends, however it ends.
+    Spawn {
+        name: String,
+        command: String,
+        /// The port this process is expected to listen on. Declared here so the
+        /// tool can refuse to start on a port somebody else holds — a check that
+        /// cannot move to `wait_for`, because by then a server that failed to
+        /// bind has died and the squatter is what answers.
+        port: Option<u16>,
+        dir: Option<String>,
+        /// `KEY=VALUE` entries added to the child's environment.
+        env: Option<Vec<String>>,
+    },
+    /// Wait for something outside the browser. Exactly one variant per step.
+    WaitFor {
+        /// A spawned process whose declared port must accept a connection.
+        ready: Option<String>,
+        /// Any TCP accept on `host:port`, for a server the scenario does not own.
+        port: Option<u16>,
+        host: Option<String>,
+        /// A GET that must answer `status` (default 200).
+        http: Option<String>,
+        status: Option<u16>,
+        /// A spawned process whose log must contain `pattern`.
+        log: Option<String>,
+        pattern: Option<String>,
+        /// A spawned process that must end, 0 unless `code` says otherwise.
+        exit: Option<String>,
+        code: Option<i32>,
+        timeout_ms: Option<u64>,
+    },
+    /// Send a peer to a URL. Peers load their `url=` before any step runs, so a
+    /// page served by a process this scenario started needs this: spawn, wait,
+    /// then navigate.
+    Goto { peer: String, url: String },
 }
 
 impl Step {
@@ -162,10 +200,13 @@ impl Step {
             Self::Burst { .. } => "burst",
             Self::Assert { .. } => "assert",
             Self::Network { .. } => "network",
+            Self::Spawn { .. } => "spawn",
+            Self::WaitFor { .. } => "wait_for",
+            Self::Goto { .. } => "goto",
         }
     }
 
-    fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         match self {
             Self::Wait {
                 peer,
@@ -269,6 +310,47 @@ impl Step {
                 peer, expression, ..
             } => format!("{peer} {expression}"),
             Self::Network { peer, .. } => peer.clone(),
+            Self::Spawn {
+                name,
+                command,
+                port,
+                ..
+            } => {
+                let port = port.map_or_else(String::new, |port| format!(" port {port}"));
+                format!("{name}{port} {command}")
+            }
+            Self::WaitFor {
+                ready,
+                port,
+                host,
+                http,
+                status,
+                log,
+                pattern,
+                exit,
+                code,
+                ..
+            } => {
+                if let Some(name) = ready {
+                    format!("ready {name}")
+                } else if let Some(port) = port {
+                    let host = host.as_deref().unwrap_or("127.0.0.1");
+                    format!("port {host}:{port}")
+                } else if let Some(url) = http {
+                    let status =
+                        status.map_or_else(String::new, |status| format!(" status {status}"));
+                    format!("http {url}{status}")
+                } else if let Some(name) = log {
+                    let pattern = pattern.as_deref().unwrap_or_default();
+                    format!("log {name} for {pattern:?}")
+                } else if let Some(name) = exit {
+                    let code = code.map_or_else(String::new, |code| format!(" code {code}"));
+                    format!("exit {name}{code}")
+                } else {
+                    "missing a variant".to_owned()
+                }
+            }
+            Self::Goto { peer, url } => format!("{peer} {url}"),
         }
     }
 }
@@ -391,12 +473,135 @@ impl Scenario {
             }
         }
 
+        // Spawn names, with the port each declared. Built in step order, so a
+        // `wait_for` can only name a process started before it.
+        let mut spawned: HashMap<&str, Option<u16>> = HashMap::new();
+
         for (index, step) in self.step.iter().enumerate() {
             let at = self.step_lines.get(index).map_or_else(
                 || format!("step {} ({})", index + 1, step.action_name()),
                 |line| format!("line {line}: step {} ({})", index + 1, step.action_name()),
             );
             match step {
+                Step::Spawn {
+                    name,
+                    command,
+                    port,
+                    dir,
+                    env,
+                } => {
+                    if name.trim().is_empty() {
+                        bail!("{at}: a spawn has an empty name");
+                    }
+                    if name.contains(',') || name.chars().any(char::is_whitespace) {
+                        bail!("{at}: spawn name {name:?} must not contain spaces or commas");
+                    }
+                    if names.contains(name.as_str()) {
+                        bail!("{at}: spawn name {name:?} is also a peer name");
+                    }
+                    if spawned.len() >= MAX_SPAWNS {
+                        bail!("{at}: at most {MAX_SPAWNS} processes can be spawned in one run");
+                    }
+                    if spawned.insert(name.as_str(), *port).is_some() {
+                        bail!("{at}: duplicate spawn name {name:?}");
+                    }
+                    if command.trim().is_empty() {
+                        bail!("{at}: spawn {name:?} needs a command");
+                    }
+                    if *port == Some(0) {
+                        bail!("{at}: port must be greater than zero");
+                    }
+                    if let Some(dir) = dir {
+                        if dir.trim().is_empty() {
+                            bail!("{at}: dir must not be empty");
+                        }
+                    }
+                    if let Some(env) = env {
+                        if env.is_empty() {
+                            bail!("{at}: env must not be empty");
+                        }
+                        for entry in env {
+                            match entry.split_once('=') {
+                                Some((key, _)) if !key.trim().is_empty() => {}
+                                _ => bail!("{at}: env entry {entry:?} is not KEY=VALUE"),
+                            }
+                        }
+                    }
+                }
+                Step::WaitFor {
+                    ready,
+                    port,
+                    host,
+                    http,
+                    status,
+                    log,
+                    pattern,
+                    exit,
+                    code,
+                    timeout_ms,
+                } => {
+                    let variants = [
+                        ready.is_some(),
+                        port.is_some(),
+                        http.is_some(),
+                        log.is_some(),
+                        exit.is_some(),
+                    ]
+                    .into_iter()
+                    .filter(|present| *present)
+                    .count();
+                    if variants != 1 {
+                        bail!("{at}: needs exactly one of ready, port, http, log or exit");
+                    }
+                    if *timeout_ms == Some(0) {
+                        bail!("{at}: timeout must be greater than zero");
+                    }
+                    if pattern.is_some() && log.is_none() {
+                        bail!("{at}: pattern belongs to log");
+                    }
+                    if status.is_some() && http.is_none() {
+                        bail!("{at}: status belongs to http");
+                    }
+                    if code.is_some() && exit.is_none() {
+                        bail!("{at}: code belongs to exit");
+                    }
+                    if host.is_some() && port.is_none() {
+                        bail!("{at}: host belongs to port");
+                    }
+                    if let Some(name) = ready {
+                        match spawned.get(name.as_str()) {
+                            None => bail!("{at}: no spawn named {name:?} before this step"),
+                            Some(None) => bail!(
+                                "{at}: spawn {name:?} declares no port, so use port= rather than ready="
+                            ),
+                            Some(Some(_)) => {}
+                        }
+                    }
+                    for name in [log.as_deref(), exit.as_deref()].into_iter().flatten() {
+                        if !spawned.contains_key(name) {
+                            bail!("{at}: no spawn named {name:?} before this step");
+                        }
+                    }
+                    if log.is_some() && pattern.as_deref().unwrap_or("").is_empty() {
+                        bail!("{at}: log needs a pattern");
+                    }
+                    if let Some(url) = http {
+                        if !url.starts_with("http://") {
+                            bail!(
+                                "{at}: http must be an http:// URL; https needs TLS this tool does not carry"
+                            );
+                        }
+                    }
+                    if *port == Some(0) {
+                        bail!("{at}: port must be greater than zero");
+                    }
+                }
+                Step::Goto { peer, url } => {
+                    check_peer(&names, &at, peer)?;
+                    if url.trim().is_empty() {
+                        bail!("{at}: goto needs a url");
+                    }
+                }
                 Step::Wait {
                     peer,
                     peers,
@@ -610,6 +815,11 @@ impl Scenario {
     }
 
     pub(crate) fn check_report(&self, path: &Path) -> CheckReport {
+        let spawns = self
+            .step
+            .iter()
+            .filter(|step| matches!(step, Step::Spawn { .. }))
+            .count();
         let actions = self
             .step
             .iter()
@@ -641,6 +851,7 @@ impl Scenario {
                 })
                 .collect(),
             step_count: self.step.len(),
+            spawns,
             steps,
             actions,
             error: None,
@@ -676,6 +887,9 @@ pub(crate) struct CheckReport {
     pub(crate) valid: bool,
     pub(crate) peers: Vec<PeerSummary>,
     pub(crate) step_count: usize,
+    /// How many processes the scenario starts. A valid scenario can execute a
+    /// command, so `check` says so rather than leaving it to be discovered.
+    pub(crate) spawns: usize,
     pub(crate) steps: Vec<StepSummary>,
     pub(crate) actions: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -705,6 +919,7 @@ impl CheckReport {
             valid: false,
             peers: Vec::new(),
             step_count: 0,
+            spawns: 0,
             steps: Vec::new(),
             actions: Vec::new(),
             error: Some(error),
@@ -729,6 +944,15 @@ impl CheckReport {
                 .line
                 .map_or_else(|| "  -".to_owned(), |line| format!("{line:>3}"));
             let _ = writeln!(out, "  {line}  {:<8} {}", step.action, step.detail);
+        }
+        if self.spawns > 0 {
+            let _ = writeln!(
+                out,
+                "spawns    {}  (this scenario starts {} process{})",
+                self.spawns,
+                self.spawns,
+                if self.spawns == 1 { "" } else { "es" }
+            );
         }
         if !self.actions.is_empty() {
             let _ = writeln!(out, "actions   {}", self.actions.join(", "));
@@ -809,6 +1033,10 @@ const CAPTURE_FIELDS: &[&str] = &["out", "select"];
 const BURST_FIELDS: &[&str] = &["out", "frames", "interval", "mode", "select"];
 const ASSERT_FIELDS: &[&str] = &["message"];
 const NETWORK_FIELDS: &[&str] = &["latency", "download", "upload", "loss"];
+const SPAWN_FIELDS: &[&str] = &["command", "port", "dir", "env"];
+const WAIT_FOR_FIELDS: &[&str] = &[
+    "ready", "port", "host", "http", "status", "log", "pattern", "exit", "code", "timeout",
+];
 
 pub(crate) fn fmt(args: Vec<String>) -> Result<bool> {
     let mut scenario_path = None;
@@ -1013,10 +1241,26 @@ fn format_line(line: &LineTokens) -> Result<String> {
             parts.push(format_value(&positionals[0].value));
             push_fields(&mut parts, &mut kvs, NETWORK_FIELDS);
         }
+        "spawn" => {
+            if positionals.len() != 1 {
+                bail_at!(first, "spawn needs a name");
+            }
+            parts.push(format_value(&positionals[0].value));
+            push_fields(&mut parts, &mut kvs, SPAWN_FIELDS);
+        }
+        "wait_for" => push_fields(&mut parts, &mut kvs, WAIT_FOR_FIELDS),
+        "goto" => {
+            if positionals.len() != 2 {
+                bail_at!(first, "goto needs a peer and a url");
+            }
+            parts.push(format_value(&positionals[0].value));
+            parts.push(format_value(&positionals[1].value));
+        }
         other => bail_at!(
             first,
             &format!(
-                "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, burst, assert or network"
+                "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, \
+                 burst, assert, network, spawn or wait_for"
             ),
         ),
     }
@@ -1158,10 +1402,23 @@ fn parse_dsl(text: &str) -> Result<Scenario> {
                 steps.push(parse_network(rest, first)?);
                 step_lines.push(first.line);
             }
+            "spawn" => {
+                steps.push(parse_spawn(rest, first)?);
+                step_lines.push(first.line);
+            }
+            "wait_for" => {
+                steps.push(parse_wait_for(rest, first)?);
+                step_lines.push(first.line);
+            }
+            "goto" => {
+                steps.push(parse_goto(rest, first)?);
+                step_lines.push(first.line);
+            }
             other => bail_at!(
                 first,
                 &format!(
-                    "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, burst, assert or network"
+                    "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, \
+                     burst, assert, network, spawn, wait_for or goto"
                 ),
             ),
         }
@@ -1700,6 +1957,110 @@ fn parse_network(tokens: &[Token], first: &Token) -> Result<Step> {
         upload_kbps,
         loss_percent,
     })
+}
+
+fn parse_spawn(tokens: &[Token], first: &Token) -> Result<Step> {
+    let positionals = positionals(tokens);
+    let name = positionals
+        .first()
+        .map(|token| token.value.clone())
+        .ok_or_else(|| anyhow!("line {}: spawn needs a name", first.line))?;
+    if positionals.len() > 1 {
+        bail_at!(positionals[1], "spawn takes a name and fields only");
+    }
+
+    let mut kvs = collect_kvs(tokens)?;
+    let command = take_required(&mut kvs, "command", first, "spawn")?;
+    let port = take_u16(&mut kvs, "port", first)?;
+    let dir = take_string(&mut kvs, "dir");
+    let env = take_string(&mut kvs, "env").map(|env| split_list(&env));
+    reject_unknown(&kvs, first, "spawn")?;
+
+    Ok(Step::Spawn {
+        name,
+        command,
+        port,
+        dir,
+        env,
+    })
+}
+
+fn parse_wait_for(tokens: &[Token], first: &Token) -> Result<Step> {
+    if !positionals(tokens).is_empty() {
+        bail_at!(
+            first,
+            "wait_for takes fields only; name a process with ready=, log= or exit="
+        );
+    }
+
+    let mut kvs = collect_kvs(tokens)?;
+    let ready = take_string(&mut kvs, "ready");
+    let port = take_u16(&mut kvs, "port", first)?;
+    let host = take_string(&mut kvs, "host");
+    let http = take_string(&mut kvs, "http");
+    let status = take_u16(&mut kvs, "status", first)?;
+    let log = take_string(&mut kvs, "log");
+    let pattern = take_string(&mut kvs, "pattern");
+    let exit = take_string(&mut kvs, "exit");
+    let code = take_u32(&mut kvs, "code")?
+        .map(|code| {
+            i32::try_from(code).map_err(|_| anyhow!("line {}: code is too large", first.line))
+        })
+        .transpose()?;
+    let timeout_ms = take_duration(&mut kvs, "timeout")?;
+    reject_unknown(&kvs, first, "wait_for")?;
+
+    Ok(Step::WaitFor {
+        ready,
+        port,
+        host,
+        http,
+        status,
+        log,
+        pattern,
+        exit,
+        code,
+        timeout_ms,
+    })
+}
+
+fn parse_goto(tokens: &[Token], first: &Token) -> Result<Step> {
+    let positionals = positionals(tokens);
+    let peer = positionals
+        .first()
+        .map(|token| token.value.clone())
+        .ok_or_else(|| anyhow!("line {}: goto needs a peer", first.line))?;
+    let url = positionals
+        .get(1)
+        .map(|token| token.value.clone())
+        .ok_or_else(|| anyhow!("line {}: goto needs a url", first.line))?;
+    if positionals.len() > 2 {
+        bail_at!(positionals[2], "goto takes a peer and a url only");
+    }
+
+    let kvs = collect_kvs(tokens)?;
+    reject_unknown(&kvs, first, "goto")?;
+
+    Ok(Step::Goto { peer, url })
+}
+
+fn take_u16(kvs: &mut BTreeMap<String, Token>, key: &str, first: &Token) -> Result<Option<u16>> {
+    take_u32(kvs, key)?
+        .map(|value| {
+            u16::try_from(value)
+                .map_err(|_| anyhow!("line {}: {key} must be at most 65535", first.line))
+        })
+        .transpose()
+}
+
+/// A comma-separated list, trimmed.
+fn split_list(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 fn parse_network_map(value: &str, first: &Token) -> Result<NetworkSpec> {
@@ -2333,5 +2694,129 @@ hold_frames = 12
         assert_eq!(parse_viewport("390x844").unwrap(), (390, 844));
         assert!(parse_viewport("390").is_err());
         assert!(parse_viewport("0x844").is_err());
+    }
+
+    /// Starting a process and waiting for it are separate steps, so a scenario
+    /// can spawn mid-run and can wait on an origin it does not own.
+    #[test]
+    fn parses_spawn_and_wait_for() {
+        let text = concat!(
+            "peer a url=x viewport=390x844\n",
+            "spawn game command=\"sh -c serve\" port=8787 dir=/tmp env=\"A=1,B=2\"\n",
+            "wait_for ready=game timeout=120s\n",
+            "wait_for port=9000 host=127.0.0.1\n",
+            "wait_for http=\"http://127.0.0.1:8787/health\" status=204\n",
+            "wait_for log=game pattern=\"listening\"\n",
+            "wait_for exit=game code=3\n",
+        );
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        assert_eq!(scenario.step.len(), 6);
+        assert_eq!(scenario.step[0].action_name(), "spawn");
+        assert_eq!(scenario.step[1].action_name(), "wait_for");
+        match &scenario.step[0] {
+            Step::Spawn {
+                name,
+                command,
+                port,
+                dir,
+                env,
+            } => {
+                assert_eq!(name, "game");
+                assert_eq!(command, "sh -c serve");
+                assert_eq!(*port, Some(8787));
+                assert_eq!(dir.as_deref(), Some("/tmp"));
+                assert_eq!(
+                    env.as_deref(),
+                    Some(&["A=1".to_owned(), "B=2".to_owned()][..])
+                );
+            }
+            other => panic!("expected a spawn step, got {other:?}"),
+        }
+        match &scenario.step[1] {
+            Step::WaitFor {
+                ready, timeout_ms, ..
+            } => {
+                assert_eq!(ready.as_deref(), Some("game"));
+                assert_eq!(*timeout_ms, Some(120_000));
+            }
+            other => panic!("expected a wait_for step, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn formats_spawn_and_wait_for_in_field_order() {
+        let text =
+            "spawn game env=\"A=1\" port=8787 command=serve\nwait_for timeout=5s ready=game\n";
+        let formatted = format_dsl(text).unwrap();
+        assert_eq!(
+            formatted,
+            "spawn game command=serve port=8787 env=\"A=1\"\nwait_for ready=game timeout=5s\n"
+        );
+        assert_eq!(format_dsl(&formatted).unwrap(), formatted);
+    }
+
+    #[test]
+    fn rejects_wait_for_with_more_than_one_variant() {
+        let text =
+            "peer a url=x viewport=390x844\nwait_for port=8787 http=\"http://127.0.0.1:8787/\"\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("exactly one of"), "{error}");
+    }
+
+    /// `ready=` is sugar over the port the spawn declared. Without one there is
+    /// nothing to wait on, and the message has to say which field to use instead.
+    #[test]
+    fn rejects_ready_for_a_spawn_with_no_port() {
+        let text = "peer a url=x viewport=390x844\nspawn game command=serve\nwait_for ready=game\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("declares no port"), "{error}");
+    }
+
+    /// A wait can only name a process started before it; otherwise it could never
+    /// succeed, and the typo would surface as a timeout an hour later.
+    #[test]
+    fn rejects_waiting_on_a_process_that_has_not_been_spawned_yet() {
+        let text = "peer a url=x viewport=390x844\nwait_for exit=job\nspawn job command=true\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("no spawn named"), "{error}");
+    }
+
+    #[test]
+    fn rejects_a_spawn_sharing_a_peers_name() {
+        let text = "peer game url=x viewport=390x844\nspawn game command=serve\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("is also a peer name"), "{error}");
+    }
+
+    #[test]
+    fn rejects_https_because_the_tool_carries_no_tls() {
+        let text = "peer a url=x viewport=390x844\nwait_for http=\"https://example.com/\"\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("https needs TLS"), "{error}");
+    }
+
+    #[test]
+    fn rejects_a_log_wait_with_no_pattern() {
+        let text = "peer a url=x viewport=390x844\nspawn game command=serve\nwait_for log=game\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("log needs a pattern"), "{error}");
+    }
+
+    /// Peers load `url=` before any step, so a page served by a process the
+    /// scenario started needs a navigation of its own.
+    #[test]
+    fn parses_and_formats_a_goto() {
+        let text = "peer a url=x viewport=390x844\ngoto a \"http://127.0.0.1:8787/?world=t\"\n";
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        match &scenario.step[0] {
+            Step::Goto { peer, url } => {
+                assert_eq!(peer, "a");
+                assert_eq!(url, "http://127.0.0.1:8787/?world=t");
+            }
+            other => panic!("expected a goto step, got {other:?}"),
+        }
+        assert_eq!(format_dsl(text).unwrap(), text);
     }
 }

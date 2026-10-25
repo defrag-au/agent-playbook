@@ -27,11 +27,14 @@ pub fn render(resolved: &Resolved) -> String {
     // says the same thing everywhere. Which *revision* a block came from is a separate question —
     // the flake knows its own rev and could bake it in, at the cost of a bump making every
     // installed block stale by design.
+    // The provenance names where a reader edits the project's own rules. There is one shape now:
+    // a repository manifest. Keeping the path relative means the block reads the same in every
+    // repository and on every machine.
     out.push_str(&format!(
-        "Generated from agent-playbook (`projects/{}` + `models/{}`).\n\
+        "Generated from `.playbook/project.conf` + `models/{}`.\n\
          Each rule's source file is named in the comment above its heading.\n\
          To change a rule, change the rule — not this block.\n",
-        resolved.project.name, resolved.target.name
+        resolved.target.name
     ));
 
     if !resolved.emphasis.is_empty() {

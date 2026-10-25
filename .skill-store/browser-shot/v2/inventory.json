@@ -1,0 +1,37 @@
+{
+  "id": "urn:skill:browser-shot",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v2",
+  "manifest": {
+    "6ea6e5a596b5226f81f8ae9c7c2d60815d48b350022871b20941b44ef1d5a233da793d87a91876e8455423ace6e4e59ee429af982b4a53f68679c36578d4a97f": [
+      "v2/content/SKILL.md"
+    ],
+    "a1738eae83e7bada7113db12f1e9908f65eeb59ba239fdb4cca6b2ce274902a4bb9f9feaa2769c90602b064255e5619c81c6aad3fdd72a596b0cf19725c635ad": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-25T06:00:42Z",
+      "state": {
+        "a1738eae83e7bada7113db12f1e9908f65eeb59ba239fdb4cca6b2ce274902a4bb9f9feaa2769c90602b064255e5619c81c6aad3fdd72a596b0cf19725c635ad": [
+          "SKILL.md"
+        ]
+      },
+      "message": "first published version",
+      "user": {
+        "name": "damo"
+      }
+    },
+    "v2": {
+      "created": "2026-10-25T07:54:27Z",
+      "state": {
+        "6ea6e5a596b5226f81f8ae9c7c2d60815d48b350022871b20941b44ef1d5a233da793d87a91876e8455423ace6e4e59ee429af982b4a53f68679c36578d4a97f": [
+          "SKILL.md"
+        ]
+      },
+      "message": "document spawn and wait_for"
+    }
+  }
+}

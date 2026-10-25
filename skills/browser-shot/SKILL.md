@@ -35,6 +35,7 @@ process it started.
 | Animation quality | `burst <peer> out=frames/<name> frames=120 mode=screencast` |
 | Verify a frame rate | `wait <peer> rate=30` |
 | A series over time (latency samples etc.) | `eval <peer> "<expression>" out=<file.json>` |
+| Start the server it tests | `spawn …`, then `wait_for …`, then `goto` |
 
 ## Single shot
 
@@ -83,6 +84,37 @@ capture a out=a.png select=canvas
 
 Each peer is a separate browser process with its own storage and WebRTC stack. `check` validates
 peer names and required fields and names the line; `fmt` only lays the file out.
+
+## Starting the server it tests
+
+A scenario can run the origin it captures. Starting and being ready are separate steps because they
+fail differently:
+
+```text
+peer page url=about:blank viewport=390x844
+
+spawn site command="direnv exec . wrangler dev --env dev --port 8787 --ip 127.0.0.1" \
+      port=8787 dir=games/island-funk/worker
+wait_for ready=site timeout=120s
+goto page "http://127.0.0.1:8787/?offline=1"
+```
+
+- `spawn` owns a **process group**, because one logical server is usually several processes and only
+  the last of them holds the port. The group is killed when the run ends, however it ends — success,
+  an assertion failure, an error or Ctrl-C. stdout and stderr go to `<artifacts>/<name>.log`.
+- `port=` is checked by binding it before launch, so a stale server from an earlier run is refused
+  rather than silently tested.
+- `wait_for` variants: `ready=<name>` (the port that spawn declared), `port=`, `http=`, `log=<name>
+  pattern=`, `exit=<name> code=`.
+- **A failed `wait_for` stops the scenario**, unlike `wait`. Everything after it assumed the condition
+  held. It shows up as a `problem` in `run.txt`, with the last twenty lines of that process's log.
+- A process that dies on its own stops the run at the next step, with its status and log tail.
+
+A scenario containing `spawn` executes a command: treat the file as a script, not as config from a
+stranger.
+
+Acceptance runs for the feature, and what each should exit with, are listed in
+`tools/browser-shot/README.md` under *Starting what the scenario tests*.
 
 ## Animation bursts
 
@@ -137,6 +169,12 @@ The image is the review; `<out>.txt` is the second check. It leads with what a g
 - **`screencast` captures the viewport only**; `select` with it is a validation error.
 - **Every CDP call costs ~100 ms on this transport**, so a frame hold is scheduled before the
   keydown. Use `hold=N` frames, not a millisecond sleep.
+- **A peer fetches its `url=` before any step runs.** A page served by a process the scenario
+  started needs `goto <peer> <url>` after the wait; pointing `peer url=` at it just shows a
+  connection error.
+- **`spawn` declares the port; `wait_for` waits on it.** The port cannot be checked at the wait,
+  because by then a server that failed to bind has died and whatever squats the port answers — the
+  wait would pass against the wrong build.
 - **`file://` cannot exercise network emulation.** Use a local server for HTTP/WebSocket checks.
 - **`--select` is a CSS selector**, not a frame-aware locator; cross-origin iframes are not
   traversed.

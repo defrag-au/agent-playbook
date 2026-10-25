@@ -56,12 +56,12 @@ Clippy is clean at `-D warnings` and should stay that way.
 (`at-peek`, `at-crate`, `at-recall`, `at-reach`, `at-describe`), `browser-shot`, a devshell, and a
 `checks` entry that runs the suite.
 
-`playbook` carries its own data tree in `share/playbook` — `rules/`, `models/`, `projects/`,
-`memory/`, `templates/` — because an installed binary has nothing else to read: the compile-time
+`playbook` carries its own data tree in `share/playbook` — `rules/`, `models/`, `memory/`,
+`templates/` — because an installed binary has nothing else to read: the compile-time
 manifest directory is a build directory that `nix build` deletes. So the binary is self-locating,
 and `playbook root` prints which tree it resolved against and how it found it. `defrag-nix` wires
-both packages into every org devshell, which is what makes `playbook check --project <name> --repo
-<path>` a command any repo can run.
+both packages into every org devshell, which is what makes `playbook check` a command any repo can
+run from its own checkout.
 
 A consequence worth knowing: the composer in a shell is the copy pinned by `defrag-nix`, so a rule
 change here only reaches a consumer after it is committed, pushed, and re-locked there — while
@@ -81,7 +81,7 @@ That is also the property worth keeping: a repository meant to be read by someon
 builds with nothing but its own flake. `defrag-nix`'s input uses `nixpkgs.follows` and
 `fenix.follows`, so neither is evaluated twice.
 
-The repo is still **not self-hosted**: there is no `projects/agent-playbook/` and no managed
+The repo is still **not self-hosted**: there is no `.playbook/project.conf` here and no managed
 block in this file.
 
 ## Adding a rule
@@ -92,7 +92,7 @@ Use [`skills/capture-rule/SKILL.md`](skills/capture-rule/SKILL.md). The short ve
 2. Copy `templates/rule.md`, fill the frontmatter, delete every placeholder.
 3. `cargo run -- rules` — confirm it activates somewhere. **An orphan rule is not a rule.**
 4. `cargo test` — the suite parses the whole tree.
-5. `cargo run -- list --project <name>` for each affected project, then install.
+5. `cargo run -- list` in each affected repository, then `install` where the block changed.
 
 ## Conventions that the tests enforce
 
@@ -107,7 +107,9 @@ message names the file.
   error, not a default.
 - **No duplicate ids**, anywhere in the tree.
 - **Every rule has a body.** A heading with no text cannot constrain anything.
-- **Every rule activates for some project.** Orphans fail `no_rule_is_unreachable`.
+- **Every rule activates for some activation a repository can declare.** A `project:` rule in the
+  shared tree is an error, because that rule belongs in the repository it applies to.
+  `no_rule_is_unreachable` fails on anything no manifest can reach.
 - **Every rule parses.** `every_rule_in_the_tree_parses_and_has_a_body`.
 - **Rendering is byte-stable.** `check` diffs the output, so nondeterminism becomes a false
   "stale" report. `rendering_is_byte_stable` pins it.
@@ -126,5 +128,5 @@ consolidation; add to that section when you make another.
 Delete it, or replace it. Do not append a correction below it and do not comment it out.
 
 The one exception is a fact whose replacement is unintuitive, where the stale version is worth
-naming so it is not rediscovered —
-`projects/archivist/rules/devshell-commands.md` is the worked example.
+naming so it is not rediscovered — `archivist`'s `.playbook/rules/devshell-commands.md` is the
+worked example.
