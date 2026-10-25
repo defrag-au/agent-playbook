@@ -38,6 +38,11 @@ targets:
 - `which at-peek` empty → `direnv exec . at-peek <verb>` (and the same for `at-recall`, `at-crate`
   and `at-describe`). An agent's spawned shell does not inherit the devshell environment; an
   interactive one does.
+- **Never wrap an `at-*` call in `nix develop`.** It works, which is what makes it the expensive
+  mistake: the nix evaluation is paid before the read starts, and the read itself is milliseconds.
+  Measured 2026-10-26: `at-peek stat` bare, 5 ms; `nix develop path:. --command at-peek stat`,
+  7.5 s. If the binary is not on `PATH`, the answers are `direnv exec .` (~140 ms, reads the
+  realised `.direnv/`, needs no daemon) or installing it — never a devshell wrapper.
 - `at-crate` resolves a crate through the nearest `Cargo.lock`, not through memory or "latest". A
   crate named twice in the lock, or a file present in more than one build-script `out`, is an error
   naming the flag that chooses — never a guess. `--version` and `--build-dir` are those flags.

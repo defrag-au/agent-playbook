@@ -46,11 +46,19 @@ after a heavy request is a poisoned isolate, not a code error.
   change to a rule reaches a shell only after it is committed and `defrag-nix` re-locks it, so
   `--root ~/code/defrag/agent-playbook` resolves against the working tree instead.
 
-They are on `PATH` in an **interactive** shell in those repos, because direnv's hook runs on `cd`.
-A shell spawned by an agent does not inherit that environment, so it reaches them as
-`direnv exec . at-peek …` (or `at-crate`, `at-recall`) or `direnv exec . playbook check …` — which
-reads the realised `.direnv/` and needs no nix daemon. A `nix profile install` of `agent-tools` puts
-the inspectors on `PATH` unconditionally instead.
+They are on `PATH` in an **interactive** shell in those repos, because direnv's hook runs on `cd`,
+and `nix-direnv` prepends the devshell, so that copy wins where one is active.
+
+`nix-config` also installs the inspectors and `browser-shot` as home packages
+(`home/modules/agent-tools.nix`), so both are on `PATH` in **every** shell — including one an agent
+spawns outside any repository. `playbook` is deliberately not among them: it renders the rules
+embedded in its own binary, so a stale copy writes a stale managed block without saying so, and it
+reaches a repository through the devshell `defrag-nix` pins instead (`direnv exec . playbook check …`,
+which reads the realised `.direnv/` and needs no nix daemon).
+
+Which copy answers is worth a `which <tool>` when it matters: the devshell's inside a repository,
+the home package's everywhere else. Neither is worth a `nix develop` wrapper — see
+`rules/org/defrag/agent-tools`.
 
 `at-peek` and `at-crate` have no write path, spawn no subprocess and make no network calls.
 `at-crate` reads the cargo home named by `--cargo-home`, `CARGO_HOME` or `~/.cargo`, the project's
