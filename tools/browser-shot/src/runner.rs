@@ -804,7 +804,13 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                 timeout_ms,
             } => {
                 let indices = selected_indices(peer, selected, &names, peers.len())?;
-                let kinds = wait_kinds(predicate, frames, rate, network_idle)?;
+                // A `capture=` is for `${name}` in *later expressions*, and a
+                // wait predicate is one: the common shape is "wait until this
+                // counter has moved past the value it had before the step".
+                let predicate = predicate
+                    .as_ref()
+                    .map(|predicate| substitute(predicate, &captures));
+                let kinds = wait_kinds(&predicate, frames, rate, network_idle)?;
                 let step_timeout = timeout_ms.map_or(timeout, Duration::from_millis);
                 let tasks = indices
                     .iter()

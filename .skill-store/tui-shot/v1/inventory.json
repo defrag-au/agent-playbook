@@ -1,0 +1,25 @@
+{
+  "id": "urn:skill:tui-shot",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v1",
+  "manifest": {
+    "18134ddf36d95e0e3bee9353adbe526058787afe2fe2f63bb0afa69f9b300eae752bda7c4831afa336c25f86ce36146897effc95eae45e54882bd4d805345186": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-26T08:46:17Z",
+      "state": {
+        "18134ddf36d95e0e3bee9353adbe526058787afe2fe2f63bb0afa69f9b300eae752bda7c4831afa336c25f86ce36146897effc95eae45e54882bd4d805345186": [
+          "SKILL.md"
+        ]
+      },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}
