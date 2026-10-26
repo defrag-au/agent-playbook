@@ -77,6 +77,22 @@ wait app exit=true
 The grammar and every field are in
 `~/code/defrag/agent-playbook/tools/tui-shot/SCENARIO.md`.
 
+## When the renderer has a harness
+
+A TUI split into a pure `render` (view + UI state + clock) and a `TestBackend` harness —
+`factotum-tui` is the worked example — draws the same screens from a captured `SessionView` in
+microseconds, with no PTY and no daemon:
+
+```sh
+./target/release/factotum-tui --state crates/factotum-tui/fixtures/permission.json \
+    --plan crates/factotum-tui/examples/permission.dsl
+```
+
+The plan grammar is the one above, so the same file drives both. The harness adds `at=` (move a
+fixed clock) and `status=` (the connection label); `tui-shot` refuses both by name. Use the
+harness while iterating on the drawing, and come back to `tui-shot` for the live process before
+calling it done.
+
 ## Read both files
 
 **The `.txt` is the review.** It is the screen, right-trimmed.

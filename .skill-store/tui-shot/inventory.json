@@ -2,10 +2,13 @@
   "id": "urn:skill:tui-shot",
   "type": "https://ocfl.io/1.1/spec/#inventory",
   "digestAlgorithm": "sha512",
-  "head": "v4",
+  "head": "v5",
   "manifest": {
     "18134ddf36d95e0e3bee9353adbe526058787afe2fe2f63bb0afa69f9b300eae752bda7c4831afa336c25f86ce36146897effc95eae45e54882bd4d805345186": [
       "v1/content/SKILL.md"
+    ],
+    "426cf106bbcf3a31a91c7a89cd69b001fd404263312b5200af2098569f95f24c4c1a6f2e07f9ce35aa3c34f2ff1434e36999a3537cc51a2dbaaa9512eee0ac10": [
+      "v5/content/SKILL.md"
     ],
     "6b93ea263992e6d6b30dadf61f227d1d84bbb9cd4f1b18cbdc1bedbcad7e3d1ce10b19b7dcf68aa0076d4b2c5b3e0a676bbc8b2164ae1dce3dfac38fd182ebec": [
       "v4/content/SKILL.md"
@@ -61,6 +64,19 @@
           "SKILL.md"
         ]
       },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    },
+    "v5": {
+      "created": "2026-10-26T12:46:49Z",
+      "state": {
+        "426cf106bbcf3a31a91c7a89cd69b001fd404263312b5200af2098569f95f24c4c1a6f2e07f9ce35aa3c34f2ff1434e36999a3537cc51a2dbaaa9512eee0ac10": [
+          "SKILL.md"
+        ]
+      },
+      "message": "The in-process harness, and cells the app never wrote capture as spaces",
       "user": {
         "name": "Damon Oehlman",
         "address": "https://github.com/defrag-au/agent-playbook"
