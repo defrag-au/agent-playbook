@@ -684,7 +684,18 @@ pub fn run(args: Vec<String>) -> Result<bool> {
     let mut checks = Vec::new();
     let mut outputs = Vec::new();
 
-    for step in &scenario.step {
+    let steps = scenario.step.len();
+    for (index, step) in scenario.step.iter().enumerate() {
+        // One line per step, on stderr so `--json` on stdout stays machine-readable.
+        // A mesh scenario spends minutes between the first and last line and has
+        // nothing else to show that it is alive; a silent run reads as a hang.
+        eprintln!(
+            "[{}/{}] {} {}",
+            index + 1,
+            steps,
+            step.action_name(),
+            step.summary()
+        );
         // A server that died between steps is the failure, and every later step
         // would only add noise to it.
         if let Some(problem) = reap_spawned(&mut spawned)? {

@@ -23,6 +23,7 @@ Budget: ≤ 200 lines and ≤ 8 KB per file. The test suite enforces a 10 KB cei
 | headless_chrome | 1.0.22 | `headless_chrome-1.0.22.md` | `## Launch a browser and own it` |
 | liquid | 0.26 | `liquid-0.26.md` | `## Building a Parser with Custom Extensions` |
 | ratatui | 0.29.0 | `ratatui-0.29.md` | `## Init, draw, restore` |
+| ratatui | 0.30.2 | `ratatui-0.30.2.md` | `## Key differences from 0.29` |
 | rmcp | 1.3 | `rmcp-1.3.md` | `## Simplest Pattern: #[tool_router(server_handler)]` |
 | rusqlite | 0.40.2 | `rusqlite-0.40.md` | `## Open a database read-only` |
 | serde | 1.0.229 | `serde-1.0.md` | `## Derive a tolerant reader` |
@@ -38,7 +39,8 @@ Budget: ≤ 200 lines and ≤ 8 KB per file. The test suite enforces a 10 KB cei
 | clap | Derive parser, subcommands and the feature set that produces them |
 | headless_chrome | Headless Chromium over CDP: process lifecycle, true viewport, input, console events, raw commands |
 | liquid | Parser builder, custom filters/tags and partials for the Liquid engine |
-| ratatui | Terminal init/draw/restore, the re-exported crossterm and widget layout |
+| ratatui | Terminal init/draw/restore, the re-exported crossterm and widget layout (0.29) |
+| ratatui 0.30 | `ratatui::run`, key-press filtering, array layouts, a polling dashboard and headless rendering |
 | rmcp | MCP server with `#[tool_router(server_handler)]` and transport-io |
 | rusqlite | Bundled SQLite, read-only opens and statement/transaction patterns |
 | serde | Tolerant derives, `#[serde(default)]` and `IgnoredAny` for large values |
