@@ -1,0 +1,26 @@
+{
+  "id": "urn:skill:tui-shot",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v1",
+  "manifest": {
+    "426cf106bbcf3a31a91c7a89cd69b001fd404263312b5200af2098569f95f24c4c1a6f2e07f9ce35aa3c34f2ff1434e36999a3537cc51a2dbaaa9512eee0ac10": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-26T12:53:46Z",
+      "state": {
+        "426cf106bbcf3a31a91c7a89cd69b001fd404263312b5200af2098569f95f24c4c1a6f2e07f9ce35aa3c34f2ff1434e36999a3537cc51a2dbaaa9512eee0ac10": [
+          "SKILL.md"
+        ]
+      },
+      "message": "The first published version: capture a TUI without tmux, and replay a plan against a fixture",
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}

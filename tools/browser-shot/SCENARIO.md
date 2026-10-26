@@ -105,6 +105,12 @@ and path (`cannot encode a cyclic object at $.self`). The file is written when t
 later assertion failure (exit 2) does not discard it. `run.json`'s `outputs` lists the files
 written.
 
+`${name}` is substituted in `eval`, `assert` **and `wait predicate=`** expressions, and the value
+arrives as a JSON literal — so a captured number becomes a **string**. Compare it as one, or coerce
+it: `window.__bt.received > Number(${recvBefore}) + 20`. The common shape this exists for is "wait
+until this counter has moved past the value it had before the step", which needs the substitution
+in the predicate and not only in the assertion after it.
+
 Every tool-side event carries a wall-clock epoch millisecond timestamp: `input` and pointer
 events, `eval`, the `ready` predicates and `burst` (`t=1750.123`), and `captured` is ISO with
 milliseconds. A page timestamping itself with `performance.timeOrigin + performance.now()` can be

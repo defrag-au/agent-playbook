@@ -24,7 +24,13 @@ macro_rules! bail_at {
 
 pub(crate) const DEFAULT_SEED: u32 = 0x9e37_79b9;
 /// The signal handler keeps one slot per process. Keep this in step with the array in `runner.rs`.
-pub(crate) const MAX_PEERS: usize = 8;
+///
+/// Sixteen rather than eight because a mesh scenario needs one page per member
+/// of the room's interest set: at twelve (`INTEREST_MAX` in island-sim) a peer
+/// holds eleven links with twelve pages, and twelve with thirteen. Eight pages
+/// could only ever hold seven, so the cap was the thing measured rather than
+/// the design.
+pub(crate) const MAX_PEERS: usize = 16;
 /// Spawned process groups share the same fixed-size signal table.
 pub(crate) const MAX_SPAWNS: usize = 8;
 

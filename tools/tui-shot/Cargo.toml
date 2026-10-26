@@ -1,0 +1,27 @@
+[package]
+name = "tui-shot"
+version = "0.1.0"
+edition = "2021"
+description = "Drive a terminal UI in a PTY it owns, and write the screen plus a typed report"
+license = "MIT"
+default-run = "tui-shot"
+
+[[bin]]
+name = "tui-shot"
+path = "src/main.rs"
+
+# The fixture the integration tests drive. It is not installed by the flake.
+[[bin]]
+name = "tui-shot-demo"
+path = "src/bin/tui-shot-demo.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = { workspace = true }
+libc = "0.2"
+portable-pty = "0.9"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+shell-words = "1"
+vt100 = "0.15.2"

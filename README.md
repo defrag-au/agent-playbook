@@ -82,7 +82,7 @@ Full resolution rules, including how `activation` and `overrides` are evaluated,
 
 ```
 Cargo.toml        the workspace manifest; the composer is std-only, deliberately
-flake.nix         the devshell, and packages: `playbook`, `agent-tools` and `browser-shot`
+flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot` and `tui-shot`
 src/              resolution engine + CLI
   frontmatter.rs    flat `key: value` readers
   model.rs          Rule, Project, Target, Layer, Activation
@@ -101,6 +101,7 @@ tools/            the agent toolkit, plus the skill store
   at-reach/         a private fleet tree — root, hosts, probe
   at-describe/      the catalogue, which opens nothing
   browser-shot/     browser captures, scenarios and frame bursts
+  tui-shot/         terminal captures and scenario runs in a PTY it owns
   skill-store/      OCFL publish and export for skills (writes, and fetches)
   zed-thread-tools/ thread auditing, recovery and a TUI
 tests/            spec tests for the resolution model

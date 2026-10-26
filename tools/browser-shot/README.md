@@ -65,6 +65,15 @@ Each peer is a separate browser process with its own profile, storage and WebRTC
 launched in parallel; a `wait` that names several peers dispatches to all of them concurrently.
 The run writes `run.json` / `run.txt`, plus one image and sidecar per peer.
 
+A scenario may declare up to **16 peers**. The cap exists because the signal handler keeps one slot
+per process; it was eight, which capped a WebRTC mesh at seven links per peer — less than the twelve
+a game's interest set may name. Sixteen leaves room for a thirteen-peer mesh, the first world where
+every page holds twelve links.
+
+**`run` prints one line per step on stderr as it starts it**, `[12/44] wait p01,p02 frames=200`.
+A mesh scenario spends minutes between its first and last step and has no other output until the
+run finishes; `--json` still writes only the report to stdout.
+
 The line-oriented DSL is the preferred form; [`SCENARIO.md`](SCENARIO.md) is the grammar and field
 reference. The older TOML form is still accepted, and this is the same scenario in TOML:
 

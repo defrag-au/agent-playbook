@@ -155,6 +155,33 @@
           '';
         };
 
+      # The TUI capture tool. Separate from `agent-tools` for the same reason `browser-shot` is:
+      # it starts a child process and writes a screen beside a report, where every `at-*` binary
+      # runs nothing (bar `at-recall`'s `git`) and has no write path. It is also separate from
+      # `browser-shot` because a terminal is not a page: the screen is text, the input is bytes,
+      # and the emulator has to be its own dependency.
+      tuiShotFor =
+        rustPlatform:
+        rustPlatform.buildRustPackage {
+          pname = "tui-shot";
+          version = (lib.importTOML ./tools/tui-shot/Cargo.toml).package.version;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [ "-p" "tui-shot" ];
+          # `cargoBuildFlags` also builds the test fixture (`tui-shot-demo`); only the tool is
+          # installed. As with `agent-tools`: the workspace root is the composer, so the default
+          # install phase would install `playbook`, and cargoBuildHook's `--target <triple>` puts
+          # the artefact under `target/<triple>/release/`.
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            install -m755 \
+              "$(find target -maxdepth 3 -type f -name tui-shot -perm -u+x | head -n1)" \
+              "$out/bin/tui-shot"
+            runHook postInstall
+          '';
+        };
+
       # The skill store: publishes a plain skill directory as an OCFL version and exports a version
       # back out as an envelope. Not part of `agent-tools` — that derivation's contract is
       # read-only binaries with no write path, and this one writes a store and fetches from git.
@@ -227,6 +254,7 @@
         {
           inherit playbook agent-tools;
           browser-shot = browserShotFor rustPlatform;
+          tui-shot = tuiShotFor rustPlatform;
           skill-store = skillStoreFor pkgs;
           zed-thread-tools = zedThreadToolsFor rustPlatform;
           # What this repository is *for*; the toolkit is what it also ships.
