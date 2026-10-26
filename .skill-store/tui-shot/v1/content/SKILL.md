@@ -23,6 +23,10 @@ run is worse than a failed build.
 direnv exec . cargo build -p <crate>
 ```
 
+`tui-shot` is packaged by agent-playbook: `nix build ~/code/defrag/agent-playbook#tui-shot`. Once
+agent-playbook is re-locked into `defrag-nix` it is on `PATH` in every defrag devshell; until then
+run `~/code/defrag/agent-playbook/result/bin/tui-shot` from the repository you are capturing.
+
 ## Run it from the repo that owns the artefacts
 
 ```sh
@@ -70,7 +74,24 @@ key app q
 wait app exit=true
 ```
 
-The grammar and fields are in `tools/tui-shot/SCENARIO.md`.
+The grammar and every field are in
+`~/code/defrag/agent-playbook/tools/tui-shot/SCENARIO.md`.
+
+## When the renderer has a harness
+
+A TUI split into a pure `render` (view + UI state + clock) and a `TestBackend` harness —
+`factotum-tui` is the worked example — draws the same screens from a captured `SessionView` in
+microseconds, with no PTY and no daemon:
+
+```sh
+./target/release/factotum-tui --state crates/factotum-tui/fixtures/permission.json \
+    --plan crates/factotum-tui/examples/permission.dsl
+```
+
+The plan grammar is the one above, so the same file drives both. The harness adds `at=` (move a
+fixed clock) and `status=` (the connection label); `tui-shot` refuses both by name. Use the
+harness while iterating on the drawing, and come back to `tui-shot` for the live process before
+calling it done.
 
 ## Read both files
 
@@ -107,6 +128,13 @@ for the settle window returns and the capture says `still changing`.
 
 `0` pass · `2` artifacts written but a wait or assertion failed · `1` operational error. Exit `2`
 is not a pass, and the failed wait's screen is written as `<tui>-failure-<line>.txt`.
+
+## Limits
+
+- Keys and literal text only: no mouse events, no bracketed paste, no scrollback. The capture is
+the visible screen.
+- A child that forks and keeps the pty open is still captured; `wait exit=true` waits for the main
+process, with a short grace for the reader to drain.
 
 ## Do not
 

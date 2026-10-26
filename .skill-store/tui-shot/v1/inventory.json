@@ -4,18 +4,19 @@
   "digestAlgorithm": "sha512",
   "head": "v1",
   "manifest": {
-    "18134ddf36d95e0e3bee9353adbe526058787afe2fe2f63bb0afa69f9b300eae752bda7c4831afa336c25f86ce36146897effc95eae45e54882bd4d805345186": [
+    "426cf106bbcf3a31a91c7a89cd69b001fd404263312b5200af2098569f95f24c4c1a6f2e07f9ce35aa3c34f2ff1434e36999a3537cc51a2dbaaa9512eee0ac10": [
       "v1/content/SKILL.md"
     ]
   },
   "versions": {
     "v1": {
-      "created": "2026-10-26T08:46:17Z",
+      "created": "2026-10-26T12:53:46Z",
       "state": {
-        "18134ddf36d95e0e3bee9353adbe526058787afe2fe2f63bb0afa69f9b300eae752bda7c4831afa336c25f86ce36146897effc95eae45e54882bd4d805345186": [
+        "426cf106bbcf3a31a91c7a89cd69b001fd404263312b5200af2098569f95f24c4c1a6f2e07f9ce35aa3c34f2ff1434e36999a3537cc51a2dbaaa9512eee0ac10": [
           "SKILL.md"
         ]
       },
+      "message": "The first published version: capture a TUI without tmux, and replay a plan against a fixture",
       "user": {
         "name": "Damon Oehlman",
         "address": "https://github.com/defrag-au/agent-playbook"
