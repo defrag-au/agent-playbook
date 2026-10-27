@@ -11,6 +11,7 @@ mod input;
 mod keys;
 mod navigate;
 mod probe;
+mod profile;
 mod report;
 mod runner;
 mod scenario;
@@ -144,7 +145,10 @@ extern "C" fn handle_signal(_: libc::c_int) {
             libc::kill(pid as i32, libc::SIGTERM);
         }
     }
-    unsafe { libc::_exit(130) };
+    // The cleanup thread removes the profile once the browser has gone, then exits 130.
+    if !profile::on_signal() {
+        unsafe { libc::_exit(130) };
+    }
 }
 
 #[cfg(unix)]
@@ -165,27 +169,26 @@ fn install_signal_handlers(pid: u32) {
 #[cfg(not(unix))]
 fn install_signal_handlers(_pid: u32) {}
 
-struct Profile {
-    path: PathBuf,
-    keep: bool,
-}
+/// This run's profile, `.tmp/browser-shot-<pid>`. Declared before the `Browser` in `run`, so it
+/// is dropped after it.
+struct Profile(profile::ProfileDir);
 
 impl Profile {
     fn new(keep: bool) -> Result<Self> {
         let path = std::env::current_dir()?
             .join(".tmp")
             .join(format!("browser-shot-{}", std::process::id()));
-        fs::create_dir_all(&path)
+        let dir = profile::ProfileDir::create(path.clone(), keep)
             .with_context(|| format!("create profile directory {}", path.display()))?;
-        Ok(Self { path, keep })
+        Ok(Self(dir))
     }
 }
 
-impl Drop for Profile {
-    fn drop(&mut self) {
-        if !self.keep {
-            let _ = fs::remove_dir_all(&self.path);
-        }
+impl std::ops::Deref for Profile {
+    type Target = profile::ProfileDir;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -200,7 +203,7 @@ fn main() {
                 1
             }
         };
-        std::process::exit(code);
+        profile::exit(code);
     }
 
     if std::env::args().nth(1).as_deref() == Some("check") {
@@ -213,7 +216,7 @@ fn main() {
                 1
             }
         };
-        std::process::exit(code);
+        profile::exit(code);
     }
 
     if std::env::args().nth(1).as_deref() == Some("run") {
@@ -226,7 +229,7 @@ fn main() {
                 1
             }
         };
-        std::process::exit(code);
+        profile::exit(code);
     }
 
     let code = match parse_args().and_then(run) {
@@ -237,7 +240,7 @@ fn main() {
             1
         }
     };
-    std::process::exit(code);
+    profile::exit(code);
 }
 
 fn parse_args() -> Result<Options> {

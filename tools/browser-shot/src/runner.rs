@@ -65,7 +65,10 @@ extern "C" fn handle_child_signal(_: libc::c_int) {
             }
         }
     }
-    unsafe { libc::_exit(130) };
+    // The cleanup thread removes the profiles once the browsers have gone, then exits 130.
+    if !crate::profile::on_signal() {
+        unsafe { libc::_exit(130) };
+    }
 }
 
 #[cfg(unix)]
@@ -172,15 +175,8 @@ struct RunReport {
     outputs: Vec<String>,
 }
 
-struct RunProfile {
-    path: PathBuf,
-}
-
-impl Drop for RunProfile {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
-    }
-}
+/// A peer's profile, removed after its browser (`PeerState` declares `_browser` first).
+type RunProfile = crate::profile::ProfileDir;
 
 #[derive(Clone, Serialize)]
 struct SpawnReport {
@@ -644,8 +640,10 @@ pub fn run(args: Vec<String>) -> Result<bool> {
         .collect::<HashMap<_, _>>();
 
     let run_id = format!("browser-run-{}", std::process::id());
-    let run_dir = std::env::current_dir()?.join(".tmp").join(run_id);
-    fs::create_dir_all(&run_dir)?;
+    // Removed when empty, on every way out of this function: dropped after the peers.
+    let run_dir_guard =
+        crate::profile::ParentDir::create(std::env::current_dir()?.join(".tmp").join(run_id))?;
+    let run_dir = run_dir_guard.path.clone();
     let artifacts = artifacts
         .or(scenario.run.artifacts.clone())
         .unwrap_or_else(|| run_dir.join("artifacts"));
@@ -1175,10 +1173,9 @@ pub fn run(args: Vec<String>) -> Result<bool> {
         serde_json::to_string_pretty(&run_report)?,
     )?;
     fs::write(artifacts.join("run.txt"), render_run_text(&run_report))?;
-    // The profile directories are removed by their guards when the peers are dropped; the
-    // directory that held them is not. Leave it alone when it holds the default artifact tree,
-    // and remove it when it is empty.
-    let _ = fs::remove_dir(&run_dir);
+    // The profile directories were removed by their guards when the peers were dropped; the
+    // directory that held them goes with `run_dir_guard` when empty, and stays when it holds
+    // the default artifact tree.
 
     if json {
         println!("{}", serde_json::to_string_pretty(&run_report)?);
@@ -1203,10 +1200,7 @@ impl PeerState {
         let headed = spec.headed.unwrap_or(false);
         let headless = !headed;
         let profile_path = run_dir.join(format!("peer-{index}"));
-        fs::create_dir_all(&profile_path)?;
-        let profile = RunProfile {
-            path: profile_path.clone(),
-        };
+        let profile = RunProfile::create(profile_path.clone(), false)?;
 
         let mut args = vec![
             std::ffi::OsStr::new("--hide-scrollbars"),
