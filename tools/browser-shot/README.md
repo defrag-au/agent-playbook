@@ -38,7 +38,7 @@ browser-shot <url> <width> <height> <out.png> [options]
   --hover-selector CSS    hover the centre of this element (repeatable)
   --steps N               interpolate each pointer move over N steps (default 1)
   --settle-ms N           minimum observation window for frame stability (default 1200)
-  --timeout-ms N          timeout for every wait (default 30000)
+  --timeout-ms N          timeout for every wait, navigation included (default 30000)
   --no-settle             skip the stability loop; capture once
   --headed                run with a window instead of headless
   --report PATH           sidecar path (default: the image with a .txt extension)
@@ -51,8 +51,35 @@ Exit codes: 0 pass, 2 artifact written but an assertion failed, 1 operational er
 ```
 
 Exit 2 covers a failed readiness predicate, a frame-stability timeout, a DPR mismatch, a failed
-`--expect`, an uncaught exception, or touch emulation that did not take. Console errors and
-failed requests are reported but do not fail the run on their own.
+`--expect`, an uncaught exception, touch emulation that did not take, or a navigation that did not
+complete. Console errors and failed requests are reported but do not fail the run on their own.
+
+### When navigation does not complete
+
+Navigation is complete at the main frame's `networkAlmostIdle` lifecycle event (two or fewer
+connections for 500 ms), bounded by `--timeout-ms`. When it does not complete, the sidecar is still
+written, with what was collected up to that point, and the run exits 2:
+
+- `result` reads `FAIL — navigation crashed: …`, `FAIL — navigation timed out: …` or
+  `FAIL — navigation failed: …` (`Page.navigate` refused, e.g. `net::ERR_CONNECTION_REFUSED`).
+- **A crash** is `Inspector.targetCrashed` (or `Inspector.detached`), reported as soon as it
+  arrives rather than after the timeout.
+- **A timeout** says whether the main thread is hung — `Runtime.evaluate("1")` gets two seconds to
+  answer — lists the main frame's lifecycle events with their times, and names up to three
+  requests still in flight. A page that busy-loops reads `main thread hung`; a page waiting on a
+  slow request reads `main thread responsive` and names the request.
+- `ready` lists `navigation` first, then each configured predicate as `not reached`.
+- Console messages, uncaught exceptions and failed requests are the same lines a passing run
+  records.
+- **A best-effort screenshot** is taken when the page reported a first paint and the renderer is
+  still there: the `--select` element if it can be found, else the viewport, within five seconds.
+  A hung main thread usually cannot produce one; the `screenshot` line says why not.
+
+`headless_chrome`'s own `wait_until_navigated` uses the tab's default timeout, which is 20 seconds
+unless set. That is why a navigation used to fail after about 21 seconds whatever `--timeout-ms`
+said. `browser-shot` now waits on the same event itself, against `--timeout-ms`. A scenario's
+initial navigation and `goto` use the same wait against the run timeout, and fail the run with the
+same reason; they do not yet write a per-peer sidecar.
 
 ## Scenarios: more than one peer
 

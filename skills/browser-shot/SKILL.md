@@ -55,6 +55,10 @@ browser-shot "http://127.0.0.1:8095/?nav=0#/wallet-button" 390 844 .tmp/wallet-3
   scenario.
 - Exit `0` passed, `2` artefact written but an assertion failed, `1` operational. Exit 2 is not a
   pass.
+- A page that never finishes navigating (crashed renderer, hung main thread, requests that never
+  end) still exits `2` with a sidecar: its `result` line reads `FAIL — navigation crashed: …` or
+  `FAIL — navigation timed out: …`, and the console, exceptions and requests collected before that
+  are in it. Read the sidecar before reaching for a hand-launched browser.
 
 For a macroquad web build, capture the canvas at real device pixels:
 `--select canvas --dpr 3 --touch --settle-ms 5000 --no-settle`, then read `image` and `layout` in

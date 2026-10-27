@@ -16,7 +16,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use chrono::{SecondsFormat, Utc};
 use headless_chrome::browser::tab::Tab;
-use headless_chrome::protocol::cdp::{Network, Page};
+use headless_chrome::protocol::cdp::{Inspector, Network, Page};
 use headless_chrome::{Browser, LaunchOptions};
 use serde::Serialize;
 
@@ -785,14 +785,11 @@ pub fn run(args: Vec<String>) -> Result<bool> {
             Step::Goto { peer, url } => {
                 let index = peer_index(peer, &names)?;
                 let peer_state = &mut peers[index];
-                peer_state
-                    .tab
-                    .navigate_to(url)
-                    .with_context(|| format!("goto {url}"))?;
-                peer_state
-                    .tab
-                    .wait_until_navigated()
-                    .with_context(|| format!("goto {url}: waiting for the load event"))?;
+                let (_, failure) =
+                    crate::navigate::navigate(&peer_state.tab, &peer_state.collector, url, timeout);
+                if let Some(failure) = failure {
+                    bail!("goto {url}: {}", failure.reason());
+                }
             }
             Step::Wait {
                 peer,
@@ -1254,6 +1251,7 @@ impl PeerState {
             .unwrap_or_else(|_| "unknown".to_owned());
 
         tab.enable_log()?.enable_runtime()?;
+        tab.call_method(Inspector::Enable(None))?;
         tab.call_method(Network::Enable {
             max_total_buffer_size: None,
             max_resource_buffer_size: None,
@@ -1316,10 +1314,10 @@ impl PeerState {
             })?;
         }
 
-        tab.navigate_to(&spec.url)
-            .with_context(|| format!("navigate {} to {}", spec.name, spec.url))?;
-        tab.wait_until_navigated()
-            .with_context(|| format!("wait for {} to navigate", spec.name))?;
+        let (_, failure) = crate::navigate::navigate(&tab, &collector, &spec.url, timeout);
+        if let Some(failure) = failure {
+            bail!("{}: {}: {}", spec.name, spec.url, failure.reason());
+        }
 
         let fonts = probe::wait_for_fonts(&tab, timeout);
         let ready_waited = Duration::from_millis(fonts.waited_ms);
@@ -1920,6 +1918,7 @@ impl PeerState {
             screenshot: capture.screenshot.display().to_string(),
             sidecar: capture.sidecar.display().to_string(),
             passed,
+            failure: None,
         }
     }
 }

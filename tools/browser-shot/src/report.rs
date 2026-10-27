@@ -49,6 +49,9 @@ pub struct Report {
     pub screenshot: String,
     pub sidecar: String,
     pub passed: bool,
+    /// Why the run stopped early, e.g. a navigation that crashed or timed out. `None` for a run
+    /// that got as far as a capture, whether or not it passed.
+    pub failure: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -432,7 +435,11 @@ impl Report {
         line(
             &mut out,
             "result",
-            if self.passed { "pass" } else { "FAIL" },
+            &match (&self.failure, self.passed) {
+                (Some(reason), _) => format!("FAIL — {}", indent(reason)),
+                (None, true) => "pass".to_owned(),
+                (None, false) => "FAIL".to_owned(),
+            },
         );
         out
     }
