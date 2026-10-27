@@ -56,9 +56,27 @@ complete. Console errors and failed requests are reported but do not fail the ru
 
 ### When navigation does not complete
 
-Navigation is complete at the main frame's `networkAlmostIdle` lifecycle event (two or fewer
-connections for 500 ms), bounded by `--timeout-ms`. When it does not complete, the sidecar is still
-written, with what was collected up to that point, and the run exits 2:
+Navigation is complete at whichever comes first, bounded by `--timeout-ms`:
+
+- the main frame's `networkAlmostIdle` lifecycle event (two or fewer connections for 500 ms), or
+- the main frame's `load` event, followed by 500 ms with no request in flight and none starting or
+  ending.
+
+The second exists because Chrome can withhold `networkAlmostIdle` from a page that has loaded and
+has nothing in flight: a WebGL canvas rendering every frame on a software renderer at `--dpr 3`
+timed out with `load` fired and an empty network. The `ready` line of a passing sidecar names the
+one that applied: `navigation = complete (networkAlmostIdle)` or
+`navigation = complete (load + 500 ms network quiet)`. Navigation completing is not the page being
+ready; `--ready` and the other readiness forms below are still the gate for that.
+
+"In flight" is what `browser-shot` itself tracks: a request counts from `Network.requestWillBeSent`
+until `loadingFinished` or `loadingFailed`. An open `EventSource` or a long poll is therefore always
+in flight and holds the quiet window open; such a page completes through `networkAlmostIdle`, which
+tolerates two connections, or times out. A WebSocket never counts: Chrome reports it through
+`webSocketCreated`, not as a request.
+
+When navigation does not complete, the sidecar is still written, with what was collected up to that
+point, and the run exits 2:
 
 - `result` reads `FAIL — navigation crashed: …`, `FAIL — navigation timed out: …` or
   `FAIL — navigation failed: …` (`Page.navigate` refused, e.g. `net::ERR_CONNECTION_REFUSED`).
@@ -77,9 +95,9 @@ written, with what was collected up to that point, and the run exits 2:
 
 `headless_chrome`'s own `wait_until_navigated` uses the tab's default timeout, which is 20 seconds
 unless set. That is why a navigation used to fail after about 21 seconds whatever `--timeout-ms`
-said. `browser-shot` now waits on the same event itself, against `--timeout-ms`. A scenario's
-initial navigation and `goto` use the same wait against the run timeout, and fail the run with the
-same reason; they do not yet write a per-peer sidecar.
+said. `browser-shot` now does its own wait, for either completion above, against `--timeout-ms`.
+A scenario's initial navigation and `goto` use the same wait against the run timeout, and fail the
+run with the same reason; they do not yet write a per-peer sidecar.
 
 ## Scenarios: more than one peer
 

@@ -2,9 +2,23 @@
 //!
 //! `headless_chrome`'s `wait_until_navigated` waits on the tab's own default timeout — 20 s
 //! unless something calls `Tab::set_default_timeout` — and fails with a bare "The event waited
-//! for never came". This waits for the same event (the main frame's `networkAlmostIdle`) against
-//! the caller's timeout, gives up early when the renderer crashes, and describes a timeout well
-//! enough to tell a hung main thread from a page that is still loading.
+//! for never came". This waits against the caller's timeout, gives up early when the renderer
+//! crashes, and describes a timeout well enough to tell a hung main thread from a page that is
+//! still loading.
+//!
+//! A navigation is complete at whichever comes first (see [`completion`]):
+//!
+//! - the main frame's `networkAlmostIdle`, the event `wait_until_navigated` waits for; or
+//! - the main frame's `load`, followed by [`QUIET_MS`] with no request in flight, measured from the
+//!   network events the collector records. Chromium's idle heuristic can fail to settle on a page
+//!   that has loaded and is busy rendering — a large canvas drawn every frame through SwiftShader —
+//!   so its event alone would fail a page that works.
+//!
+//! "In flight" is what the collector tracks: every `Network.requestWillBeSent` without its
+//! `loadingFinished` or `loadingFailed`. An `EventSource` or a long poll is a request that does not
+//! finish and so holds the quiet window open, as does any request that never ends; such a page
+//! completes only through `networkAlmostIdle`, which tolerates two open connections. A WebSocket
+//! is not a request to CDP (`webSocketCreated`, not `requestWillBeSent`) and never counts.
 
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -19,6 +33,47 @@ const POLL: Duration = Duration::from_millis(50);
 /// How long a hung main thread gets to answer `Runtime.evaluate("1")` before it is called hung.
 const RESPONSIVE_MS: u64 = 2000;
 const IN_FLIGHT_SHOWN: usize = 3;
+/// How long the network must be quiet after `load` for the navigation to count as complete.
+pub const QUIET_MS: u64 = 500;
+
+/// Which condition completed a navigation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Completion {
+    NetworkAlmostIdle,
+    LoadQuiet,
+}
+
+impl Completion {
+    pub fn label(self) -> String {
+        match self {
+            Self::NetworkAlmostIdle => "complete (networkAlmostIdle)".to_owned(),
+            Self::LoadQuiet => format!("complete (load + {QUIET_MS} ms network quiet)"),
+        }
+    }
+}
+
+/// Whether a navigation is complete, from the collector's view of it.
+///
+/// `networkAlmostIdle` wins when it has arrived. Otherwise `load` must have fired, nothing may be
+/// in flight, and both `load` and the last network activity must be at least [`QUIET_MS`] ago.
+pub fn completion(
+    network_almost_idle: bool,
+    since_load: Option<Duration>,
+    in_flight: usize,
+    since_activity: Duration,
+) -> Option<Completion> {
+    let window = Duration::from_millis(QUIET_MS);
+    if network_almost_idle {
+        Some(Completion::NetworkAlmostIdle)
+    } else if since_load.is_some_and(|since| since >= window)
+        && in_flight == 0
+        && since_activity >= window
+    {
+        Some(Completion::LoadQuiet)
+    } else {
+        None
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Failure {
@@ -70,8 +125,8 @@ where
     receiver.recv_timeout(deadline).ok()
 }
 
-/// Navigate `tab` to `url` and wait for the main frame's `networkAlmostIdle`, for at most
-/// `timeout` in total. Returns the navigation predicate either way.
+/// Navigate `tab` to `url` and wait for it to complete (see [`completion`]), for at most `timeout`
+/// in total. Returns the navigation predicate either way.
 pub fn navigate(
     tab: &Arc<Tab>,
     collector: &Arc<Mutex<Collector>>,
@@ -83,7 +138,7 @@ pub fn navigate(
     let predicate = Predicate {
         name: "navigation".to_owned(),
         value: match &result {
-            Ok(()) => "networkAlmostIdle".to_owned(),
+            Ok(completion) => completion.label(),
             Err(failure) => failure.summary(),
         },
         passed: result.is_ok(),
@@ -99,7 +154,7 @@ fn navigate_inner(
     url: &str,
     timeout: Duration,
     started: Instant,
-) -> Result<(), Failure> {
+) -> Result<Completion, Failure> {
     // Keep the library's own wait meaningful for any caller that still uses it.
     tab.set_default_timeout(timeout);
     if let Ok(mut collector) = collector.lock() {
@@ -131,9 +186,16 @@ fn navigate_inner(
         if let Some(failure) = crash(collector) {
             return Err(failure);
         }
-        let navigating = collector.lock().map_or(true, |state| state.navigating());
-        if !navigating {
-            return Ok(());
+        let complete = collector.lock().ok().and_then(|state| {
+            completion(
+                !state.navigating(),
+                state.since_load(),
+                state.in_flight(),
+                state.since_activity(),
+            )
+        });
+        if let Some(complete) = complete {
+            return Ok(complete);
         }
         if started.elapsed() >= timeout {
             break;
@@ -191,7 +253,7 @@ fn timeout_text(
     responsive: Option<bool>,
 ) -> String {
     let mut parts = vec![format!(
-        "no networkAlmostIdle within {} ms",
+        "no networkAlmostIdle, and no load followed by {QUIET_MS} ms network quiet, within {} ms",
         timeout.as_millis()
     )];
     parts.push(match responsive {
@@ -239,7 +301,9 @@ mod tests {
             &[],
             Some(false),
         );
-        assert!(text.starts_with("no networkAlmostIdle within 30000 ms"));
+        assert!(text.starts_with(
+            "no networkAlmostIdle, and no load followed by 500 ms network quiet, within 30000 ms"
+        ));
         assert!(text.contains("main thread hung"));
         assert!(text.contains("lifecycle: init@5ms DOMContentLoaded@40ms"));
         assert!(!text.contains("in flight"));
@@ -270,6 +334,46 @@ mod tests {
             .reason()
             .starts_with("navigation failed"));
         assert!(Failure::Crashed("x".into()).is_crash());
+    }
+
+    fn ms(value: u64) -> Duration {
+        Duration::from_millis(value)
+    }
+
+    #[test]
+    fn network_almost_idle_is_the_fast_path() {
+        assert_eq!(
+            completion(true, None, 3, ms(0)),
+            Some(Completion::NetworkAlmostIdle)
+        );
+        assert_eq!(
+            completion(true, Some(ms(900)), 0, ms(900)),
+            Some(Completion::NetworkAlmostIdle)
+        );
+    }
+
+    #[test]
+    fn load_with_a_quiet_network_completes_without_network_almost_idle() {
+        assert_eq!(
+            completion(false, Some(ms(500)), 0, ms(500)),
+            Some(Completion::LoadQuiet)
+        );
+        assert_eq!(
+            Completion::LoadQuiet.label(),
+            "complete (load + 500 ms network quiet)"
+        );
+    }
+
+    #[test]
+    fn the_quiet_window_needs_load_an_empty_network_and_500_ms() {
+        // No load yet.
+        assert_eq!(completion(false, None, 0, ms(10_000)), None);
+        // Loaded, but a request is still open — a stuck request is a real timeout.
+        assert_eq!(completion(false, Some(ms(10_000)), 1, ms(10_000)), None);
+        // Loaded and empty, but a request finished 499 ms ago.
+        assert_eq!(completion(false, Some(ms(10_000)), 0, ms(499)), None);
+        // The network went quiet before load; the window starts at load.
+        assert_eq!(completion(false, Some(ms(499)), 0, ms(10_000)), None);
     }
 
     #[test]
