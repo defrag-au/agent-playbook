@@ -9,6 +9,7 @@ mod collect;
 mod emulation;
 mod input;
 mod keys;
+mod navigate;
 mod probe;
 mod report;
 mod runner;
@@ -25,12 +26,13 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{SecondsFormat, Utc};
 use headless_chrome::browser::tab::Tab;
-use headless_chrome::protocol::cdp::{Network, Page};
+use headless_chrome::protocol::cdp::{Inspector, Network, Page};
 use headless_chrome::{Browser, LaunchOptions};
 
 use capture::{dimensions_match, Captured};
-use collect::Snapshot;
+use collect::{Collector, Snapshot};
 use input::{Action, Pointer};
+use navigate::Failure;
 use report::{
     epoch_ms, Console, CssBox, Expect, Image, Peer, Predicate, Ready, Renderer, Report, Requests,
     Viewport,
@@ -39,6 +41,8 @@ use report::{
 const DEFAULT_BROWSER: &str = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 const SAMPLE_MS: u64 = 250;
 const STABLE_SAMPLES: u32 = 2;
+/// The most a best-effort screenshot after a failed navigation may take.
+const FAILURE_SHOT_MS: u64 = 5000;
 
 struct Options {
     url: String,
@@ -439,7 +443,7 @@ fn print_usage() {
   --hover-selector CSS    hover the centre of this element (repeatable)
   --steps N               interpolate each pointer move over N steps (default 1)
   --settle-ms N           minimum time before a frame may be accepted (default 1200)
-  --timeout-ms N          timeout for every wait (default 30000)
+  --timeout-ms N          timeout for every wait, navigation included (default 30000)
   --no-settle             skip the stability loop; capture once
   --headed                run with a window instead of headless
   --report PATH           sidecar path (default: the image with a .txt extension)
@@ -508,6 +512,9 @@ fn run(options: Options) -> Result<bool> {
         enable_durable_messages: None,
     })
     .context("enable the Network domain")?;
+    // `Inspector.targetCrashed` and `Inspector.detached` are what tell a crash from a hang.
+    tab.call_method(Inspector::Enable(None))
+        .context("enable the Inspector domain")?;
 
     let collector = collect::shared(Instant::now());
     {
@@ -550,9 +557,21 @@ fn run(options: Options) -> Result<bool> {
         .context("install the preload script")?;
     }
 
-    tab.navigate_to(&options.url)
-        .with_context(|| format!("navigate to {}", options.url))?;
-    tab.wait_until_navigated().context("wait for navigation")?;
+    let (navigation, failure) = navigate::navigate(&tab, &collector, &options.url, timeout);
+    if let Some(failure) = failure {
+        return navigation_failed(
+            &options,
+            &tab,
+            &collector,
+            &profile,
+            Launched {
+                version: browser_version,
+                pid: browser_pid,
+            },
+            navigation,
+            failure,
+        );
+    }
 
     let readiness_started = Instant::now();
     let mut predicates = Vec::new();
@@ -860,6 +879,7 @@ fn run(options: Options) -> Result<bool> {
         screenshot: options.out.display().to_string(),
         sidecar: options.report.display().to_string(),
         passed,
+        failure: None,
     };
 
     if let Some(parent) = options.out.parent() {
@@ -887,6 +907,229 @@ fn run(options: Options) -> Result<bool> {
     }
 
     Ok(report.passed)
+}
+
+struct Launched {
+    version: String,
+    pid: Option<u32>,
+}
+
+/// Write the sidecar for a navigation that crashed, timed out or failed, with everything collected
+/// up to that point, and a screenshot when the page painted and still answers.
+#[allow(clippy::too_many_arguments)]
+fn navigation_failed(
+    options: &Options,
+    tab: &Arc<Tab>,
+    collector: &Arc<std::sync::Mutex<Collector>>,
+    profile: &Profile,
+    launched: Launched,
+    navigation: Predicate,
+    failure: Failure,
+) -> Result<bool> {
+    let reason = failure.reason();
+    let painted = collector.lock().is_ok_and(|state| state.painted());
+
+    let mut predicates = vec![navigation];
+    let mut not_reached = vec!["fonts".to_owned()];
+    if let Some(window) = options.network_idle_ms {
+        not_reached.push(format!("network.idle {window} ms"));
+    }
+    if let Some(expression) = &options.ready {
+        not_reached.push(expression.clone());
+    }
+    if let Some(frames) = options.frames {
+        not_reached.push(format!("{} +{frames} frames", options.frame_counter));
+    }
+    for name in not_reached {
+        predicates.push(Predicate {
+            name,
+            value: "not reached (navigation did not complete)".to_owned(),
+            passed: false,
+            waited_ms: 0,
+            t_ms: epoch_ms(),
+        });
+    }
+
+    let mut warnings = Vec::new();
+    let shot = if failure.is_crash() {
+        Err("not taken: the renderer is gone".to_owned())
+    } else if !painted {
+        Err("not taken: the page never reported a first paint".to_owned())
+    } else {
+        let deadline = Duration::from_millis(FAILURE_SHOT_MS.min(options.timeout_ms.max(1)));
+        let capturing = Arc::clone(tab);
+        let selector = options.select.clone();
+        let element_timeout = deadline / 2;
+        match navigate::with_deadline(deadline, move || match selector {
+            Some(selector) => capture::element(&capturing, &selector, element_timeout)
+                .map(|(captured, viewport)| (captured, Some(viewport)))
+                .or_else(|_| capture::viewport(&capturing).map(|captured| (captured, None)))
+                .map_err(|error| format!("{error:#}")),
+            None => capture::viewport(&capturing)
+                .map(|captured| (captured, None))
+                .map_err(|error| format!("{error:#}")),
+        }) {
+            Some(Ok(captured)) => Ok(captured),
+            Some(Err(error)) => Err(format!("not taken: {error}")),
+            None => Err(format!(
+                "not taken: the capture did not return within {} ms",
+                deadline.as_millis()
+            )),
+        }
+    };
+    match &shot {
+        Ok((_, Some(_))) => warnings.push(format!(
+            "best-effort screenshot of {} after the failed navigation",
+            options.select.as_deref().unwrap_or("the element")
+        )),
+        Ok((_, None)) => {
+            warnings.push("best-effort viewport screenshot after the failed navigation".to_owned())
+        }
+        Err(why) => warnings.push(format!("screenshot {why}")),
+    }
+
+    let snapshot = collector
+        .lock()
+        .map(|collector| collector.snapshot())
+        .unwrap_or_else(|_| Snapshot::default());
+    if snapshot.uncaught > 0 {
+        warnings.push(format!("{} uncaught exception(s)", snapshot.uncaught));
+    }
+    if snapshot.console_errors > 0 {
+        warnings.push(format!("{} console error(s)", snapshot.console_errors));
+    }
+    if snapshot.requests_failed > 0 {
+        warnings.push(format!("{} request(s) failed", snapshot.requests_failed));
+    }
+
+    let waited_ms = predicates[0].waited_ms;
+    let (image, screenshot) = match &shot {
+        Ok((captured, clip)) => (
+            Image {
+                width: captured.width,
+                height: captured.height,
+                scope: match (&options.select, clip) {
+                    (Some(selector), Some(_)) => format!("element {selector}"),
+                    _ => "viewport".to_owned(),
+                },
+                css: clip.as_ref().map(|viewport| CssBox {
+                    x: round_to(viewport.x, 2),
+                    y: round_to(viewport.y, 2),
+                    width: round_to(viewport.width, 2),
+                    height: round_to(viewport.height, 2),
+                }),
+            },
+            options.out.display().to_string(),
+        ),
+        Err(why) => (
+            Image {
+                width: 0,
+                height: 0,
+                scope: "none".to_owned(),
+                css: None,
+            },
+            why.clone(),
+        ),
+    };
+
+    let report = Report {
+        url: options.url.clone(),
+        captured: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        peer: Peer { index: 0, of: 1 },
+        browser: launched.version,
+        pid: launched.pid,
+        mode: if options.headed {
+            "headed"
+        } else {
+            "headless (new)"
+        }
+        .to_owned(),
+        args: Vec::new(),
+        renderer: Renderer {
+            name: "not probed: navigation did not complete".to_owned(),
+            software: false,
+        },
+        viewport: Viewport {
+            width: options.width,
+            height: options.height,
+            dpr: options.dpr,
+            touch: options.touch,
+            user_agent: options.user_agent.clone(),
+        },
+        layout: None,
+        image,
+        ready: Ready {
+            predicates,
+            waited_ms,
+        },
+        frame_rate: None,
+        frame_rate_error: Some("navigation did not complete".to_owned()),
+        console: Console {
+            errors: snapshot.console_errors,
+            warnings: snapshot.console_warnings,
+            uncaught: snapshot.uncaught,
+            lines: snapshot.console_lines,
+        },
+        requests: Requests {
+            total: snapshot.requests_total,
+            failed: snapshot.requests_failed,
+            lines: snapshot.request_lines,
+        },
+        network: "not emulated".to_owned(),
+        overlay: "none".to_owned(),
+        input: Vec::new(),
+        evals: Vec::new(),
+        bursts: Vec::new(),
+        focus: "none".to_owned(),
+        scroll: "none".to_owned(),
+        locator: "none".to_owned(),
+        expect: None,
+        warnings,
+        profile: format!(
+            "{} ({})",
+            profile.path.display(),
+            if profile.keep {
+                "kept"
+            } else {
+                "removed on exit"
+            }
+        ),
+        screenshot,
+        sidecar: options.report.display().to_string(),
+        passed: false,
+        failure: Some(reason.clone()),
+    };
+
+    if let Ok((captured, _)) = &shot {
+        if let Some(parent) = options.out.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&options.out, &captured.bytes)
+            .with_context(|| format!("write {}", options.out.display()))?;
+    }
+    if let Some(parent) = options.report.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&options.report, report.render_text())
+        .with_context(|| format!("write {}", options.report.display()))?;
+
+    eprintln!("browser-shot: {reason}");
+    if options.json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        match &shot {
+            Ok((captured, _)) => println!(
+                "{} @ {}x{} (FAIL) · {}",
+                options.out.display(),
+                captured.width,
+                captured.height,
+                options.report.display()
+            ),
+            Err(_) => println!("no image (FAIL) · {}", options.report.display()),
+        }
+    }
+
+    Ok(false)
 }
 
 fn wait_for_stable<F>(

@@ -1,5 +1,8 @@
 //! Console, exception and network-failure collection, plus the in-flight count that makes
 //! `wait_for_network_idle` a condition rather than a sleep.
+//!
+//! It also follows the main frame's lifecycle and the renderer's health, so a navigation that
+//! never completes can say whether the page crashed, hung, or is still loading.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -34,6 +37,11 @@ pub struct Collector {
     requests_failed: u32,
     in_flight: HashMap<String, String>,
     last_activity: Instant,
+    main_frame: Option<String>,
+    navigating: bool,
+    lifecycle: Vec<String>,
+    painted: bool,
+    crash: Option<String>,
 }
 
 impl Collector {
@@ -49,7 +57,49 @@ impl Collector {
             requests_failed: 0,
             in_flight: HashMap::new(),
             last_activity: started,
+            main_frame: None,
+            navigating: false,
+            lifecycle: Vec::new(),
+            painted: false,
+            crash: None,
         }
+    }
+
+    /// Start following a navigation of `main_frame`. In Chromium a page target's main frame id is
+    /// its target id, so lifecycle events from iframes are ignored.
+    ///
+    /// The navigation is complete at the main frame's `networkAlmostIdle`, the same event
+    /// `headless_chrome`'s `wait_until_navigated` waits for.
+    pub fn begin_navigation(&mut self, main_frame: &str) {
+        self.main_frame = Some(main_frame.to_owned());
+        self.navigating = true;
+        self.lifecycle.clear();
+    }
+
+    pub fn navigating(&self) -> bool {
+        self.navigating
+    }
+
+    /// The main frame's lifecycle events since the navigation began, in arrival order.
+    pub fn lifecycle(&self) -> &[String] {
+        &self.lifecycle
+    }
+
+    /// Whether the main frame reported a first paint, i.e. a screenshot may show something.
+    pub fn painted(&self) -> bool {
+        self.painted
+    }
+
+    /// Why the renderer is gone, if it is.
+    pub fn crash(&self) -> Option<&str> {
+        self.crash.as_deref()
+    }
+
+    /// URLs of requests that started and have not finished, sorted for a stable report.
+    pub fn in_flight_urls(&self) -> Vec<String> {
+        let mut urls = self.in_flight.values().cloned().collect::<Vec<_>>();
+        urls.sort();
+        urls
     }
 
     pub fn handle(&mut self, event: &Event) {
@@ -141,6 +191,48 @@ impl Collector {
                         format!("[+{at}ms] HTTP {status} {}", event.params.response.url),
                     );
                 }
+            }
+            Event::PageLifecycleEvent(event) => {
+                let params = &event.params;
+                let main = self
+                    .main_frame
+                    .as_deref()
+                    .is_none_or(|frame| frame == params.frame_id);
+                if main {
+                    match params.name.as_str() {
+                        "init" => {
+                            self.navigating = true;
+                            self.lifecycle.clear();
+                        }
+                        "networkAlmostIdle" => self.navigating = false,
+                        "firstPaint" | "firstContentfulPaint" | "firstMeaningfulPaint" => {
+                            self.painted = true;
+                        }
+                        _ => {}
+                    }
+                    if self.lifecycle.len() < MAX_LINES {
+                        self.lifecycle.push(format!("{}@{at}ms", params.name));
+                    }
+                }
+            }
+            Event::InspectorTargetCrashed(_) => {
+                self.crash = Some("renderer crashed (Inspector.targetCrashed)".to_owned());
+                push(
+                    &mut self.console_lines,
+                    format!("[+{at}ms] renderer crashed (Inspector.targetCrashed)"),
+                );
+            }
+            Event::InspectorDetached(event) => {
+                if self.crash.is_none() {
+                    self.crash = Some(format!(
+                        "inspector detached (Inspector.detached: {})",
+                        event.params.reason
+                    ));
+                }
+                push(
+                    &mut self.console_lines,
+                    format!("[+{at}ms] inspector detached: {}", event.params.reason),
+                );
             }
             _ => {}
         }
