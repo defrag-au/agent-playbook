@@ -574,7 +574,7 @@ fn run(options: Options) -> Result<bool> {
     }
 
     let readiness_started = Instant::now();
-    let mut predicates = Vec::new();
+    let mut predicates = vec![navigation];
     predicates.push(probe::wait_for_fonts(&tab, timeout));
     if let Some(window) = options.network_idle_ms {
         predicates.push(probe::wait_for_network_idle(

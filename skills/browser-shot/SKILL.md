@@ -59,6 +59,10 @@ browser-shot "http://127.0.0.1:8095/?nav=0#/wallet-button" 390 844 .tmp/wallet-3
   end) still exits `2` with a sidecar: its `result` line reads `FAIL — navigation crashed: …` or
   `FAIL — navigation timed out: …`, and the console, exceptions and requests collected before that
   are in it. Read the sidecar before reaching for a hand-launched browser.
+- Navigation completes at `networkAlmostIdle` or at `load` followed by 500 ms with no request in
+  flight, whichever comes first; the sidecar's `ready` line names which. An open `EventSource` or
+  long poll keeps a page off the second path. Completing navigation is not readiness: `--ready`
+  still decides that.
 
 For a macroquad web build, capture the canvas at real device pixels:
 `--select canvas --dpr 3 --touch --settle-ms 5000 --no-settle`, then read `image` and `layout` in

@@ -39,6 +39,7 @@ pub struct Collector {
     last_activity: Instant,
     main_frame: Option<String>,
     navigating: bool,
+    loaded_at: Option<Instant>,
     lifecycle: Vec<String>,
     painted: bool,
     crash: Option<String>,
@@ -59,6 +60,7 @@ impl Collector {
             last_activity: started,
             main_frame: None,
             navigating: false,
+            loaded_at: None,
             lifecycle: Vec::new(),
             painted: false,
             crash: None,
@@ -68,16 +70,27 @@ impl Collector {
     /// Start following a navigation of `main_frame`. In Chromium a page target's main frame id is
     /// its target id, so lifecycle events from iframes are ignored.
     ///
-    /// The navigation is complete at the main frame's `networkAlmostIdle`, the same event
-    /// `headless_chrome`'s `wait_until_navigated` waits for.
+    /// `navigate` decides when the navigation is complete; see `navigate::completion`.
     pub fn begin_navigation(&mut self, main_frame: &str) {
         self.main_frame = Some(main_frame.to_owned());
         self.navigating = true;
+        self.loaded_at = None;
         self.lifecycle.clear();
     }
 
+    /// True until the main frame reports `networkAlmostIdle`.
     pub fn navigating(&self) -> bool {
         self.navigating
+    }
+
+    /// How long ago the main frame fired `load`, if it has since the navigation began.
+    pub fn since_load(&self) -> Option<Duration> {
+        self.loaded_at.map(|at| at.elapsed())
+    }
+
+    /// How long ago a request last started, finished, failed or got its response.
+    pub fn since_activity(&self) -> Duration {
+        self.last_activity.elapsed()
     }
 
     /// The main frame's lifecycle events since the navigation began, in arrival order.
@@ -202,8 +215,10 @@ impl Collector {
                     match params.name.as_str() {
                         "init" => {
                             self.navigating = true;
+                            self.loaded_at = None;
                             self.lifecycle.clear();
                         }
+                        "load" => self.loaded_at = Some(Instant::now()),
                         "networkAlmostIdle" => self.navigating = false,
                         "firstPaint" | "firstContentfulPaint" | "firstMeaningfulPaint" => {
                             self.painted = true;

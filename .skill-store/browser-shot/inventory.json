@@ -2,7 +2,7 @@
   "id": "urn:skill:browser-shot",
   "type": "https://ocfl.io/1.1/spec/#inventory",
   "digestAlgorithm": "sha512",
-  "head": "v3",
+  "head": "v4",
   "manifest": {
     "6ea6e5a596b5226f81f8ae9c7c2d60815d48b350022871b20941b44ef1d5a233da793d87a91876e8455423ace6e4e59ee429af982b4a53f68679c36578d4a97f": [
       "v2/content/SKILL.md"
@@ -12,6 +12,9 @@
     ],
     "a1738eae83e7bada7113db12f1e9908f65eeb59ba239fdb4cca6b2ce274902a4bb9f9feaa2769c90602b064255e5619c81c6aad3fdd72a596b0cf19725c635ad": [
       "v1/content/SKILL.md"
+    ],
+    "a281250234efc6edc042fabf5db777529f0deca4fbd352c37efd675bafc2c2292b081e57d678fd5b36838281caa15f2f33c027bd302b03ebd539e97a53b3adae": [
+      "v4/content/SKILL.md"
     ]
   },
   "versions": {
@@ -44,6 +47,19 @@
         ]
       },
       "message": "navigation failures still write a sidecar",
+      "user": {
+        "name": "Grok Bot",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    },
+    "v4": {
+      "created": "2026-10-27T14:09:29Z",
+      "state": {
+        "a281250234efc6edc042fabf5db777529f0deca4fbd352c37efd675bafc2c2292b081e57d678fd5b36838281caa15f2f33c027bd302b03ebd539e97a53b3adae": [
+          "SKILL.md"
+        ]
+      },
+      "message": "navigation completes at load plus network quiet",
       "user": {
         "name": "Grok Bot",
         "address": "https://github.com/defrag-au/agent-playbook"
