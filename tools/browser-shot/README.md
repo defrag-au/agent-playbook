@@ -198,7 +198,8 @@ Steps (TOML field names; the DSL names are in `SCENARIO.md`):
 
 | `action` | Fields |
 | --- | --- |
-| `wait` | `peer` or `peers`, and one or more of `predicate`, `frames`, `rate`, `network_idle`; `timeout_ms` |
+| `wait` | `peer` or `peers`, and one or more of `predicate`, `frames`, `rate`, `network_idle`, `selector` (+ optional `state`), `text`, `url` / `url_contains`, `stable_ms`; `timeout_ms` |
+| `sleep` | `peer`, `duration_ms` — explicit pause; prefer a condition wait |
 | `eval` | `peer`, `expression`, `await_promise`, `capture` (stores the result for `${name}` substitution), optional `out` (writes the value as JSON), optional `timeout_ms` on an awaited expression |
 | `key` | `peer`, `code`, `state` (`down`/`up`), optional `hold_frames` on a down step |
 | `pointer` | `peer`, `kind` (`click`/`hover`/`drag`/`tap`/`swipe`), `x`+`y` or `selector`, `steps`, optional `button`, `from_x`+`from_y` |
@@ -216,6 +217,41 @@ A peer may carry extra browser flags with `args` (`args="--use-fake-ui-for-media
 DSL, `args = ["--use-fake-ui-for-media-stream"]` in TOML). The run sets `--user-data-dir`,
 `--remote-debugging-port` and the headless mode itself; an override is a validation error. The
 sidecar repeats the extra flags, so a capture can be diffed against the process it came from.
+
+## Waiting, not sleeping
+
+Wait on what the page shows, not on a fixed delay:
+
+```text
+wait page selector="#wallet-button" state=enabled
+pointer page click selector="#wallet-button"
+wait page selector="#wallet-modal" state=visible
+wait page text="Connect" selector="#wallet-modal"
+wait page url~="#/wallet"
+wait page stable=500ms selector="#wallet-modal"
+```
+
+- Prefer `wait … selector=` / `text=` / `url~=` / `stable=` over `eval "new Promise(r => setTimeout(r, N))" await`.
+- Prefer `pointer … selector=` over click coordinates. A `click`/`tap` on a selector waits until the
+  element is enabled before clicking, bounded by the step timeout.
+- `sleep page 1s` exists for the rare case nothing else applies; it is named in the report so a
+  fallback pause is visible. Do not use it as the default.
+
+A wallet modal flow that an agent once wrote as coordinate clicks and `setTimeout` sleeps rewrites as:
+
+```text
+peer page url="http://127.0.0.1:8095/?nav=0#/wallet-button" viewport=1280x800
+
+wait page selector="[data-testid=wallet-button]" state=enabled
+pointer page click selector="[data-testid=wallet-button]"
+wait page selector="[data-testid=wallet-modal]" state=visible
+wait page text="Choose a wallet" selector="[data-testid=wallet-modal]"
+pointer page click selector="[data-testid=wallet-option-injected]"
+wait page url~="#/wallet/connected" timeout=10s
+capture page out=wallet-connected.png
+```
+
+(Selectors are placeholders for the real page's hooks.)
 
 ## Scenario DSL
 
@@ -399,7 +435,7 @@ with it.
 | Requirement | State |
 | --- | --- |
 | 1. N isolated browser processes, driven concurrently | **Covered.** One process and profile per peer; launches and shared waits run in parallel. Verified with two peers. |
-| 2. Deterministic readiness, no fixed sleeps | **Covered.** `wait_until`, `frames`, `rate` and `network_idle`; a timeout names the predicate and its last value. Frame rate is measured over one second and reported per peer, and a rate under 20 Hz warns that the capture is not representative. |
+| 2. Deterministic readiness, no fixed sleeps | **Covered.** `predicate`, `frames`, `rate`, `network_idle`, `selector`/`state`, `text`, `url`/`url~`, `stable`; a timeout names the condition and its last value. `sleep` exists but is for rare fallbacks. Frame rate is measured over one second and reported per peer, and a rate under 20 Hz warns that the capture is not representative. |
 | 3. Element capture at real pixel dimensions | **Covered.** Reports the CSS box and PNG size; a DPR mismatch fails. |
 | 4. True device emulation | **Covered.** Viewport, DPR, touch and UA through CDP; touch is verified via `navigator.maxTouchPoints`. |
 | 5. Evaluate before the document's scripts | **Covered** with `--preload` and the per-peer `preload`. The loss hook installs before the document runs. |
