@@ -104,8 +104,23 @@ pub(crate) enum Step {
         frames: Option<u32>,
         rate: Option<f64>,
         network_idle: Option<u64>,
+        /// CSS selector; with `state` (default `visible`) waits for that element state.
+        selector: Option<String>,
+        /// `present` | `visible` | `hidden` | `gone` | `enabled`. Requires `selector`.
+        state: Option<String>,
+        /// Substring of visible text (`innerText`). Combined with `selector` to limit scope.
+        text: Option<String>,
+        /// Exact match against `location.href`.
+        url: Option<String>,
+        /// Substring match against `location.href` (`url~=` in the DSL; `url_contains` in TOML).
+        url_contains: Option<String>,
+        /// No DOM mutations for this many milliseconds (optionally under `selector`).
+        stable_ms: Option<u64>,
         timeout_ms: Option<u64>,
     },
+    /// An explicit pause. Prefer a condition wait; use this only when nothing else applies,
+    /// so the sleep is visible in the scenario and the report.
+    Sleep { peer: String, duration_ms: u64 },
     Eval {
         peer: String,
         expression: String,
@@ -199,6 +214,7 @@ impl Step {
     pub(crate) fn action_name(&self) -> &'static str {
         match self {
             Self::Wait { .. } => "wait",
+            Self::Sleep { .. } => "sleep",
             Self::Eval { .. } => "eval",
             Self::Key { .. } => "key",
             Self::Pointer { .. } => "pointer",
@@ -221,6 +237,12 @@ impl Step {
                 frames,
                 rate,
                 network_idle,
+                selector,
+                state,
+                text,
+                url,
+                url_contains,
+                stable_ms,
                 ..
             } => {
                 let who = peer
@@ -240,7 +262,26 @@ impl Step {
                 if let Some(network_idle) = network_idle {
                     conditions.push(format!("network_idle {network_idle}"));
                 }
+                if let Some(selector) = selector {
+                    let state = state.as_deref().unwrap_or("visible");
+                    conditions.push(format!("selector {selector:?} {state}"));
+                }
+                if let Some(text) = text {
+                    conditions.push(format!("text {text:?}"));
+                }
+                if let Some(url) = url {
+                    conditions.push(format!("url {url:?}"));
+                }
+                if let Some(url_contains) = url_contains {
+                    conditions.push(format!("url~ {url_contains:?}"));
+                }
+                if let Some(stable_ms) = stable_ms {
+                    conditions.push(format!("stable {stable_ms}ms"));
+                }
                 format!("{who} {}", conditions.join(", "))
+            }
+            Self::Sleep { peer, duration_ms } => {
+                format!("{peer} {duration_ms}ms")
             }
             Self::Eval {
                 peer,
@@ -615,6 +656,12 @@ impl Scenario {
                     frames,
                     rate,
                     network_idle,
+                    selector,
+                    state,
+                    text,
+                    url,
+                    url_contains,
+                    stable_ms,
                     timeout_ms,
                 } => {
                     let selected = match (peer, peers) {
@@ -629,20 +676,69 @@ impl Scenario {
                             bail!("{at}: unknown peer {name:?}");
                         }
                     }
+                    if state.is_some() && selector.is_none() {
+                        bail!("{at}: state= needs selector=");
+                    }
                     if predicate.is_none()
                         && frames.is_none()
                         && rate.is_none()
                         && network_idle.is_none()
+                        && selector.is_none()
+                        && text.is_none()
+                        && url.is_none()
+                        && url_contains.is_none()
+                        && stable_ms.is_none()
                     {
-                        bail!("{at}: needs predicate, frames, rate or network_idle");
+                        bail!(
+                            "{at}: needs predicate, frames, rate, network_idle, selector, text, url, url~ or stable"
+                        );
+                    }
+                    if let Some(state) = state {
+                        if crate::probe::SelectorState::parse(state).is_none() {
+                            bail!(
+                                "{at}: state must be present, visible, hidden, gone or enabled, got {state:?}"
+                            );
+                        }
+                    }
+                    if let Some(selector) = selector {
+                        if selector.trim().is_empty() {
+                            bail!("{at}: selector must not be empty");
+                        }
+                    }
+                    if let Some(text) = text {
+                        if text.is_empty() {
+                            bail!("{at}: text must not be empty");
+                        }
+                    }
+                    if let Some(url) = url {
+                        if url.is_empty() {
+                            bail!("{at}: url must not be empty");
+                        }
+                    }
+                    if let Some(url_contains) = url_contains {
+                        if url_contains.is_empty() {
+                            bail!("{at}: url~ must not be empty");
+                        }
+                    }
+                    if url.is_some() && url_contains.is_some() {
+                        bail!("{at}: url and url~ cannot be combined; pick one");
                     }
                     if let Some(rate) = rate {
                         if !rate.is_finite() || *rate <= 0.0 {
                             bail!("{at}: rate must be a positive number of frames per second");
                         }
                     }
+                    if *stable_ms == Some(0) {
+                        bail!("{at}: stable must be greater than zero");
+                    }
                     if *timeout_ms == Some(0) {
                         bail!("{at}: timeout must be greater than zero");
+                    }
+                }
+                Step::Sleep { peer, duration_ms } => {
+                    check_peer(&names, &at, peer)?;
+                    if *duration_ms == 0 {
+                        bail!("{at}: sleep duration must be greater than zero");
                     }
                 }
                 Step::Eval {
@@ -1032,7 +1128,19 @@ const PEER_FIELDS: &[&str] = &[
     "network",
     "loss_hook",
 ];
-const WAIT_FIELDS: &[&str] = &["predicate", "frames", "rate", "network_idle", "timeout"];
+const WAIT_FIELDS: &[&str] = &[
+    "predicate",
+    "frames",
+    "rate",
+    "network_idle",
+    "selector",
+    "state",
+    "text",
+    "url",
+    "url~",
+    "stable",
+    "timeout",
+];
 const KEY_FIELDS: &[&str] = &["hold"];
 const POINTER_FIELDS: &[&str] = &["selector", "at", "steps", "button", "from"];
 const CAPTURE_FIELDS: &[&str] = &["out", "select"];
@@ -1182,6 +1290,13 @@ fn format_line(line: &LineTokens) -> Result<String> {
             parts.push(format_value(&peer_list.value));
             push_fields(&mut parts, &mut kvs, WAIT_FIELDS);
         }
+        "sleep" => {
+            if positionals.len() != 2 {
+                bail_at!(first, "sleep needs a peer and a duration such as 1s");
+            }
+            parts.push(format_value(&positionals[0].value));
+            parts.push(format_value(&positionals[1].value));
+        }
         "eval" => {
             if positionals.len() < 2 {
                 bail_at!(first, "eval needs a peer and an expression");
@@ -1265,8 +1380,8 @@ fn format_line(line: &LineTokens) -> Result<String> {
         other => bail_at!(
             first,
             &format!(
-                "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, \
-                 burst, assert, network, spawn or wait_for"
+                "unknown action {other:?}; expected run, peer, wait, sleep, eval, key, pointer, capture, \
+                 burst, assert, network, spawn, wait_for or goto"
             ),
         ),
     }
@@ -1380,6 +1495,10 @@ fn parse_dsl(text: &str) -> Result<Scenario> {
                 steps.push(parse_wait(rest, first)?);
                 step_lines.push(first.line);
             }
+            "sleep" => {
+                steps.push(parse_sleep(rest, first)?);
+                step_lines.push(first.line);
+            }
             "eval" => {
                 steps.push(parse_eval(rest, first)?);
                 step_lines.push(first.line);
@@ -1423,7 +1542,7 @@ fn parse_dsl(text: &str) -> Result<Scenario> {
             other => bail_at!(
                 first,
                 &format!(
-                    "unknown action {other:?}; expected run, peer, wait, eval, key, pointer, capture, \
+                    "unknown action {other:?}; expected run, peer, wait, sleep, eval, key, pointer, capture, \
                      burst, assert, network, spawn, wait_for or goto"
                 ),
             ),
@@ -1691,6 +1810,12 @@ fn parse_wait(tokens: &[Token], first: &Token) -> Result<Step> {
     let frames = take_u32(&mut kvs, "frames")?;
     let rate = take_f64(&mut kvs, "rate")?;
     let network_idle = take_duration(&mut kvs, "network_idle")?;
+    let selector = take_string(&mut kvs, "selector");
+    let state = take_string(&mut kvs, "state");
+    let text = take_string(&mut kvs, "text");
+    let url = take_string(&mut kvs, "url");
+    let url_contains = take_string(&mut kvs, "url~");
+    let stable_ms = take_duration(&mut kvs, "stable")?;
     let timeout_ms = take_duration(&mut kvs, "timeout")?;
     reject_unknown(&kvs, first, "wait")?;
 
@@ -1702,6 +1827,12 @@ fn parse_wait(tokens: &[Token], first: &Token) -> Result<Step> {
             frames,
             rate,
             network_idle,
+            selector,
+            state,
+            text,
+            url,
+            url_contains,
+            stable_ms,
             timeout_ms,
         })
     } else {
@@ -1712,9 +1843,40 @@ fn parse_wait(tokens: &[Token], first: &Token) -> Result<Step> {
             frames,
             rate,
             network_idle,
+            selector,
+            state,
+            text,
+            url,
+            url_contains,
+            stable_ms,
             timeout_ms,
         })
     }
+}
+
+fn parse_sleep(tokens: &[Token], first: &Token) -> Result<Step> {
+    let positionals = positionals(tokens);
+    let peer = positionals
+        .first()
+        .map(|token| token.value.clone())
+        .ok_or_else(|| anyhow!("line {}: sleep needs a peer", first.line))?;
+    let duration = positionals.get(1).ok_or_else(|| {
+        anyhow!(
+            "line {}: sleep needs a duration such as 1s or 500ms",
+            first.line
+        )
+    })?;
+    if positionals.len() > 2 {
+        bail_at!(positionals[2], "sleep takes a peer and a duration only");
+    }
+    let kvs = collect_kvs(tokens)?;
+    reject_unknown(&kvs, first, "sleep")?;
+    let duration_ms = parse_duration_ms(&duration.value)
+        .with_context(|| format!("line {}:{}: duration", duration.line, duration.column))?;
+    if duration_ms == 0 {
+        bail_at!(duration, "sleep duration must be greater than zero");
+    }
+    Ok(Step::Sleep { peer, duration_ms })
 }
 
 fn parse_eval(tokens: &[Token], first: &Token) -> Result<Step> {
@@ -2456,8 +2618,144 @@ assert b "window.__received === 100" message="all messages arrive"
         assert!(
             error
                 .to_string()
-                .contains("predicate, frames, rate or network_idle"),
+                .contains("predicate, frames, rate, network_idle, selector, text, url"),
             "{error}"
+        );
+    }
+    #[test]
+    fn parses_selector_text_url_and_stable_waits() {
+        let text = concat!(
+            "peer a url=x viewport=390x844\n",
+            "wait a selector=\"#btn\" state=enabled timeout=2s\n",
+            "wait a text=\"Hello\" selector=\"#modal\"\n",
+            "wait a url~=\"#/wallet\"\n",
+            "wait a url=\"http://127.0.0.1/exact\"\n",
+            "wait a stable=500ms selector=\"#root\"\n",
+            "sleep a 1s\n",
+        );
+        let scenario = parse_dsl(text).unwrap();
+        scenario.validate().unwrap();
+        match &scenario.step[0] {
+            Step::Wait {
+                selector, state, ..
+            } => {
+                assert_eq!(selector.as_deref(), Some("#btn"));
+                assert_eq!(state.as_deref(), Some("enabled"));
+            }
+            other => panic!("{other:?}"),
+        }
+        match &scenario.step[1] {
+            Step::Wait {
+                text,
+                selector,
+                state,
+                ..
+            } => {
+                assert_eq!(text.as_deref(), Some("Hello"));
+                assert_eq!(selector.as_deref(), Some("#modal"));
+                assert!(state.is_none());
+            }
+            other => panic!("{other:?}"),
+        }
+        match &scenario.step[2] {
+            Step::Wait {
+                url_contains, url, ..
+            } => {
+                assert_eq!(url_contains.as_deref(), Some("#/wallet"));
+                assert!(url.is_none());
+            }
+            other => panic!("{other:?}"),
+        }
+        match &scenario.step[3] {
+            Step::Wait { url, .. } => assert_eq!(url.as_deref(), Some("http://127.0.0.1/exact")),
+            other => panic!("{other:?}"),
+        }
+        match &scenario.step[4] {
+            Step::Wait {
+                stable_ms,
+                selector,
+                ..
+            } => {
+                assert_eq!(*stable_ms, Some(500));
+                assert_eq!(selector.as_deref(), Some("#root"));
+            }
+            other => panic!("{other:?}"),
+        }
+        match &scenario.step[5] {
+            Step::Sleep { peer, duration_ms } => {
+                assert_eq!(peer, "a");
+                assert_eq!(*duration_ms, 1000);
+            }
+            other => panic!("{other:?}"),
+        }
+        let formatted = format_dsl(text).unwrap();
+        assert!(formatted.contains("selector=\"#btn\""), "{formatted}");
+        assert!(formatted.contains("url~=\"#/wallet\""), "{formatted}");
+        assert!(formatted.contains("stable=500ms"), "{formatted}");
+        assert!(formatted.contains("sleep a 1s"), "{formatted}");
+        assert_eq!(format_dsl(&formatted).unwrap(), formatted);
+    }
+
+    #[test]
+    fn rejects_state_without_selector() {
+        let text = "peer a url=x viewport=390x844\nwait a state=visible\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(
+            error.to_string().contains("state= needs selector="),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_selector_state() {
+        let text = "peer a url=x viewport=390x844\nwait a selector=\"#x\" state=clickable\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("present, visible, hidden, gone or enabled"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn rejects_url_and_url_contains_together() {
+        let text = "peer a url=x viewport=390x844\nwait a url=\"/a\" url~=\"/b\"\n";
+        let error = parse_dsl(text).unwrap().validate().unwrap_err();
+        assert!(error.to_string().contains("url and url~"), "{error}");
+    }
+
+    #[test]
+    fn rejects_empty_new_wait_fields() {
+        let cases = [
+            ("wait a selector=\"\"\n", "selector must not be empty"),
+            ("wait a text=\"\"\n", "text must not be empty"),
+            ("wait a url=\"\"\n", "url must not be empty"),
+            ("wait a url~=\"\"\n", "url~ must not be empty"),
+            ("wait a stable=0\n", "stable must be greater than zero"),
+            ("sleep a 0ms\n", "greater than zero"),
+        ];
+        for (line, needle) in cases {
+            let text = format!("peer a url=x viewport=390x844\n{line}");
+            let error = match parse_dsl(&text) {
+                Ok(scenario) => scenario.validate().unwrap_err().to_string(),
+                Err(error) => error.to_string(),
+            };
+            assert!(
+                error.contains(needle),
+                "for {line}: {error} (want {needle})"
+            );
+        }
+    }
+
+    #[test]
+    fn defaults_selector_state_to_visible_in_summary() {
+        let text = "peer a url=x viewport=390x844\nwait a selector=\"#btn\"\n";
+        let scenario = parse_dsl(text).unwrap();
+        assert!(
+            scenario.step[0].summary().contains("visible"),
+            "{}",
+            scenario.step[0].summary()
         );
     }
 
