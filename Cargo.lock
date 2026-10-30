@@ -99,6 +99,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 
 [[package]]
+name = "at-chain"
+version = "0.1.0"
+dependencies = [
+ "at-core",
+ "serde",
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
 name = "at-core"
 version = "0.1.0"
 
@@ -122,6 +132,7 @@ dependencies = [
 name = "at-describe"
 version = "0.1.0"
 dependencies = [
+ "at-chain",
  "at-cost",
  "at-crate",
  "at-peek",

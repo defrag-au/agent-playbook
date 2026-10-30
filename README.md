@@ -99,6 +99,8 @@ tools/            the agent toolkit, plus the skill store
   at-crate/         installed crate source and build output — where, installed, files, slice, search, out
   at-recall/        history and state — state, log, diff, pr
   at-reach/         a private fleet tree — root, hosts, probe
+  at-cost/          what the machine is costing, by repository — repos, tree, pid
+  at-chain/         read-only Cardano chain enquiry through Koios
   at-describe/      the catalogue, which opens nothing
   browser-shot/     browser captures, scenarios and frame bursts
   tui-shot/         terminal captures and scenario runs in a PTY it owns
@@ -221,8 +223,8 @@ crate has no dependencies at all, so it still builds with no network and no regi
 ## The inspection toolkit
 
 The other half of this repository is not a rule. It is the thing that makes it possible to stop
-writing rules about shell pipelines: five read-only binaries, built from `tools/`, that give an
-agent the reads it needs without an approval per command and without a bound hidden in a pipe.
+writing rules about shell pipelines: seven binaries, built from `tools/`, that give an agent the
+reads it needs without an approval per command and without a bound hidden in a pipe.
 
 | Binary | Reads | Verbs |
 | --- | --- | --- |
@@ -230,7 +232,9 @@ agent the reads it needs without an approval per command and without a bound hid
 | `at-crate` | extracted crate source, `Cargo.lock`, and build-script output; spawns nothing | `where`, `installed`, `files`, `slice`, `search`, `out` |
 | `at-recall` | `.git` objects and refs, through one subprocess — `git`, read verbs only | `state`, `log`, `diff`, `pr` |
 | `at-reach` | a private fleet tree, and one read-only probe over `ssh` (or `sh` locally) | `root`, `hosts`, `probe` |
-| `at-describe` | nothing; it prints the catalogue | the four verb tables |
+| `at-cost` | the process table, attributed to repositories; spawns nothing | `repos`, `tree`, `pid` |
+| `at-chain` | Koios over HTTPS, GET and query-POST only; the key is never printed | `tip`, `address`, `utxos`, `tx`, `asset`, `policy`, `account`, `block`, `query`, … |
+| `at-describe` | nothing; it prints the catalogue | the six verb tables |
 
 `rg` becomes `at-peek search`, `sed -n '40,60p' f.rs` becomes `at-peek slice f.rs:40-60`,
 `grep -rn … ~/.cargo/registry/src` becomes `at-crate search <pattern> <crate>`, and `git status`
@@ -246,6 +250,10 @@ at-recall state --summary               # branch, HEAD, changed paths — the fr
 at-recall pr --base main                # the facts a PR description is written from
 at-reach hosts                          # the private fleet inventory
 at-reach probe example-host             # OS, Nix, Tailscale, repos — read-only
+at-chain tip                            # the chain head, no key required
+at-chain tx <hash>                      # block, fee, size, input/output totals
+at-chain utxos <address>                # the UTxOs at an address, with a page bound
+at-chain query tx_info --post --body '{"_tx_hashes":["<hash>"]}'   # the long tail
 at-describe                             # the catalogue, one screen
 ```
 
@@ -265,7 +273,7 @@ intention:
   invocation that produced it and runs exactly as printed — an *address*, never a handle, so no
   state crosses invocations.
 
-The tier each binary sits in is the reason there are five, because a prefix allowlist can only
+The tier each binary sits in is the reason there are seven, because a prefix allowlist can only
 see a difference that is in the binary. `at-describe` opens no file at all. `at-peek` reads files
 and runs nothing. `at-crate` reads the cargo home, `Cargo.lock` and `target/`, and runs nothing —
 in particular it never invokes `cargo`, so an uninstalled crate is an answer rather than a fetch.
@@ -273,7 +281,10 @@ in particular it never invokes `cargo`, so an uninstalled crate is an answer rat
 mutating verb is reachable, a repository's pagers and diff drivers neutralised, and `@{…}` refused
 by syntax because the reflog is not read. `at-reach` reads a private fleet tree and runs one fixed
 probe over `ssh` or `sh`; it has no write, sudo or secret verb. Its contract is
-[`docs/fleet.md`](docs/fleet.md).
+[`docs/fleet.md`](docs/fleet.md). `at-cost` reads the macOS process table and nothing else.
+`at-chain` is the one member with a socket: HTTPS to a Koios host chosen only by `--network`, GET
+and query-POST only, redirects disabled, `/submittx` refused by name, and a key read from
+`~/.config/koios/api_key` that no output ever prints.
 
 `defrag-nix` installs them into every defrag devshell, so they are on `PATH` in an interactive
 shell in any of those repositories; a shell an agent spawned reaches for them as

@@ -4,11 +4,13 @@
 contract, path containment and text reading), `tools/at-peek` (`stat`, `slice`, `search`),
 `tools/at-crate` (`where`, `installed`, `files`, `slice`, `search`, `out`), `tools/at-recall`
 (`state`, `log`, `diff`, and the `pr` recipe), `tools/at-reach` (fleet inspection),
-`tools/at-cost` (`repos`, `tree`, `pid` — the process table, attributed to repositories), and
-`tools/at-describe` (the catalogue). The toolkit is packaged by this repository's `flake.nix` and
-wired into the org's shells by `defrag-nix`. Everything else here is still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in
-`peek`; `show`, `blame`, `why`, `churn` in `recall`), the other two recipes (`review`, `release`),
-and the rule and skill drafts at the end — which stay drafts until the verbs they name exist.
+`tools/at-cost` (`repos`, `tree`, `pid` — the process table, attributed to repositories),
+`tools/at-chain` (read-only Cardano chain enquiry through Koios), and `tools/at-describe` (the
+catalogue). The toolkit is packaged by this repository's `flake.nix` and wired into the org's
+shells by `defrag-nix`. Everything else here is still the plan: the remaining verbs (`tree`, `find`,
+`outline`, `scope` in `peek`; `show`, `blame`, `why`, `churn` in `recall`), the other two recipes
+(`review`, `release`), and the rule and skill drafts at the end — which stay drafts until the verbs
+they name exist.
 
 `at-reach` is a fourth `at-` binary but not an inspection tier: it reads a private fleet tree and
 runs one fixed read-only probe over SSH. Its contract is [`fleet.md`](fleet.md), not this document.
@@ -54,9 +56,9 @@ rather than hidden in a pipe.
 
 ## The shape
 
-One namespace (`at-` for agent tools), five binaries, because they are separate trust tiers and an
-approval should grant the smallest one that answers the question. Four read the filesystem or a
-private inventory; the fifth, `at-describe`, opens nothing and is the catalogue.
+One namespace (`at-` for agent tools), seven binaries, because they are separate trust tiers and
+an approval should grant the smallest one that answers the question. Six read the filesystem, a
+private inventory, or the chain; the seventh, `at-describe`, opens nothing and is the catalogue.
 
 | | `at-describe` | `at-peek` | `at-crate` | `at-recall` |
 | --- | --- | --- | --- | --- |
@@ -70,9 +72,11 @@ private inventory; the fifth, `at-describe`, opens nothing and is the catalogue.
 
 The namespace is a promise rather than a filing convention: **membership in `at-` claims that the
 binary's entire grammar is safe to allowlist.** No member has a write path in any form — not a
-flag, not a cache file, not an option to be added later. Without that, someone eventually adds
-`at-edit`, and it inherits the trust the prefix earned while being the exact thing the prefix was
-supposed to guarantee.
+flag, not a cache file, not an option to be added later. `at-chain` is the one member with a
+socket, and its grammar is bounded to Koios reads: a fixed host per network, one endpoint segment,
+GET and query-POST only, redirects off, and `/submittx` refused by name. Without that, someone
+eventually adds `at-edit`, and it inherits the trust the prefix earned while being the exact thing
+the prefix was supposed to guarantee.
 
 ```mermaid
 graph TD
@@ -530,7 +534,10 @@ Otherwise:
   `--include-secret-paths` reads one anyway. This is a guard rail against an accidental
   `search TOKEN` sweep, not a boundary — the agent can still `cat`, and pretending otherwise
   would be worse than not having it.
-- **No network code at all**, so the TLS/dependency question does not arise.
+- **No network code at all** in `at-peek`, `at-crate`, `at-recall` and `at-reach`, so the
+  TLS/dependency question does not arise there. `at-chain` is the exception and is described in
+  its own section: one HTTPS client, a fixed host per network, no redirects, and `/submittx`
+  refused before a socket opens.
 
 ### The grant is total, or it is not a grant
 
@@ -595,6 +602,76 @@ auditable, so the invocation set is fixed, small, and tested:
   resolution, packed-refs and shallow-clone handling correctly. Not for v1; revisit if the
   hardening list starts to feel like it is growing.
 
+## `at-chain` — the chain
+
+The request that produced this tier was the tenth ad-hoc `curl https://api.koios.rest/...` in a
+session. The requests were already a catalogue: `/tx_info`, `/tx_utxos`, `/tx_cbor`, `/utxo_info`,
+`/datum_info`, `/asset_info`, `/address_info`, `/address_utxos`, `/address_txs`, `/address_assets`,
+`/credential_utxos`, `/account_info`, `/block_info`, `/block_txs`, `/policy_asset_info`,
+`/policy_asset_mints`, `/policy_asset_addresses`, `/script_info`, and `/tip`. Each one was a shell
+approval, a body retyped from memory, and a key either in the command line or in the environment.
+`/submittx` sat in the same grammar, one keystroke from a write.
+
+`at-chain` is Koios as the first adaptor, and the verbs are the questions:
+
+| Question | Command |
+| --- | --- |
+| Where is the chain now | `at-chain tip` |
+| What does this address hold | `at-chain address <addr>` |
+| Which UTxOs are at these addresses | `at-chain utxos <addr>…` |
+| Which transactions touched these addresses | `at-chain txs <addr>…` |
+| Which assets do these addresses hold | `at-chain assets <addr>…` |
+| Which UTxOs are at these payment credentials | `at-chain credential-utxos <hex>…` |
+| What is this transaction | `at-chain tx <hash>…` |
+| Which UTxOs does this transaction reference | `at-chain tx-utxos <hash>…` |
+| What are this transaction's bytes | `at-chain tx-cbor <hash>…` |
+| What metadata does this transaction carry | `at-chain tx-metadata <hash>…` |
+| Is this transaction confirmed | `at-chain tx-status <hash>…` |
+| What is this output | `at-chain utxo <tx#index>…` |
+| What is this datum | `at-chain datum <hash>…` |
+| What is this asset | `at-chain asset <policy.name>…` |
+| What is in this policy | `at-chain policy <policy> [--mints \| --addresses]` |
+| What does this stake key hold | `at-chain account <stake>…` |
+| Which UTxOs sit under these stake keys | `at-chain account-utxos <stake>…` |
+| Which assets sit under these stake keys | `at-chain account-assets <stake>…` |
+| What is this block | `at-chain block <hash>…` or `<height>` |
+| Which transactions are in this block | `at-chain block-txs <hash>…` or `<height>` |
+| What is this script | `at-chain script <hash>…` |
+| Anything else Koios answers | `at-chain query <endpoint>` |
+
+Every list verb takes `--limit` (default 20, ceiling 1000), `--offset`, `--order`, `--select` and
+`--all`; a full page prints the next offset as a `# next:` command, and `--all` follows pages at
+the 1000-row ceiling up to a ten-page cap. `--summary` is the frame without the rows, as in the
+other tools. `--json` returns the response body — bounded to 64 KiB — when the projection is not
+the answer; `tx-cbor` has its own 256 KiB hex cap. `--network` chooses mainnet, preprod, preview or
+guild, and `--keyless` ignores a configured key.
+
+`query` is the long tail and the only open-ended verb. It takes one endpoint name, GET by default
+or POST with `--body`/`--body-file`, and `--query key=value` repeated. The endpoint must be one
+segment of lowercase letters, digits and `_`; the host is fixed by `--network`; redirects are not
+followed; there is no header flag; and `/submittx` is refused by name. So the grant is "ask Koios a
+read question", not "run an HTTP client".
+
+### The key
+
+`KOIOS_API_KEY` is read first, then `$XDG_CONFIG_HOME/koios/api_key` (or
+`~/.config/koios/api_key`). The header names the source — `key from ~/.config/koios/api_key`,
+`keyless (no …)`, or `keyless (--keyless)` — and never the value. A key file that is readable by
+other accounts is reported with a `chmod 600` caveat. `at-chain auth` prints the endpoint and the
+key source without making a request; it is the first command after an unexpectedly rate-limited
+run.
+
+### The bounds
+
+- A response is capped at 4 MiB and a raw JSON output at 64 KiB; a cut says how many bytes were
+  withheld and how to narrow the request.
+- The HTTP client follows no redirects, has a 60-second global timeout, and sends the bearer only
+  to the fixed Koios host.
+- The source has no write API, no subprocess and no network outside `koios.rs`; `tests/contract.rs`
+  asserts each absence, and asserts that `/submittx` is refused before a socket opens.
+- `policy --addresses` on a 10k-asset collection can still exceed the timeout. That is Koios's
+  cost, not a hidden walk: narrow it with `--limit`/`--offset` or use the holder index.
+
 ## Bootstrapping: how an agent learns this
 
 Three pieces at three layers, because each has a different lifetime. The terse one is a rule
@@ -621,8 +698,8 @@ targets:
 ## Directive
 
 Ask questions with `at-peek` (working tree), `at-crate` (installed crate source),
-`at-recall` (history) and `at-describe` (what the toolkit can do). All four are read-only; none
-needs a pipe, and none is `git`.
+`at-recall` (history), `at-chain` (Cardano chain facts through Koios) and `at-describe` (what
+the toolkit can do). All are read-only; none needs a pipe, and none is `git` or `curl`.
 
 | Question | Command |
 | --- | --- |
@@ -635,10 +712,12 @@ needs a pipe, and none is `git`.
 | What am I looking at · what changed lately | `at-recall state` · `at-recall log --limit 20` |
 | Why are these lines like this | `at-recall why <file>:40-60` |
 | Write the PR description | `at-recall pr` |
+| A chain fact — tx, address, asset, policy, account, block | `at-chain <verb>` · `at-chain query <endpoint>` |
 | Anything else | `at-describe`, then that verb's `--help` |
 
-- Never `sed`, `awk`, `cat`, `rg`, `grep` or `git` to read. A pipeline costs me an approval and
-  tells me less than one verb does.
+- Never `sed`, `awk`, `cat`, `rg`, `grep`, `git` or `curl` to read. A pipeline costs me an
+  approval and tells me less than one verb does. The Koios key lives in
+  `~/.config/koios/api_key`, not in a command line.
 - Every answer states its own bound, and anything that would make it wrong. Repeat both when you
   report the finding.
 - These tools read. History is mine to write — see `rules/core/git-is-the-users-domain`.
@@ -659,9 +738,10 @@ false for them.
 ### The skills
 
 `skills/inspect-code/SKILL.md` — *"Use when you need to find, read or explain code or its history
-— maps the question to an `at-peek`, `at-crate` or `at-recall` verb."* It carries what the rule cannot afford:
-the target syntax, and the traps. The traps are why it is a skill rather than a reference — each
-one is walked into exactly when the skill fires:
+— maps the question to an `at-peek`, `at-crate` or `at-recall` verb."* The chain half is the rule's
+one row plus `at-describe at-chain`: the verbs, the key path and the pagination rules. The skill
+carries what the rule cannot afford: the target syntax, and the traps. The traps are why it is a
+skill rather than a reference — each one is walked into exactly when the skill fires.
 
 - **`at-peek` is not a read for the purposes of editing.** A `slice` does not satisfy the editor
   tools' read-before-edit check, and an agent that treats it as one gets a stale-read refusal and
@@ -706,13 +786,20 @@ the text format is checked for shape only, so prose can be tuned without a test 
   should be able to read that list and nothing else.
 - `no_write_api_in_the_source` — the grep from *Security*, as a test: no `fs::write`,
   `File::create`, `OpenOptions`, `remove_file`, `rename`, `Command` or socket in any read-only
-  binary. Absence is a stronger guarantee than behaviour, and cheaper to check.
+  binary. `at-chain` has a socket by design, so its version of the test confines `ureq` to
+  `koios.rs` and asserts the rest of the crate is write-free. Absence is a stronger guarantee than
+  behaviour, and cheaper to check.
 - `no_command_writes` — run every verb against a fixture repo and assert the tree and `.git` are
   byte-identical afterwards. Crude, and it catches the exact class of regression that would
   invalidate the whitelist.
 
 ## Non-goals
 
+- **Not a generic HTTP client.** `at-chain query` names one Koios endpoint; it cannot name a
+  host, a scheme, a port, a redirect target or a header. The open-ended part is the endpoint
+  name, not the request.
+- **Not a transaction submitter.** `/submittx` is a write and is refused by name. Signing and
+  submission belong to a wallet or a deploy tool, where the key and the intent live.
 - **Not an LSP and not a symbol resolver.** `outline`, `scope` and `search` are textual and
   heuristic. Where a heuristic cannot answer, the tool says nothing rather than guessing —
   `at-peek scope` on a line outside any declaration prints the line and says so. A fuzzy
@@ -738,11 +825,11 @@ the text format is checked for shape only, so prose can be tuned without a test 
 ## Decisions to settle before code
 
 1. ~~**One source for the catalogue.**~~ **Settled.** `at-describe` links the verb tables from
-   `at-peek`, `at-crate`, `at-recall` and `at-reach` rather than restating them, and every table
-   lives in `at-core`'s vocabulary, so the catalogue cannot describe a grammar the parsers do not
-   enforce. The rule quotes the substitutions rather than the table, so it has nothing to go stale.
-   `at-describe` also lists only the binaries it is linked with, which is why a separately installed
-   tool does not appear in it.
+   `at-peek`, `at-crate`, `at-recall`, `at-reach`, `at-cost` and `at-chain` rather than restating
+   them, and every table lives in `at-core`'s vocabulary, so the catalogue cannot describe a
+   grammar the parsers do not enforce. The rule quotes the substitutions rather than the table, so
+   it has nothing to go stale. `at-describe` also lists only the binaries it is linked with, which
+   is why a separately installed tool does not appear in it.
 2. **Sequencing.** Primitives first, recipes second: `at-peek`'s read verbs, then `at-recall`'s
    state/log/diff/blame/search, then `at-describe` and the recipes. A recipe written against
    half-finished primitives bakes in the wrong section shapes — and the recipes are the largest
@@ -765,8 +852,9 @@ the text format is checked for shape only, so prose can be tuned without a test 
    `packages.agent-tools` so a repository's devshell gets it without a second install.
 6. **Grant granularity.** The tiering assumes approvals are per-command-prefix, which gives three
    levels: `at-*` for the toolkit, `at-peek *` for the working tree, `at-recall search *` for one
-   verb. If the harness grants more coarsely the split buys nothing — but it costs nothing either,
-   and the namespace stays useful as documentation of intent.
+   verb, and `at-chain query *` for the chain's long tail. If the harness grants more coarsely the
+   split buys nothing — but it costs nothing either, and the namespace stays useful as
+   documentation of intent.
 7. **How far recipes go.** The admission test is the guard against the set growing into a report
    generator. If a fourth recipe keeps being wanted, the question to ask first is whether it is a
    recipe or a flag on one.

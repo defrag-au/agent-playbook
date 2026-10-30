@@ -77,9 +77,13 @@
         };
 
       # The at-* toolkit. One derivation for every binary: they are tiers of the same toolkit — a
-      # catalogue, a working-tree reader, a history reader, an installed-crate reader — and are
-      # always installed together, and a further tool is a line in cargoBuildFlags and a line in
-      # installPhase.
+      # catalogue, a working-tree reader, a history reader, an installed-crate reader, a fleet
+      # reader, a process reader and a chain reader — and are always installed together, and a
+      # further tool is a line in cargoBuildFlags and a line in installPhase.
+      #
+      # Every member has no write path. `at-chain` is the one member that opens a socket: HTTPS to
+      # Koios, GET and query-POST, no redirects, and `/submittx` refused. That is a network read,
+      # not a write, and the package's contract says so.
       #
       # Built with the same toolchain the devshell below provides, from the same fenix pin
       # the sibling repositories use.
@@ -109,6 +113,8 @@
             "-p"
             "at-cost"
             "-p"
+            "at-chain"
+            "-p"
             "at-describe"
           ];
           # `cargo install` takes one package per invocation and the workspace root is the
@@ -119,7 +125,7 @@
           installPhase = ''
             runHook preInstall
             mkdir -p $out/bin
-            for tool in at-peek at-crate at-recall at-reach at-cost at-describe; do
+            for tool in at-peek at-crate at-recall at-reach at-cost at-chain at-describe; do
               install -m755 \
                 "$(find target -maxdepth 3 -type f -name "$tool" -perm -u+x | head -n1)" \
                 "$out/bin/$tool"

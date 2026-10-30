@@ -38,8 +38,9 @@ after a heavy request is a poisoned isolate, not a code error.
 
 - **The inspectors** — `at-peek` (the working tree), `at-crate` (installed crate source and
   build-script output, resolved through `Cargo.lock`), `at-recall` (history and state),
-  `at-reach` (the fleet inventory) and `at-describe` (the catalogue). A further tool is a line in
-  that flake's `cargoBuildFlags`.
+  `at-reach` (the fleet inventory), `at-cost` (the process table by repository), `at-chain`
+  (read-only Cardano chain enquiry through Koios) and `at-describe` (the catalogue). A further
+  tool is a line in that flake's `cargoBuildFlags`.
 - **The composer** — `playbook`, which resolves the rules for a project and target and can
   `check`/`install` a repository's managed block. It carries its own rule tree, so it needs no
   checkout: `playbook root` prints which tree it is resolving against and how it found it. A
@@ -64,10 +65,12 @@ the home package's everywhere else. Neither is worth a `nix develop` wrapper —
 `at-crate` reads the cargo home named by `--cargo-home`, `CARGO_HOME` or `~/.cargo`, the project's
 `Cargo.lock`, and its `target/` directory; it never invokes `cargo`, so an uninstalled crate is an
 answer rather than a fetch. `at-recall` has no write path either, and runs exactly one program —
-`git`, with read verbs only. `playbook` writes one file, the managed block, and only under
-`install`. That difference is why they are separate binaries, and why they are separate approvals
-when the grants are tiered. Which verb to reach for is `rules/org/defrag/agent-tools`; the traps
-are the `inspect-code` skill.
+`git`, with read verbs only. `at-chain` is the one member with a socket: HTTPS to Koios only, GET
+and query-POST, `/submittx` refused, and a key read from `KOIOS_API_KEY` or
+`~/.config/koios/api_key` that is never printed. `playbook` writes one file, the managed block,
+and only under `install`. That difference is why they are separate binaries, and why they are
+separate approvals when the grants are tiered. Which verb to reach for is
+`rules/org/defrag/agent-tools`; the traps are the `inspect-code` skill.
 
 ## Where reference material lives
 
