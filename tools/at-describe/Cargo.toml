@@ -9,6 +9,7 @@ license = "MIT"
 # not enforce. They are siblings in this workspace rather than crates from a registry. Nothing
 # else is linked.
 [dependencies]
+at-cost = { workspace = true }
 at-crate = { workspace = true }
 at-peek = { workspace = true }
 at-reach = { workspace = true }

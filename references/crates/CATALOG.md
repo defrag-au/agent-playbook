@@ -21,6 +21,7 @@ Budget: ≤ 200 lines and ≤ 8 KB per file. The test suite enforces a 10 KB cei
 | chrono | 0.4.45 | `chrono-0.4.md` | `## Parse an RFC 3339 timestamp` |
 | clap | 4.6.7 | `clap-4.6.md` | `## Derive a parser` |
 | headless_chrome | 1.0.22 | `headless_chrome-1.0.22.md` | `## Launch a browser and own it` |
+| libproc | 0.14.11 | `libproc-0.14.11.md` | `## Enumerate, then describe` |
 | liquid | 0.26 | `liquid-0.26.md` | `## Building a Parser with Custom Extensions` |
 | ratatui | 0.29.0 | `ratatui-0.29.md` | `## Init, draw, restore` |
 | ratatui | 0.30.2 | `ratatui-0.30.2.md` | `## Key differences from 0.29` |
@@ -38,6 +39,7 @@ Budget: ≤ 200 lines and ≤ 8 KB per file. The test suite enforces a 10 KB cei
 | chrono | RFC 3339 parsing and `DateTime<Utc>` without the serde feature |
 | clap | Derive parser, subcommands and the feature set that produces them |
 | headless_chrome | Headless Chromium over CDP: process lifecycle, true viewport, input, console events, raw commands |
+| libproc | macOS process table: ppid, rusage, per-thread time — and the calls that are stubs |
 | liquid | Parser builder, custom filters/tags and partials for the Liquid engine |
 | ratatui | Terminal init/draw/restore, the re-exported crossterm and widget layout (0.29) |
 | ratatui 0.30 | `ratatui::run`, key-press filtering, array layouts, a polling dashboard and headless rendering |

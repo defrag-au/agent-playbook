@@ -1,0 +1,16 @@
+[package]
+name = "at-cost"
+version = "0.1.0"
+edition = "2021"
+description = "Tier 1 of the agent toolkit: what the machine is costing, by repository"
+license = "MIT"
+
+# `at-core` is the shared contract. `libproc` wraps the macOS process syscalls `ps` uses — the
+# only way to read a working directory, per-thread time and rusage counters without spawning
+# anything. It is a target dependency because its macOS modules are cfg-gated and this tool
+# refuses to run anywhere else.
+[dependencies]
+at-core = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libproc = "0.14.11"

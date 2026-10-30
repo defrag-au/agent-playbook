@@ -3,7 +3,8 @@
 **Status:** proposal, 2026-09-22; part built. Built and tested: `tools/at-core` (the shared output
 contract, path containment and text reading), `tools/at-peek` (`stat`, `slice`, `search`),
 `tools/at-crate` (`where`, `installed`, `files`, `slice`, `search`, `out`), `tools/at-recall`
-(`state`, `log`, `diff`, and the `pr` recipe), `tools/at-reach` (fleet inspection), and
+(`state`, `log`, `diff`, and the `pr` recipe), `tools/at-reach` (fleet inspection),
+`tools/at-cost` (`repos`, `tree`, `pid` — the process table, attributed to repositories), and
 `tools/at-describe` (the catalogue). The toolkit is packaged by this repository's `flake.nix` and
 wired into the org's shells by `defrag-nix`. Everything else here is still the plan: the remaining verbs (`tree`, `find`, `outline`, `scope` in
 `peek`; `show`, `blame`, `why`, `churn` in `recall`), the other two recipes (`review`, `release`),
