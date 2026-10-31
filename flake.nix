@@ -77,9 +77,13 @@
         };
 
       # The at-* toolkit. One derivation for every binary: they are tiers of the same toolkit — a
-      # catalogue, a working-tree reader, a history reader, an installed-crate reader — and are
-      # always installed together, and a further tool is a line in cargoBuildFlags and a line in
-      # installPhase.
+      # catalogue, a working-tree reader, a history reader, an installed-crate reader, a fleet
+      # reader, a process reader and a Cardano reader — and are always installed together, and a
+      # further tool is a line in cargoBuildFlags and a line in installPhase.
+      #
+      # Every member has no write path. `at-cardano` is the one member that opens a socket: HTTPS to
+      # Koios, GET and query-POST, no redirects, and `/submittx` refused. That is a network read,
+      # not a write, and the package's contract says so.
       #
       # Built with the same toolchain the devshell below provides, from the same fenix pin
       # the sibling repositories use.
@@ -107,6 +111,10 @@
             "-p"
             "at-reach"
             "-p"
+            "at-cost"
+            "-p"
+            "at-cardano"
+            "-p"
             "at-describe"
           ];
           # `cargo install` takes one package per invocation and the workspace root is the
@@ -117,7 +125,7 @@
           installPhase = ''
             runHook preInstall
             mkdir -p $out/bin
-            for tool in at-peek at-crate at-recall at-reach at-describe; do
+            for tool in at-peek at-crate at-recall at-reach at-cost at-cardano at-describe; do
               install -m755 \
                 "$(find target -maxdepth 3 -type f -name "$tool" -perm -u+x | head -n1)" \
                 "$out/bin/$tool"
@@ -178,6 +186,31 @@
             install -m755 \
               "$(find target -maxdepth 3 -type f -name tui-shot -perm -u+x | head -n1)" \
               "$out/bin/tui-shot"
+            runHook postInstall
+          '';
+        };
+
+      # The image tool. Separate from `agent-tools` for the same reason as the other `*-shot`
+      # tools: it writes derived views, where every `at-*` binary has no write path. It is also
+      # separate from `browser-shot` and `tui-shot` because it reads files that already exist and
+      # writes images, rather than owning a browser or a terminal process.
+      imageShotFor =
+        rustPlatform:
+        rustPlatform.buildRustPackage {
+          pname = "image-shot";
+          version = (lib.importTOML ./tools/image-shot/Cargo.toml).package.version;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [ "-p" "image-shot" ];
+          # As with `agent-tools`: the workspace root is the composer, so the default install
+          # phase would install `playbook`, and cargoBuildHook's `--target <triple>` puts the
+          # artefact under `target/<triple>/release/`.
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            install -m755 \
+              "$(find target -maxdepth 3 -type f -name image-shot -perm -u+x | head -n1)" \
+              "$out/bin/image-shot"
             runHook postInstall
           '';
         };
@@ -255,6 +288,7 @@
           inherit playbook agent-tools;
           browser-shot = browserShotFor rustPlatform;
           tui-shot = tuiShotFor rustPlatform;
+          image-shot = imageShotFor rustPlatform;
           skill-store = skillStoreFor pkgs;
           zed-thread-tools = zedThreadToolsFor rustPlatform;
           # What this repository is *for*; the toolkit is what it also ships.

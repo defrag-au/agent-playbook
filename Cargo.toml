@@ -1,12 +1,15 @@
 [workspace]
 members = [
     "tools/at-core",
+    "tools/at-cardano",
+    "tools/at-cost",
     "tools/at-crate",
     "tools/at-describe",
     "tools/at-peek",
     "tools/at-recall",
     "tools/at-reach",
     "tools/browser-shot",
+    "tools/image-shot",
     "tools/skill-store",
     "tools/tui-shot",
     "tools/zed-thread-tools",
@@ -19,6 +22,8 @@ resolver = "2"
 [workspace.dependencies]
 # Sibling crates. Declaring the path once means a rename or a move is one line here, not five.
 at-core = { path = "tools/at-core" }
+at-cardano = { path = "tools/at-cardano" }
+at-cost = { path = "tools/at-cost" }
 at-crate = { path = "tools/at-crate" }
 at-peek = { path = "tools/at-peek" }
 at-reach = { path = "tools/at-reach" }

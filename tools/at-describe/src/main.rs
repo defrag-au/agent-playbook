@@ -8,6 +8,8 @@
 //! reviewable — an agent that is unsure asks here instead of composing a shell pipeline to find
 //! out, and the answer comes from the same tables the parsers enforce.
 
+use at_cardano::catalogue as chain;
+use at_cost::catalogue as cost;
 use at_crate::catalogue as crate_source;
 use at_peek::catalogue as peek;
 use at_reach::catalogue as reach;
@@ -34,11 +36,13 @@ fn run(args: &[String]) -> i32 {
         }
         "--version" => {
             println!(
-                "{TOOL} {VERSION} · at-peek {} · at-crate {} · at-recall {} · at-reach {}",
+                "{TOOL} {VERSION} · at-peek {} · at-crate {} · at-recall {} · at-reach {} · at-cost {} · at-cardano {}",
                 at_peek::VERSION,
                 at_crate::VERSION,
                 at_recall::VERSION,
-                at_reach::VERSION
+                at_reach::VERSION,
+                at_cost::VERSION,
+                at_cardano::VERSION
             );
             0
         }
@@ -58,12 +62,22 @@ fn run(args: &[String]) -> i32 {
             print!("{}", reach::help_all());
             0
         }
+        "at-cost" => {
+            print!("{}", cost::help_all());
+            0
+        }
+        "at-cardano" => {
+            print!("{}", chain::help_all());
+            0
+        }
         name => {
             let found = peek::find(name)
                 .map(peek::help_for)
                 .or_else(|| crate_source::find(name).map(crate_source::help_for))
                 .or_else(|| recall::find(name).map(recall::help_for))
-                .or_else(|| reach::find(name).map(reach::help_for));
+                .or_else(|| reach::find(name).map(reach::help_for))
+                .or_else(|| cost::find(name).map(cost::help_for))
+                .or_else(|| chain::find(name).map(chain::help_for));
             match found {
                 Some(help) => {
                     print!("{help}");
@@ -71,11 +85,13 @@ fn run(args: &[String]) -> i32 {
                 }
                 None => {
                     eprintln!(
-                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-crate, at-recall, at-reach · verbs: {}, {}, {}, {}",
+                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-crate, at-recall, at-reach, at-cost, at-cardano · verbs: {}, {}, {}, {}, {}, {}",
                         peek::names(),
                         crate_source::names(),
                         recall::names(),
-                        reach::names()
+                        reach::names(),
+                        cost::names(),
+                        chain::names()
                     );
                     2
                 }
@@ -88,7 +104,9 @@ fn run(args: &[String]) -> i32 {
 /// Bounded to a screen, because its reader is mid-task.
 fn toolkit() -> String {
     let mut out = String::new();
-    out.push_str("# binaries in this build: at-peek, at-crate, at-recall, at-reach\n");
+    out.push_str(
+        "# binaries in this build: at-peek, at-crate, at-recall, at-reach, at-cost, at-cardano\n",
+    );
     out.push_str("# every `at-` binary is read-only: no write path, in any flag or any option\n\n");
 
     out.push_str(&format!(
@@ -137,6 +155,30 @@ fn toolkit() -> String {
         out.push('\n');
     }
 
+    out.push_str(&format!(
+        "\nat-cost {} — what the machine is costing, by repository\n",
+        at_cost::VERSION
+    ));
+    out.push_str(
+        "#   No subprocess, no socket, no writes. Reads the macOS process table, and nothing else.\n",
+    );
+    for line in cost::verb_lines() {
+        out.push_str(&line);
+        out.push('\n');
+    }
+
+    out.push_str(&format!(
+        "\nat-cardano {} — read-only Cardano chain enquiry through Koios\n",
+        at_cardano::VERSION
+    ));
+    out.push_str(
+        "#   HTTPS GET/POST to Koios only; /submittx refused, no writes, no subprocess, key redacted.\n",
+    );
+    for line in chain::verb_lines() {
+        out.push_str(&line);
+        out.push('\n');
+    }
+
     out.push_str("\nRecipes\n");
     for line in recall::recipe_lines() {
         out.push_str(&line);
@@ -159,6 +201,6 @@ fn toolkit() -> String {
     );
     out.push_str("# does not appear here. Ask for detail with `at-describe at-peek`,\n");
     out.push_str("# `at-describe at-crate`, `at-describe at-recall`, `at-describe at-reach`,\n");
-    out.push_str("# or `at-describe <verb>`.\n");
+    out.push_str("# `at-describe at-cost`, `at-describe at-cardano`, or `at-describe <verb>`.\n");
     out
 }

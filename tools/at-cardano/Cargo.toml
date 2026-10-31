@@ -1,0 +1,18 @@
+[package]
+name = "at-cardano"
+version = "0.1.0"
+edition = "2021"
+description = "Tier 6 of the agent toolkit: read-only Cardano chain enquiry through Koios"
+license = "MIT"
+
+[[bin]]
+name = "at-cardano"
+path = "src/main.rs"
+
+# `ureq` is the single network path: rustls, no OpenSSL, fixed Koios hosts, redirects disabled.
+# `serde`/`serde_json` turn responses into typed rows; no `serde_json::Value` is used as a model.
+[dependencies]
+at-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+ureq = "3"

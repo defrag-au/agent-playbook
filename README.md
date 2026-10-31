@@ -82,7 +82,7 @@ Full resolution rules, including how `activation` and `overrides` are evaluated,
 
 ```
 Cargo.toml        the workspace manifest; the composer is std-only, deliberately
-flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot` and `tui-shot`
+flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot`, `tui-shot` and `image-shot`
 src/              resolution engine + CLI
   frontmatter.rs    flat `key: value` readers
   model.rs          Rule, Project, Target, Layer, Activation
@@ -99,9 +99,12 @@ tools/            the agent toolkit, plus the skill store
   at-crate/         installed crate source and build output — where, installed, files, slice, search, out
   at-recall/        history and state — state, log, diff, pr
   at-reach/         a private fleet tree — root, hosts, probe
+  at-cost/          what the machine is costing, by repository — repos, tree, pid
+  at-cardano/       read-only Cardano chain enquiry through Koios
   at-describe/      the catalogue, which opens nothing
   browser-shot/     browser captures, scenarios and frame bursts
   tui-shot/         terminal captures and scenario runs in a PTY it owns
+  image-shot/       image inspection, derived views and diffs on the IIIF grammar
   skill-store/      OCFL publish and export for skills (writes, and fetches)
   zed-thread-tools/ thread auditing, recovery and a TUI
 tests/            spec tests for the resolution model
@@ -221,8 +224,8 @@ crate has no dependencies at all, so it still builds with no network and no regi
 ## The inspection toolkit
 
 The other half of this repository is not a rule. It is the thing that makes it possible to stop
-writing rules about shell pipelines: five read-only binaries, built from `tools/`, that give an
-agent the reads it needs without an approval per command and without a bound hidden in a pipe.
+writing rules about shell pipelines: seven binaries, built from `tools/`, that give an agent the
+reads it needs without an approval per command and without a bound hidden in a pipe.
 
 | Binary | Reads | Verbs |
 | --- | --- | --- |
@@ -230,7 +233,9 @@ agent the reads it needs without an approval per command and without a bound hid
 | `at-crate` | extracted crate source, `Cargo.lock`, and build-script output; spawns nothing | `where`, `installed`, `files`, `slice`, `search`, `out` |
 | `at-recall` | `.git` objects and refs, through one subprocess — `git`, read verbs only | `state`, `log`, `diff`, `pr` |
 | `at-reach` | a private fleet tree, and one read-only probe over `ssh` (or `sh` locally) | `root`, `hosts`, `probe` |
-| `at-describe` | nothing; it prints the catalogue | the four verb tables |
+| `at-cost` | the process table, attributed to repositories; spawns nothing | `repos`, `tree`, `pid` |
+| `at-cardano` | Koios over HTTPS, GET and query-POST only; the key is never printed | nouns and aspects: `tip`, `network`, `epoch`, `block`, `blocks`, `tx`, `utxo`, `address`, `account`, `asset`, `policy`, `pool`, `drep`, `proposal`, `script`, `datum`, `endpoints`, `query`, `run` |
+| `at-describe` | nothing; it prints the catalogue | the six verb tables |
 
 `rg` becomes `at-peek search`, `sed -n '40,60p' f.rs` becomes `at-peek slice f.rs:40-60`,
 `grep -rn … ~/.cargo/registry/src` becomes `at-crate search <pattern> <crate>`, and `git status`
@@ -246,6 +251,13 @@ at-recall state --summary               # branch, HEAD, changed paths — the fr
 at-recall pr --base main                # the facts a PR description is written from
 at-reach hosts                          # the private fleet inventory
 at-reach probe example-host             # OS, Nix, Tailscale, repos — read-only
+at-cardano tip                            # the chain head, no key required
+at-cardano tx <hash>                      # block, fee, size, input/output totals
+at-cardano address utxos <address>        # the UTxOs at an address, with a page bound
+at-cardano pool delegators <pool>         # who delegates, and their stake
+at-cardano endpoints                      # every Koios path, and what answers it
+at-cardano query tx_info --post --body '{"_tx_hashes":["<hash>"]}'   # the long tail
+at-cardano run --scenario .tmp/block.dsl  # several questions, a value carried between them
 at-describe                             # the catalogue, one screen
 ```
 
@@ -265,7 +277,7 @@ intention:
   invocation that produced it and runs exactly as printed — an *address*, never a handle, so no
   state crosses invocations.
 
-The tier each binary sits in is the reason there are five, because a prefix allowlist can only
+The tier each binary sits in is the reason there are seven, because a prefix allowlist can only
 see a difference that is in the binary. `at-describe` opens no file at all. `at-peek` reads files
 and runs nothing. `at-crate` reads the cargo home, `Cargo.lock` and `target/`, and runs nothing —
 in particular it never invokes `cargo`, so an uninstalled crate is an answer rather than a fetch.
@@ -273,7 +285,10 @@ in particular it never invokes `cargo`, so an uninstalled crate is an answer rat
 mutating verb is reachable, a repository's pagers and diff drivers neutralised, and `@{…}` refused
 by syntax because the reflog is not read. `at-reach` reads a private fleet tree and runs one fixed
 probe over `ssh` or `sh`; it has no write, sudo or secret verb. Its contract is
-[`docs/fleet.md`](docs/fleet.md).
+[`docs/fleet.md`](docs/fleet.md). `at-cost` reads the macOS process table and nothing else.
+`at-cardano` is the one member with a socket: HTTPS to a Koios host chosen only by `--network`, GET
+and query-POST only, redirects disabled, `/submittx` refused by name, and a key read from
+`~/.config/koios/api_key` that no output ever prints.
 
 `defrag-nix` installs them into every defrag devshell, so they are on `PATH` in an interactive
 shell in any of those repositories; a shell an agent spawned reaches for them as
@@ -283,6 +298,33 @@ The verbs above are built. `tree`, `find`, `outline` and `scope` in `at-peek`; `
 `why` and `churn` in `at-recall`; and the `review` and `release` recipes are designed and not
 written — [`docs/inspection-tools.md`](docs/inspection-tools.md) is the design record, and
 `at-describe` answers with what exists rather than what was planned.
+
+## The image tool
+
+`tools/image-shot/` is outside the `at-` namespace for the same reason as `browser-shot` and
+`tui-shot`: it writes derived views. It inspects and derives images on the IIIF worker's five-axis
+operation grammar, so a crop is `--box X,Y,W,H`, a render is `full/400,/0/gray.png`, and the report
+prints the canonical operation it applied.
+
+```sh
+image-shot info .tmp/capture.png          # format, dimensions, colour type, size
+image-shot stats .tmp/capture.png         # mean/sd, alpha, colours, ink bbox, sharpness
+image-shot crop .tmp/capture.png --box 0,0,780,200 --zoom 2
+image-shot fit .tmp/capture.png --edge 24
+image-shot diff .tmp/before.png .tmp/after.png --tolerance 2
+image-shot run  --scenario .tmp/review.dsl
+```
+
+A scenario composes the same operations: `source`, `crop`, `fit`, `sheet`, `overlay`, `trim`,
+`stats`, `diff` and `assert`, with `run.txt` / `run.json` beside the images. It is line-oriented and
+has no shell action. The grammar is [`tools/image-shot/SCENARIO.md`](tools/image-shot/SCENARIO.md).
+
+It reads PNG, JPEG, GIF and WebP, and refuses BMP, TIFF, SVG, AVIF, HEIC and PDF by name. Writes go
+only into its artifacts directory, never over an input; a derived name is a hash of the source
+bytes, the canonical operation and the tool version. The build is `anyhow` plus `image` with four
+codecs and no native libraries. [`tools/image-shot/README.md`](tools/image-shot/README.md) is the
+full contract. The procedure an agent follows is
+[`skills/image-shot/SKILL.md`](skills/image-shot/SKILL.md), published into `.skill-store/`.
 
 ## The Zed thread tools
 

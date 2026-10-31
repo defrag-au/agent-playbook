@@ -84,7 +84,9 @@ impl Fail {
 #[derive(Default)]
 pub struct Report {
     lines: Vec<String>,
-    content: usize,
+    /// The content lines on their own, so a caller that has to read an answer as text — a
+    /// scenario's `contains` — does not have to strip the `# ` metadata back out.
+    content: Vec<String>,
 }
 
 impl Report {
@@ -99,8 +101,9 @@ impl Report {
     }
 
     pub fn content(&mut self, line: impl Into<String>) {
-        self.lines.push(line.into());
-        self.content += 1;
+        let line = line.into();
+        self.lines.push(line.clone());
+        self.content.push(line);
     }
 
     pub fn note(&mut self, line: impl Into<String>) {
@@ -139,7 +142,13 @@ impl Report {
     /// How many content lines were produced. Zero means "nothing found", which is an exit
     /// code rather than an empty success.
     pub fn content_lines(&self) -> usize {
-        self.content
+        self.content.len()
+    }
+
+    /// The content lines, without the header and without any bound — the answer as a reader
+    /// would read it, which is what an assertion over an answer should test.
+    pub fn content_text(&self) -> String {
+        self.content.join("\n")
     }
 
     pub fn render(&self) -> String {
@@ -384,6 +393,18 @@ mod tests {
         let mut report = Report::new();
         report.content("a line");
         assert_eq!(Outcome::from_report(report).exit, Exit::Results);
+    }
+
+    #[test]
+    fn content_text_is_the_answer_without_the_frame() {
+        let mut report = Report::new();
+        report.header("at-cardano", "tip", "mainnet", "Koios /tip");
+        report.bound("auth: keyless");
+        report.content("hash: abc");
+        report.note("");
+        report.content("epoch: 500");
+        assert_eq!(report.content_lines(), 2);
+        assert_eq!(report.content_text(), "hash: abc\nepoch: 500");
     }
 
     #[test]

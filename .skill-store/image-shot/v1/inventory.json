@@ -1,0 +1,26 @@
+{
+  "id": "urn:skill:image-shot",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v1",
+  "manifest": {
+    "5a2185782fa1df2a94262db59809b3a23c2516c7b7caffbd939a35188ab615c05a83ca1d4ab36d737e9efed7ec2a8067c09131800d3a9b7bf94313081c493994": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-31T03:10:01Z",
+      "state": {
+        "5a2185782fa1df2a94262db59809b3a23c2516c7b7caffbd939a35188ab615c05a83ca1d4ab36d737e9efed7ec2a8067c09131800d3a9b7bf94313081c493994": [
+          "SKILL.md"
+        ]
+      },
+      "message": "image-shot procedure",
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}

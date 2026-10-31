@@ -51,8 +51,9 @@ skill-store verify  path:<repo>/.skill-store
 ```
 
 This directory holds the skills whose subject **is** this repository's toolkit — `at-peek` and
-`at-crate` for `inspect-code`, the thread tools for `crate-research`, the composer for
-`capture-rule`. They are published into [`.skill-store/`](../.skill-store) at the repository root,
+`at-crate` for `inspect-code`, the Cardano client for `at-cardano`, the thread tools for
+`crate-research`, the composer for `capture-rule`. They are published into
+[`.skill-store/`](../.skill-store) at the repository root,
 which is what `github:defrag-au/agent-playbook#inspect-code@v1` resolves to.
 
 ## Authoring here, publishing there

@@ -38,6 +38,9 @@ fn the_toolkit_view_lists_every_verb_in_every_binary() {
     for verb in at_reach::catalogue::VERBS {
         assert!(text.contains(verb.name), "{} is not described", verb.name);
     }
+    for noun in at_cardano::catalogue::nouns() {
+        assert!(text.contains(noun.name), "{} is not described", noun.name);
+    }
     assert!(
         text.contains("read-only"),
         "the namespace contract is stated: {text}"
@@ -56,6 +59,8 @@ fn each_binary_states_what_it_does_not_do() {
         "{text}"
     );
     assert!(text.contains("One subprocess, git"), "{text}");
+    assert!(text.contains("Koios"), "{text}");
+    assert!(text.contains("submittx"), "{text}");
 }
 
 #[test]
@@ -73,6 +78,13 @@ fn every_binary_can_be_asked_for_its_flags() {
 
     let reach = stdout(&describe(&["at-reach"]));
     assert!(reach.contains("--fleet-root"), "{reach}");
+
+    let chain = stdout(&describe(&["at-cardano"]));
+    assert!(chain.contains("--network"), "{chain}");
+    assert!(chain.contains("--body-file"), "{chain}");
+    // The noun's aspects are what a caller of a 100-endpoint grammar needs next.
+    assert!(chain.contains("delegators"), "{chain}");
+    assert!(chain.contains("also:"), "{chain}");
 }
 
 #[test]
@@ -86,6 +98,11 @@ fn a_verb_is_found_whichever_binary_owns_it() {
 
     let location = stdout(&describe(&["where"]));
     assert!(location.contains("at-crate where"), "{location}");
+
+    let tip = stdout(&describe(&["tip"]));
+    assert!(tip.contains("at-cardano tip"), "{tip}");
+    let query = stdout(&describe(&["query"]));
+    assert!(query.contains("at-cardano query"), "{query}");
 }
 
 #[test]
