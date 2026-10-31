@@ -213,7 +213,9 @@ pub fn decrypt_to_encrypt(
 }
 
 /// Read the packet headers and confirm the expected encryption key is one of the recipients.
-/// This needs no secret key, and `--no-throw-keyids` makes it possible.
+/// This needs no secret key, but `gpg --list-packets` still tries to decrypt when one is
+/// available; with no secret key it prints the key id and exits non-zero. The id is therefore the
+/// answer, and the exit status is only consulted when no id was printed at all.
 fn verify_recipient(path: &Path, expected: &str) -> Result<(), Fail> {
     let output = Command::new("gpg")
         .args(["--batch", "--list-packets"])
@@ -221,41 +223,64 @@ fn verify_recipient(path: &Path, expected: &str) -> Result<(), Fail> {
         .output()
         .map_err(|error| Fail::environment(format!("cannot run gpg list-packets: {error}")))?;
 
+    let expected = expected.to_ascii_uppercase();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if mentions_key_id(&stdout, &expected) || mentions_key_id(&stderr, &expected) {
+        return Ok(());
+    }
+
     if !output.status.success() {
         return Err(Fail::environment(format!(
             "cannot inspect the encryption packets of {} · {}",
             path.display(),
-            first_line(&String::from_utf8_lossy(&output.stderr))
+            last_line(&stderr)
         )));
     }
 
-    let expected = expected.to_ascii_uppercase();
-    let found = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter_map(|line| {
-            let (_, tail) = line.split_once("keyid ")?;
-            let id = tail
-                .trim_start()
-                .split(|character: char| character == ',' || character.is_whitespace())
-                .next()?;
-            Some(id.to_ascii_uppercase())
-        })
-        .any(|id| id == expected);
+    Err(Fail::refused(format!(
+        "{} is not encrypted to the expected recipient key {expected} · check that gpg's \
+         throw-keyids setting is not hiding the key id",
+        path.display()
+    )))
+}
 
-    if !found {
-        return Err(Fail::refused(format!(
-            "{} is not encrypted to the expected recipient key {expected} · check that gpg's \
-             throw-keyids setting is not hiding the key id",
-            path.display()
-        )));
+/// A key id appears in two shapes, depending on which stream gpg used: `keyid <id>` in the packet
+/// listing, and `ID <id>` in the "encrypted with …" summary. Both are 16 hex digits.
+fn mentions_key_id(text: &str, expected: &str) -> bool {
+    for line in text.lines() {
+        for marker in ["keyid ", "ID "] {
+            let mut rest = line;
+            while let Some(at) = rest.find(marker) {
+                let candidate = &rest[at + marker.len()..];
+                let end = candidate
+                    .find(|character: char| !character.is_ascii_hexdigit())
+                    .unwrap_or(candidate.len());
+                if end == 16 && candidate[..end].eq_ignore_ascii_case(expected) {
+                    return true;
+                }
+                rest = if end < candidate.len() {
+                    &candidate[end + 1..]
+                } else {
+                    ""
+                };
+            }
+        }
     }
-
-    Ok(())
+    false
 }
 
 fn first_line(text: &str) -> String {
     text.lines()
         .find(|line| !line.trim().is_empty())
+        .map(|line| line.trim().to_string())
+        .unwrap_or_else(|| "no stderr".to_string())
+}
+
+fn last_line(text: &str) -> String {
+    text.lines()
+        .rfind(|line| !line.trim().is_empty())
         .map(|line| line.trim().to_string())
         .unwrap_or_else(|| "no stderr".to_string())
 }
@@ -300,5 +325,25 @@ fpr:::::::::BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB:
         let raw = ONE_KEY.replacen("pub:u:", "pub:r:", 1);
         let error = parse_recipient(&raw).expect_err("revoked");
         assert!(error.message.contains("revoked"));
+    }
+
+    #[test]
+    fn a_key_id_is_found_in_the_packet_listing() {
+        let listing = ":pubkey enc packet: version 3, algo 18, keyid 19990289A6A735CF\n";
+        assert!(mentions_key_id(listing, "19990289A6A735CF"));
+        assert!(!mentions_key_id(listing, "0000000000000000"));
+    }
+
+    #[test]
+    fn a_key_id_is_found_in_the_gpg_summary() {
+        let summary = "gpg: encrypted with cv25519 key, ID 19990289A6A735CF, created 2026-10-31\n";
+        assert!(mentions_key_id(summary, "19990289A6A735CF"));
+    }
+
+    #[test]
+    fn a_different_key_id_does_not_match_a_prefix_or_an_extension() {
+        let listing = ":pubkey enc packet: version 3, algo 18, keyid 19990289A6A735CF\n";
+        assert!(!mentions_key_id(listing, "19990289A6A735C"));
+        assert!(!mentions_key_id(listing, "19990289A6A735CF0"));
     }
 }
