@@ -377,6 +377,9 @@ non-terminal stdin unless `--allow-non-tty` is explicit, because its job is to d
 selection, then hand the command over. The crate's gpg round-trip test uses throwaway keys in a
 temporary `GNUPGHOME`; it is still the human's command, not the agent's.
 
+The full contract — inputs, the two-process gpg pipe, the manifest, failure modes and the tests —
+is [`tools/travel-secrets/README.md`](tools/travel-secrets/README.md).
+
 ## The Zed thread tools
 
 `tools/zed-thread-tools/` is deliberately outside the `at-` namespace. `zed-thread-audit`

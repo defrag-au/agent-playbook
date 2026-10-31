@@ -139,8 +139,15 @@ The selection lives in `fleet/travel/<host>.md` and is built for one trip. It na
 values, and it does not make the satellite a writer: the travel key's secret half is generated on
 the satellite, and only its public half is imported on the admin machine.
 
+A **public** key is not a secret, so its fingerprint — or the armored key itself — may be committed
+to the private fleet repository beside the selection. The secret half never leaves the satellite,
+and `~/.gnupg` is never copied. A committed key is build input, though: whoever can write to the
+fleet repository could substitute one, so verify the fingerprint out of band (or re-export it from
+the satellite) when that matters.
+
 **An agent must not run `travel-secrets`, `pass` or `gpg --decrypt` against a real keyring.**
 Preparing the selection and reading the manifest are agent work; the command is the human's.
+The tool's full contract is [`tools/travel-secrets/README.md`](tools/travel-secrets/README.md).
 
 ## What `probe` does
 
