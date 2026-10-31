@@ -323,7 +323,8 @@ It reads PNG, JPEG, GIF and WebP, and refuses BMP, TIFF, SVG, AVIF, HEIC and PDF
 only into its artifacts directory, never over an input; a derived name is a hash of the source
 bytes, the canonical operation and the tool version. The build is `anyhow` plus `image` with four
 codecs and no native libraries. [`tools/image-shot/README.md`](tools/image-shot/README.md) is the
-full contract.
+full contract. The procedure an agent follows is
+[`skills/image-shot/SKILL.md`](skills/image-shot/SKILL.md), published into `.skill-store/`.
 
 ## The Zed thread tools
 
