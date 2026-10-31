@@ -9,8 +9,10 @@ members = [
     "tools/at-recall",
     "tools/at-reach",
     "tools/browser-shot",
+    "tools/fleet-sync",
     "tools/image-shot",
     "tools/skill-store",
+    "tools/travel-secrets",
     "tools/tui-shot",
     "tools/zed-thread-tools",
 ]

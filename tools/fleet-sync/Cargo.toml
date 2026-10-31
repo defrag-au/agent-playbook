@@ -1,0 +1,11 @@
+[package]
+name = "fleet-sync"
+version = "0.1.0"
+edition = "2021"
+description = "Seed and resync a read-only fleet satellite from a git bundle"
+license = "MIT"
+
+[dependencies]
+at-core = { workspace = true }
+at-reach = { workspace = true }
+sha2 = { workspace = true }

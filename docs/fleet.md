@@ -71,6 +71,8 @@ repos: example-org/nix-config,example-org/shared-crates
 rebuild_repo: example-org/nix-config
 rebuild: home-manager switch --flake .#user@example-host
 writes: none
+sync: bundle
+sync_clean: artifacts
 notes: Example only.
 ```
 
@@ -85,6 +87,67 @@ Required keys: `id`, `role`, `os`, `arch`, `ssh`, `sudo`, `rebuild`, `writes`.
 - `tailscale` is the desired MagicDNS name; `tailscale_ip` is the fallback while a name is
   being corrected in the admin console.
 - `writes` records the repo(s) this host is the authoritative writer for. One writer per repo.
+- `sync` is optional: `bundle` (the default) makes the host a `fleet-sync` target, and `none`
+  opts it out. A host with `writes` other than `none` is not a target even when this says
+  `bundle`; `fleet-sync apply` refuses it without `--allow-writer`.
+- `sync_clean` is optional: what `fleet-sync apply` may remove in a checkout — `artifacts` (the
+  default), `reset` (artifacts plus `git clean -xfd`, protecting `.env`) or `none`.
+
+## Sync to a satellite
+
+`fleet-sync` is the write-side counterpart, and it is a **separate binary and package**:
+`at-reach` stays read-only, and a read-only probe can never become a write by adding a flag.
+
+```sh
+fleet-sync bundle <host> --out <dir>   # on the machine that has the work
+fleet-sync plan   <host> --from <dir>  # on the target: what apply would do
+fleet-sync apply  <host> --from <dir>  # on the target: clean and reset
+```
+
+`bundle` reads the profile's repos against `repo_root` (or `--source-root`), writes one `.bundle`
+per repo and a flat `manifest` carrying the host, ref, commit, size and SHA-256. It carries
+commits, not working-tree changes; a dirty source checkout is reported, not copied. The target is
+not contacted.
+
+`plan` and `apply` resolve the same profile on the target and refuse unless the local hostname
+matches the profile's `id` and `writes` is `none` (or `--allow-writer`). There is no SSH
+path in either direction. Before writing, every bundle's size and digest is verified; a checkout
+with tracked changes is refused until `--force`; and the plan refuses when the payload plus 256
+MiB of headroom will not fit after the clean. The artifact list is fixed: `target`, `.direnv`,
+`node_modules`, `.tmp`, `.venv`. A symlinked artifact is left alone.
+
+The payload contains git history, so a private repository's bundle belongs on an encrypted
+volume. The password store is deliberately not part of this tool.
+
+### Credentials
+
+`travel-secrets` builds the other payload for the same trip, and is a separate binary for the
+same reason: re-encrypting a password store is a different approval from moving commits.
+
+```sh
+travel-secrets --store ~/.password-store --whitelist <selection> \
+               --recipient <travel-fingerprint> --out <dir>
+```
+
+The selection is a flat file whose `pass:` line names areas or individual entries under the
+store. The tool decrypts each one with the current keyring, re-encrypts it to the travel
+recipient through a pipe, and writes a self-contained store plus a manifest of entry, size and
+SHA-256. Plaintext is never written to disk, symlinks are refused, and the source store is never
+modified. The root `.gpg-id` of the output is the travel fingerprint; nested ids are not copied.
+
+The selection lives in `fleet/travel/<host>.md` and is built for one trip. It names paths, never
+values, and it does not make the satellite a writer: the travel key's secret half is generated on
+the satellite, and only its public half is imported on the admin machine.
+
+A **public** key is not a secret, so its fingerprint — or the armored key itself — may be committed
+to the private fleet repository beside the selection. The secret half never leaves the satellite,
+and `~/.gnupg` is never copied. A committed key is build input, though: whoever can write to the
+fleet repository could substitute one, so verify the fingerprint out of band (or re-export it from
+the satellite) when that matters.
+
+**An agent must not run `travel-secrets`, `pass` or `gpg --decrypt` against a real keyring.**
+Preparing the selection and reading the manifest are agent work; the command is the human's.
+The tool's full contract is [`tools/travel-secrets/README.md`](tools/travel-secrets/README.md).
 
 ## What `probe` does
 
@@ -127,9 +190,12 @@ The inventory is private because it describes the fleet, not because it contains
 not put private keys, tokens, PINs, PUKs, decrypted passwords or wallet material in it. Those
 belong in the YubiKey-backed tier or `sops`.
 
-## Future write verbs
+## Write verbs
 
-`run` and `apply` are not part of this tool. If they are added, they should be a separate
-approval: host allowlist from the inventory, per-host lock, preflight for dirty Git trees and
-staged Nix files, postflight for services and generations, and no password prompt. A read-only
-probe should never be able to become a write by adding a flag.
+`run` and `apply` are not part of `at-reach`, and that has not changed: `fleet-sync` is the
+separate tool that writes. It takes its host from the inventory, refuses to run anywhere but the
+named target, refuses a dirty checkout without `--force`, verifies every bundle before touching a
+checkout, and does not prompt for a password. A read-only probe cannot become a write by adding a
+flag. `travel-secrets` is a third binary for the credential half, not a flag on either of these.
+
+A future remote push would be another tool with its own approval, not a flag on any of these.

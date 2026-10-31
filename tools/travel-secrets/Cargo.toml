@@ -1,0 +1,10 @@
+[package]
+name = "travel-secrets"
+version = "0.1.0"
+edition = "2021"
+description = "Build a whitelisted, recipient-encrypted pass-store subset for travel"
+license = "MIT"
+
+[dependencies]
+at-core = { workspace = true }
+sha2 = { workspace = true }

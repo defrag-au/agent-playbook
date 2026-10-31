@@ -138,7 +138,9 @@ pub fn probe(fleet: &Fleet, id: &str) -> Result<Outcome, Fail> {
     Ok(Outcome::from_report(report))
 }
 
-fn is_local(profile: &Profile) -> bool {
+/// Whether this process is running on the machine the profile names. `fleet-sync` uses the
+/// same test to refuse to write anywhere but the target itself.
+pub fn is_local(profile: &Profile) -> bool {
     if profile.ssh.eq_ignore_ascii_case("local") {
         return true;
     }
