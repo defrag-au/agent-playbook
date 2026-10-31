@@ -82,7 +82,7 @@ Full resolution rules, including how `activation` and `overrides` are evaluated,
 
 ```
 Cargo.toml        the workspace manifest; the composer is std-only, deliberately
-flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot` and `tui-shot`
+flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot`, `tui-shot` and `image-shot`
 src/              resolution engine + CLI
   frontmatter.rs    flat `key: value` readers
   model.rs          Rule, Project, Target, Layer, Activation
@@ -100,10 +100,11 @@ tools/            the agent toolkit, plus the skill store
   at-recall/        history and state — state, log, diff, pr
   at-reach/         a private fleet tree — root, hosts, probe
   at-cost/          what the machine is costing, by repository — repos, tree, pid
-  at-chain/         read-only Cardano chain enquiry through Koios
+  at-cardano/       read-only Cardano chain enquiry through Koios
   at-describe/      the catalogue, which opens nothing
   browser-shot/     browser captures, scenarios and frame bursts
   tui-shot/         terminal captures and scenario runs in a PTY it owns
+  image-shot/       image inspection, derived views and diffs on the IIIF grammar
   skill-store/      OCFL publish and export for skills (writes, and fetches)
   zed-thread-tools/ thread auditing, recovery and a TUI
 tests/            spec tests for the resolution model
@@ -233,7 +234,7 @@ reads it needs without an approval per command and without a bound hidden in a p
 | `at-recall` | `.git` objects and refs, through one subprocess — `git`, read verbs only | `state`, `log`, `diff`, `pr` |
 | `at-reach` | a private fleet tree, and one read-only probe over `ssh` (or `sh` locally) | `root`, `hosts`, `probe` |
 | `at-cost` | the process table, attributed to repositories; spawns nothing | `repos`, `tree`, `pid` |
-| `at-chain` | Koios over HTTPS, GET and query-POST only; the key is never printed | `tip`, `address`, `utxos`, `tx`, `asset`, `policy`, `account`, `block`, `query`, … |
+| `at-cardano` | Koios over HTTPS, GET and query-POST only; the key is never printed | nouns and aspects: `tip`, `network`, `epoch`, `block`, `blocks`, `tx`, `utxo`, `address`, `account`, `asset`, `policy`, `pool`, `drep`, `proposal`, `script`, `datum`, `endpoints`, `query`, `run` |
 | `at-describe` | nothing; it prints the catalogue | the six verb tables |
 
 `rg` becomes `at-peek search`, `sed -n '40,60p' f.rs` becomes `at-peek slice f.rs:40-60`,
@@ -250,10 +251,13 @@ at-recall state --summary               # branch, HEAD, changed paths — the fr
 at-recall pr --base main                # the facts a PR description is written from
 at-reach hosts                          # the private fleet inventory
 at-reach probe example-host             # OS, Nix, Tailscale, repos — read-only
-at-chain tip                            # the chain head, no key required
-at-chain tx <hash>                      # block, fee, size, input/output totals
-at-chain utxos <address>                # the UTxOs at an address, with a page bound
-at-chain query tx_info --post --body '{"_tx_hashes":["<hash>"]}'   # the long tail
+at-cardano tip                            # the chain head, no key required
+at-cardano tx <hash>                      # block, fee, size, input/output totals
+at-cardano address utxos <address>        # the UTxOs at an address, with a page bound
+at-cardano pool delegators <pool>         # who delegates, and their stake
+at-cardano endpoints                      # every Koios path, and what answers it
+at-cardano query tx_info --post --body '{"_tx_hashes":["<hash>"]}'   # the long tail
+at-cardano run --scenario .tmp/block.dsl  # several questions, a value carried between them
 at-describe                             # the catalogue, one screen
 ```
 
@@ -282,7 +286,7 @@ mutating verb is reachable, a repository's pagers and diff drivers neutralised, 
 by syntax because the reflog is not read. `at-reach` reads a private fleet tree and runs one fixed
 probe over `ssh` or `sh`; it has no write, sudo or secret verb. Its contract is
 [`docs/fleet.md`](docs/fleet.md). `at-cost` reads the macOS process table and nothing else.
-`at-chain` is the one member with a socket: HTTPS to a Koios host chosen only by `--network`, GET
+`at-cardano` is the one member with a socket: HTTPS to a Koios host chosen only by `--network`, GET
 and query-POST only, redirects disabled, `/submittx` refused by name, and a key read from
 `~/.config/koios/api_key` that no output ever prints.
 
@@ -294,6 +298,27 @@ The verbs above are built. `tree`, `find`, `outline` and `scope` in `at-peek`; `
 `why` and `churn` in `at-recall`; and the `review` and `release` recipes are designed and not
 written — [`docs/inspection-tools.md`](docs/inspection-tools.md) is the design record, and
 `at-describe` answers with what exists rather than what was planned.
+
+## The image tool
+
+`tools/image-shot/` is outside the `at-` namespace for the same reason as `browser-shot` and
+`tui-shot`: it writes derived views. It inspects and derives images on the IIIF worker's five-axis
+operation grammar, so a crop is `--box X,Y,W,H`, a render is `full/400,/0/gray.png`, and the report
+prints the canonical operation it applied.
+
+```sh
+image-shot info .tmp/capture.png          # format, dimensions, colour type, size
+image-shot stats .tmp/capture.png         # mean/sd, alpha, colours, ink bbox, sharpness
+image-shot crop .tmp/capture.png --box 0,0,780,200 --zoom 2
+image-shot fit .tmp/capture.png --edge 24
+image-shot diff .tmp/before.png .tmp/after.png --tolerance 2
+```
+
+It reads PNG, JPEG, GIF and WebP, and refuses BMP, TIFF, SVG, AVIF, HEIC and PDF by name. Writes go
+only into its artifacts directory, never over an input; a derived name is a hash of the source
+bytes, the canonical operation and the tool version. The build is `anyhow` plus `image` with four
+codecs and no native libraries. [`tools/image-shot/README.md`](tools/image-shot/README.md) is the
+full contract.
 
 ## The Zed thread tools
 

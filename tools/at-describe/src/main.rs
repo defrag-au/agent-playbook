@@ -8,7 +8,7 @@
 //! reviewable — an agent that is unsure asks here instead of composing a shell pipeline to find
 //! out, and the answer comes from the same tables the parsers enforce.
 
-use at_chain::catalogue as chain;
+use at_cardano::catalogue as chain;
 use at_cost::catalogue as cost;
 use at_crate::catalogue as crate_source;
 use at_peek::catalogue as peek;
@@ -36,13 +36,13 @@ fn run(args: &[String]) -> i32 {
         }
         "--version" => {
             println!(
-                "{TOOL} {VERSION} · at-peek {} · at-crate {} · at-recall {} · at-reach {} · at-cost {} · at-chain {}",
+                "{TOOL} {VERSION} · at-peek {} · at-crate {} · at-recall {} · at-reach {} · at-cost {} · at-cardano {}",
                 at_peek::VERSION,
                 at_crate::VERSION,
                 at_recall::VERSION,
                 at_reach::VERSION,
                 at_cost::VERSION,
-                at_chain::VERSION
+                at_cardano::VERSION
             );
             0
         }
@@ -66,7 +66,7 @@ fn run(args: &[String]) -> i32 {
             print!("{}", cost::help_all());
             0
         }
-        "at-chain" => {
+        "at-cardano" => {
             print!("{}", chain::help_all());
             0
         }
@@ -85,7 +85,7 @@ fn run(args: &[String]) -> i32 {
                 }
                 None => {
                     eprintln!(
-                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-crate, at-recall, at-reach, at-cost, at-chain · verbs: {}, {}, {}, {}, {}, {}",
+                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-crate, at-recall, at-reach, at-cost, at-cardano · verbs: {}, {}, {}, {}, {}, {}",
                         peek::names(),
                         crate_source::names(),
                         recall::names(),
@@ -105,7 +105,7 @@ fn run(args: &[String]) -> i32 {
 fn toolkit() -> String {
     let mut out = String::new();
     out.push_str(
-        "# binaries in this build: at-peek, at-crate, at-recall, at-reach, at-cost, at-chain\n",
+        "# binaries in this build: at-peek, at-crate, at-recall, at-reach, at-cost, at-cardano\n",
     );
     out.push_str("# every `at-` binary is read-only: no write path, in any flag or any option\n\n");
 
@@ -168,8 +168,8 @@ fn toolkit() -> String {
     }
 
     out.push_str(&format!(
-        "\nat-chain {} — read-only Cardano chain enquiry through Koios\n",
-        at_chain::VERSION
+        "\nat-cardano {} — read-only Cardano chain enquiry through Koios\n",
+        at_cardano::VERSION
     ));
     out.push_str(
         "#   HTTPS GET/POST to Koios only; /submittx refused, no writes, no subprocess, key redacted.\n",
@@ -201,6 +201,6 @@ fn toolkit() -> String {
     );
     out.push_str("# does not appear here. Ask for detail with `at-describe at-peek`,\n");
     out.push_str("# `at-describe at-crate`, `at-describe at-recall`, `at-describe at-reach`,\n");
-    out.push_str("# `at-describe at-cost`, `at-describe at-chain`, or `at-describe <verb>`.\n");
+    out.push_str("# `at-describe at-cost`, `at-describe at-cardano`, or `at-describe <verb>`.\n");
     out
 }

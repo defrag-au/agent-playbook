@@ -1,18 +1,19 @@
-//! `at-chain` is allowlisted for what its grammar can do, so its tests are about that
-//! grammar: every catalogued verb has help, a write is refused before a socket opens, the key
-//! is named but never printed, and there is no write API in the source.
+//! `at-cardano` is allowlisted for what its grammar can do, so its tests are about that
+//! grammar: every noun and aspect has help, a write is refused before a socket opens, the key
+//! is named but never printed, every published endpoint is answered, and there is no write API
+//! in the source.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const BIN: &str = env!("CARGO_BIN_EXE_at-chain");
+const BIN: &str = env!("CARGO_BIN_EXE_at-cardano");
 
-fn at_chain(args: &[&str]) -> Output {
+fn at_cardano(args: &[&str]) -> Output {
     Command::new(BIN)
         .args(args)
         .env_remove("KOIOS_API_KEY")
         .output()
-        .expect("run at-chain")
+        .expect("run at-cardano")
 }
 
 fn stdout(out: &Output) -> String {
@@ -25,7 +26,7 @@ fn stderr(out: &Output) -> String {
 
 fn temp_root(label: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!(
-        "at-chain-{label}-{}-{}",
+        "at-cardano-{label}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -36,22 +37,29 @@ fn temp_root(label: &str) -> PathBuf {
     root
 }
 
+/// A verb name is one noun and one aspect: `tip`, `pool`, `pool delegators`.
+fn words(verb: &at_cardano::catalogue::Verb) -> Vec<&'static str> {
+    verb.name.split(' ').collect()
+}
+
 #[test]
-fn the_help_lists_every_catalogued_verb() {
-    let out = at_chain(&["--help"]);
+fn the_help_lists_every_noun() {
+    let out = at_cardano(&["--help"]);
     let text = stdout(&out);
 
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
-    for verb in at_chain::catalogue::VERBS {
-        assert!(text.contains(verb.name), "{} is not listed", verb.name);
+    for noun in at_cardano::catalogue::nouns() {
+        assert!(text.contains(noun.name), "{} is not listed", noun.name);
     }
     assert!(text.contains("/submittx refused"), "{text}");
 }
 
 #[test]
-fn every_catalogued_verb_has_its_own_help() {
-    for verb in at_chain::catalogue::VERBS {
-        let out = at_chain(&[verb.name, "--help"]);
+fn every_verb_has_its_own_help() {
+    for verb in at_cardano::catalogue::verbs() {
+        let mut args = words(verb);
+        args.push("--help");
+        let out = at_cardano(&args);
         let text = stdout(&out);
         assert_eq!(
             out.status.code(),
@@ -61,29 +69,79 @@ fn every_catalogued_verb_has_its_own_help() {
             stderr(&out)
         );
         assert!(
-            text.contains(&format!("at-chain {}", verb.name)),
+            text.contains(&format!("at-cardano {}", verb.name)),
             "{} help does not name itself: {text}",
+            verb.name
+        );
+        assert!(
+            text.contains(verb.usage),
+            "{} help does not carry its usage: {text}",
             verb.name
         );
     }
 }
 
 #[test]
-fn an_unknown_verb_is_a_usage_error_that_names_what_is_known() {
-    let out = at_chain(&["tipx"]);
+fn every_noun_help_lists_its_aspects() {
+    for noun in at_cardano::catalogue::nouns() {
+        let out = at_cardano(&["help", noun.name]);
+        let text = stdout(&out);
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "help {}: {}",
+            noun.name,
+            stderr(&out)
+        );
+        for aspect in noun.aspects() {
+            assert!(
+                text.contains(aspect),
+                "`{}` help does not list `{aspect}`: {text}",
+                noun.name
+            );
+        }
+    }
+}
 
-    assert_eq!(out.status.code(), Some(2));
+#[test]
+fn a_noun_without_a_principal_question_names_its_aspects() {
+    let out = at_cardano(&["proposal"]);
+
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stderr(&out).contains("needs an aspect"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("summary"), "{}", stderr(&out));
+}
+
+#[test]
+fn a_mistyped_aspect_names_the_aspects() {
+    let out = at_cardano(&["pool", "deegators"]);
+
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(
-        stderr(&out).contains("unknown verb `tipx`"),
+        stderr(&out).contains("aspects of `pool`"),
         "{}",
         stderr(&out)
     );
-    assert!(stderr(&out).contains("tx-cbor"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("delegators"), "{}", stderr(&out));
+}
+
+#[test]
+fn an_unknown_noun_is_a_usage_error_that_names_what_is_known() {
+    let out = at_cardano(&["tipx"]);
+
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        stderr(&out).contains("unknown noun `tipx`"),
+        "{}",
+        stderr(&out)
+    );
+    assert!(stderr(&out).contains("network"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("pools"), "{}", stderr(&out));
 }
 
 #[test]
 fn an_unknown_flag_is_a_usage_error_that_names_the_flags() {
-    let out = at_chain(&["tip", "--chain", "mainnet"]);
+    let out = at_cardano(&["tip", "--chain", "mainnet"]);
 
     assert_eq!(out.status.code(), Some(2));
     assert!(
@@ -96,7 +154,7 @@ fn an_unknown_flag_is_a_usage_error_that_names_the_flags() {
 
 #[test]
 fn transaction_submission_is_refused_before_a_request() {
-    let out = at_chain(&["query", "submittx"]);
+    let out = at_cardano(&["query", "submittx"]);
 
     assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
     assert!(
@@ -108,7 +166,7 @@ fn transaction_submission_is_refused_before_a_request() {
 
 #[test]
 fn an_endpoint_is_a_name_not_a_url() {
-    let out = at_chain(&["query", "https://api.koios.rest/api/v1/tx_info"]);
+    let out = at_cardano(&["query", "https://api.koios.rest/api/v1/tx_info"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(
@@ -116,6 +174,32 @@ fn an_endpoint_is_a_name_not_a_url() {
         "{}",
         stderr(&out)
     );
+}
+
+#[test]
+fn the_endpoint_table_answers_every_read_but_the_documented_long_tail() {
+    let out = at_cardano(&["endpoints"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let mut unanswerable: Vec<&str> = text
+        .lines()
+        .filter(|line| line.ends_with(" query"))
+        .map(|line| line.split_whitespace().next().unwrap_or(""))
+        .collect();
+    unanswerable.sort_unstable();
+    assert_eq!(
+        unanswerable,
+        vec![
+            "ogmios",
+            "reserve_withdrawals",
+            "treasury_withdrawals",
+            "tx_outs_epoch"
+        ],
+        "only the Ogmios proxy and the three endpoints Koios will not answer are left to query"
+    );
+    assert!(text.contains("submittx"), "{text}");
+    assert!(text.contains("refused"), "{text}");
 }
 
 #[test]
@@ -202,7 +286,7 @@ fn keyless_ignores_the_file() {
 
 #[test]
 fn all_and_json_are_alternatives() {
-    let out = at_chain(&["utxos", "addr1example", "--all", "--json"]);
+    let out = at_cardano(&["address", "utxos", "addr1example", "--all", "--json"]);
 
     assert_eq!(out.status.code(), Some(2));
     assert!(
@@ -214,7 +298,7 @@ fn all_and_json_are_alternatives() {
 
 #[test]
 fn a_zero_limit_is_a_usage_error() {
-    let out = at_chain(&["utxos", "addr1example", "--limit", "0"]);
+    let out = at_cardano(&["address", "utxos", "addr1example", "--limit", "0"]);
 
     assert_eq!(out.status.code(), Some(2));
     assert!(stderr(&out).contains("--limit 0"), "{}", stderr(&out));
@@ -222,7 +306,7 @@ fn a_zero_limit_is_a_usage_error() {
 
 #[test]
 fn an_asset_unit_needs_a_policy() {
-    let out = at_chain(&["asset", "not-a-policy"]);
+    let out = at_cardano(&["asset", "not-a-policy"]);
 
     assert_eq!(out.status.code(), Some(2));
     assert!(
@@ -235,7 +319,7 @@ fn an_asset_unit_needs_a_policy() {
 #[test]
 fn a_mixed_block_batch_is_refused() {
     let hash = "a".repeat(64);
-    let out = at_chain(&["block", &hash, "14100188"]);
+    let out = at_cardano(&["block", &hash, "14100188"]);
 
     assert_eq!(out.status.code(), Some(2));
     assert!(
@@ -246,10 +330,22 @@ fn a_mixed_block_batch_is_refused() {
 }
 
 #[test]
+fn a_policy_verb_takes_one_policy() {
+    let out = at_cardano(&[
+        "policy",
+        "c364930bd612f42e14d156e1c5410511e77f64cab8f2367a9df544d1",
+        "ab",
+    ]);
+
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stderr(&out).contains("at most 1"), "{}", stderr(&out));
+}
+
+#[test]
 fn version_is_a_version() {
-    let out = at_chain(&["--version"]);
+    let out = at_cardano(&["--version"]);
     assert_eq!(out.status.code(), Some(0));
-    assert!(stdout(&out).starts_with("at-chain "), "{}", stdout(&out));
+    assert!(stdout(&out).starts_with("at-cardano "), "{}", stdout(&out));
 }
 
 #[test]
@@ -291,12 +387,23 @@ fn ureq_is_confined_to_the_adaptor() {
     }
 }
 
+/// Every source file, submodules included — the module split is a structure choice, not a
+/// narrower guarantee.
 fn source_files() -> Vec<(String, String)> {
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut files = Vec::new();
-    for entry in std::fs::read_dir(&src).expect("read src directory") {
+    collect(&src, &mut files);
+    files
+}
+
+fn collect(directory: &Path, files: &mut Vec<(String, String)>) {
+    for entry in std::fs::read_dir(directory).expect("read source directory") {
         let entry = entry.expect("directory entry");
         let path = entry.path();
+        if path.is_dir() {
+            collect(&path, files);
+            continue;
+        }
         if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
             continue;
         }
@@ -308,5 +415,4 @@ fn source_files() -> Vec<(String, String)> {
         let text = std::fs::read_to_string(&path).expect("read source");
         files.push((name, text));
     }
-    files
 }

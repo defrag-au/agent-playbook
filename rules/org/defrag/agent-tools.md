@@ -14,7 +14,7 @@ targets:
   crate source or build-script output with `grep`, `sed` or `find` under `~/.cargo` or
   `target/…/build` → use `at-crate`. Reading history or working-tree state with `git status`,
   `git diff` or `git log` → use `at-recall`. Asking the chain a question with `curl` → use
-  `at-chain`. All four are read-only, bounded by construction, and say what they did not show.
+  `at-cardano`. All four are read-only, bounded by construction, and say what they did not show.
   `git show` and `git blame` have no `at-recall` verb yet — say so rather than reaching for them
   silently.
 
@@ -30,7 +30,7 @@ targets:
 | `git diff`, `git diff --stat` | `at-recall diff [<rev>] [<path>…]` — add `--patch` for the hunks |
 | `git log`, `git log --oneline` | `at-recall log [<rev>] [<path>…]` |
 | the archaeology before a PR description: branch, base, `merge-base`, `log --oneline base..HEAD`, `diff --stat` | `at-recall pr [--base <rev>]` — the branch, its commits and its diffstat in one read |
-| `curl https://api.koios.rest/…`, a retyped JSON body, a key in the command line | `at-chain <verb>` · `at-chain query <endpoint>` |
+| `curl https://api.koios.rest/…`, a retyped JSON body, a key in the command line | `at-cardano <noun> [<aspect>]` · `at-cardano query <endpoint>` · `at-cardano endpoints` · `at-cardano run --scenario <file.dsl>` for several in order |
 | anything not listed | `at-describe` — the catalogue, one screen |
 
 - The exact lines · every mention · how many · which files → `at-peek slice <file>:40-60` ·
@@ -60,7 +60,7 @@ targets:
   before editing it.
 - `at-peek` and `at-crate` run nothing at all; `at-recall` runs `git` and nothing else. That
   difference is why they are separate binaries, and why they are separate approvals if I have
-  tiered them. `at-chain` makes HTTPS requests to Koios and nothing else: the host is fixed by
+  tiered them. `at-cardano` makes HTTPS requests to Koios and nothing else: the host is fixed by
   `--network`, the key is read from `~/.config/koios/api_key` (never printed), and `/submittx` is
   refused. Never curl a Koios endpoint to avoid it; the curl is the generic executor this tool
   replaces.
@@ -75,9 +75,14 @@ targets:
 - `at-recall` answers `state`, `log`, `diff` and the `pr` recipe. `blame`, `show` and `churn`, and the
   `review` and `release` recipes, are designed and not written — ask for the one you want rather than
   reaching for `git`, and name the question, because that is what turns it into a verb. `at-crate`
-  answers `where`, `installed`, `files`, `slice`, `search` and `out`. `at-chain` answers `tip`,
-  `address`, `utxos`, `tx`, `asset`, `policy`, `account`, `block` and `query` (plus the related
-  verbs `at-describe at-chain` lists).
+  answers `where`, `installed`, `files`, `slice`, `search` and `out`. `at-cardano` is noun + aspect —
+  `at-cardano pool delegators <pool>`, `at-cardano tx utxos <hash>`,
+  `at-cardano account rewards <stake>` — and `at-cardano --help` lists the nouns while
+  `at-cardano help <noun>` lists that noun's aspects. Every read endpoint in the published Koios
+  spec has a verb; `at-cardano endpoints` proves it, and `query` is the long tail rather than the
+  way in. A question that takes two answers — the tip's height into `block`, a block's first
+  transaction into `tx` — is `at-cardano run --scenario <file.dsl>`, where a `save` binds one value
+  out of an answer and the next step uses it; `at-cardano run --help` names the five actions.
 
 ## Rationale
 

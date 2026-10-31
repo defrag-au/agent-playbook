@@ -1,0 +1,19 @@
+[package]
+name = "image-shot"
+version = "0.1.0"
+edition = "2021"
+description = "Inspect, render and compose image views, with the IIIF operation grammar"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "image-shot"
+path = "src/main.rs"
+
+# The whole dependency budget, deliberately. `default-features = false` drops AVIF/EXR/TIFF/QOI
+# and rayon; the four codecs below are the formats this tool both reads and writes. Everything
+# else is std, so the tool builds with no native libraries and stays cheap enough to install
+# beside the other `*-shot` tools.
+[dependencies]
+anyhow = "1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }

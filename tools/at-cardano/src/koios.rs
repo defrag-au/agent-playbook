@@ -208,7 +208,7 @@ impl Client {
     fn url(&self, endpoint: &str, query: &[(String, String)]) -> Result<String, Fail> {
         if refused_endpoint(endpoint) {
             return Err(Fail::refused(format!(
-                "/{endpoint} is a write to the chain; at-chain answers reads only"
+                "/{endpoint} is a write to the chain; at-cardano answers reads only"
             )));
         }
         if !valid_endpoint(endpoint) {

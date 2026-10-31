@@ -1,14 +1,14 @@
-//! Argument parsing — a closed grammar.
+//! Argument parsing — a closed grammar of a noun and an aspect.
 //!
-//! The flags a verb accepts come from [`crate::catalogue`], so a flag that is not in the table
-//! is a usage error naming it. There is no `--` pass-through, no arbitrary URL, and no
-//! subprocess; an approval over this grammar is a complete description of what the tool can be
-//! asked to do.
+//! The flags a verb accepts come from its [`crate::catalogue`] entry, so a flag that is not in
+//! the table is a usage error naming it, and the aspects a noun accepts come from the same
+//! entry. There is no `--` pass-through, no arbitrary URL, and no subprocess; an approval over
+//! this grammar is a complete description of what the tool can be asked to do.
 
-use crate::catalogue::{self, Verb};
+use crate::catalogue::{self, Noun, Route, Verb};
 use crate::contract::{Exit, Fail};
 use crate::koios::Network;
-use crate::verbs::{self, Options, MAX_BATCH};
+use crate::verbs::{self, targets, Options};
 
 pub const DEFAULT_ROWS: usize = 20;
 pub const MAX_ROWS: usize = 1000;
@@ -34,16 +34,7 @@ fn dispatch(args: &[String]) -> Result<Exit, Fail> {
             print!("{}", catalogue::help_all());
             return Ok(Exit::Results);
         }
-        "help" => {
-            let rendered = match args.get(1) {
-                Some(name) => {
-                    catalogue::help_for(catalogue::find(name).ok_or_else(|| unknown(name))?)
-                }
-                None => catalogue::help_all(),
-            };
-            print!("{rendered}");
-            return Ok(Exit::Results);
-        }
+        "help" => return help(&args[1..]),
         "--version" => {
             println!("{} {}", crate::TOOL, crate::VERSION);
             return Ok(Exit::Results);
@@ -51,19 +42,30 @@ fn dispatch(args: &[String]) -> Result<Exit, Fail> {
         _ => {}
     }
 
-    let verb = catalogue::find(first).ok_or_else(|| unknown(first))?;
-    let parsed = parse(verb, &args[1..])?;
+    let noun = catalogue::find_noun(first).ok_or_else(|| unknown_noun(first))?;
+    let (verb, consumed) = resolve(noun, &args[1..])?;
+    let parsed = parse(verb, &args[1 + consumed..])?;
 
     if parsed.has("--help") {
         print!("{}", catalogue::help_for(verb));
         return Ok(Exit::Results);
     }
 
-    let targets = targets(verb, &parsed)?;
-    verbs::validate_targets(verb.name, &targets)?;
+    if let Err(mut fail) = validate(verb, &parsed.positionals) {
+        if noun.verbs.len() > 1 {
+            fail.message.push_str(&format!(
+                " · aspects of `{}`: {} · run `{} help {}`",
+                noun.name,
+                noun.aspects().join(", "),
+                crate::TOOL,
+                noun.name
+            ));
+        }
+        return Err(fail);
+    }
     let options = options(&parsed)?;
 
-    let outcome = verbs::run(verb.name, &targets, &options)?;
+    let outcome = verbs::run(verb, &parsed.positionals, &options)?;
     let rendered = outcome.report.render();
     if !rendered.is_empty() {
         print!("{rendered}");
@@ -71,54 +73,105 @@ fn dispatch(args: &[String]) -> Result<Exit, Fail> {
     Ok(outcome.exit)
 }
 
-fn unknown(name: &str) -> Fail {
+/// `at-cardano help`, `at-cardano help pool`, `at-cardano help pool delegators`.
+fn help(args: &[String]) -> Result<Exit, Fail> {
+    let Some(name) = args.first() else {
+        print!("{}", catalogue::help_all());
+        return Ok(Exit::Results);
+    };
+    if let Some(noun) = catalogue::find_noun(name) {
+        match args.get(1) {
+            Some(aspect) => {
+                let verb = noun.find(aspect).ok_or_else(|| {
+                    Fail::usage(format!(
+                        "`{}` has no aspect `{aspect}` · aspects: {}",
+                        noun.name,
+                        noun.aspects().join(", ")
+                    ))
+                })?;
+                print!("{}", catalogue::help_for(verb));
+            }
+            None => print!("{}", catalogue::help_noun(noun)),
+        }
+        return Ok(Exit::Results);
+    }
+    // `at-cardano help "pool delegators"` and the two-word spelling both work.
+    let wanted = args.join(" ");
+    let verb = catalogue::find(&wanted).ok_or_else(|| unknown_noun(name))?;
+    print!("{}", catalogue::help_for(verb));
+    Ok(Exit::Results)
+}
+
+/// The noun's aspect if one was typed, otherwise its principal question.
+fn resolve(noun: &'static Noun, rest: &[String]) -> Result<(&'static Verb, usize), Fail> {
+    if let Some(candidate) = rest.first() {
+        if !candidate.starts_with('-') {
+            if let Some(verb) = noun.find(candidate) {
+                return Ok((verb, 1));
+            }
+        }
+    }
+    if let Some(verb) = noun.default_verb() {
+        return Ok((verb, 0));
+    }
+    Err(Fail::usage(format!(
+        "`{}` needs an aspect · {} · run `{} help {}`",
+        noun.name,
+        noun.aspects().join(", "),
+        crate::TOOL,
+        noun.name
+    )))
+}
+
+fn unknown_noun(name: &str) -> Fail {
     let hint = if name.starts_with('-') {
-        " · flags come after the verb, e.g. `at-chain tip --network preprod`"
+        " · flags come after the noun, e.g. `at-cardano tip --network preprod`"
     } else {
         ""
     };
     Fail::usage(format!(
-        "unknown verb `{name}` · verbs: {}{hint}",
+        "unknown noun `{name}` · nouns: {}{hint}",
         catalogue::names()
     ))
 }
 
-fn targets(verb: &Verb, parsed: &Parsed) -> Result<Vec<String>, Fail> {
-    match verb.name {
-        "tip" | "auth" => {
-            if let Some(extra) = parsed.positionals.first() {
+fn validate(verb: &'static Verb, targets: &[String]) -> Result<(), Fail> {
+    match &verb.route {
+        Route::Call(call) => targets::validate(call, targets),
+        Route::Auth => {
+            if let Some(extra) = targets.first() {
                 return Err(Fail::usage(format!(
-                    "`{}` takes no target · got `{extra}` · {}",
-                    verb.name, verb.usage
+                    "`auth` takes no target · got `{extra}` · {}",
+                    verb.usage
                 )));
             }
-            Ok(Vec::new())
+            Ok(())
         }
-        "query" => match parsed.positionals.as_slice() {
-            [only] => Ok(vec![only.clone()]),
-            [] => Err(Fail::usage(format!(
-                "`{}` needs an endpoint · {}",
-                verb.name, verb.usage
-            ))),
-            _ => Err(Fail::usage(format!(
-                "`{}` takes one endpoint · {}",
-                verb.name, verb.usage
-            ))),
-        },
-        _ => {
-            if parsed.positionals.is_empty() {
+        Route::Endpoints => {
+            if targets.len() > 1 {
                 return Err(Fail::usage(format!(
-                    "`{}` needs at least one target · {}",
-                    verb.name, verb.usage
+                    "`endpoints` takes one filter word · {}",
+                    verb.usage
                 )));
             }
-            if parsed.positionals.len() > MAX_BATCH {
+            Ok(())
+        }
+        Route::Query => {
+            if targets.len() != 1 {
                 return Err(Fail::usage(format!(
-                    "`{}` takes at most {MAX_BATCH} targets · {}",
-                    verb.name, verb.usage
+                    "`query` needs one endpoint · {}",
+                    verb.usage
                 )));
             }
-            Ok(parsed.positionals.clone())
+            Ok(())
+        }
+        Route::Scenario => {
+            if let Some(extra) = targets.first() {
+                return Err(Fail::usage(format!(
+                    "`run` takes no target · name the scenario with --scenario · got `{extra}`"
+                )));
+            }
+            Ok(())
         }
     }
 }
@@ -159,7 +212,7 @@ fn parse(verb: &'static Verb, args: &[String]) -> Result<Parsed, Fail> {
         if let Some(rest) = arg.strip_prefix('-') {
             if rest.is_empty() {
                 return Err(Fail::usage(
-                    "`-` means stdin, which at-chain does not read · pass a target",
+                    "`-` means stdin, which at-cardano does not read · pass a target",
                 ));
             }
             let (name, inline) = match arg.split_once('=') {
@@ -248,6 +301,14 @@ fn options(parsed: &Parsed) -> Result<Options, Fail> {
         None => 0,
     };
 
+    let epoch = match parsed.value("--epoch") {
+        Some(raw) => Some(
+            raw.parse::<u64>()
+                .map_err(|_| Fail::usage(format!("--epoch {raw} is not a number")))?,
+        ),
+        None => None,
+    };
+
     let all = parsed.has("--all");
     let json = parsed.has("--json");
     let summary = parsed.has("--summary");
@@ -264,11 +325,6 @@ fn options(parsed: &Parsed) -> Result<Options, Fail> {
     if summary && json {
         return Err(Fail::usage(
             "--summary and --json are alternatives · one prints the frame, the other the body",
-        ));
-    }
-    if parsed.has("--mints") && parsed.has("--addresses") {
-        return Err(Fail::usage(
-            "--mints and --addresses are alternatives · one policy view at a time",
         ));
     }
 
@@ -304,6 +360,7 @@ fn options(parsed: &Parsed) -> Result<Options, Fail> {
 
     Ok(Options {
         network,
+        network_explicit: parsed.value("--network").is_some(),
         json,
         keyless: parsed.has("--keyless"),
         summary,
@@ -319,16 +376,18 @@ fn options(parsed: &Parsed) -> Result<Options, Fail> {
         inputs: !parsed.has("--no-inputs"),
         assets: !parsed.has("--no-assets"),
         scripts: parsed.has("--scripts"),
-        mints: parsed.has("--mints"),
-        addresses: parsed.has("--addresses"),
+        epoch,
+        history: parsed.has("--history"),
         post,
         body,
         body_file,
         query,
+        scenario: parsed.value("--scenario").map(str::to_string),
+        check: parsed.has("--check"),
     })
 }
 
-fn valid_order(raw: &str) -> Result<&str, Fail> {
+pub(crate) fn valid_order(raw: &str) -> Result<&str, Fail> {
     if raw.is_empty() {
         return Err(Fail::usage("--order is empty"));
     }
@@ -354,7 +413,7 @@ fn valid_order(raw: &str) -> Result<&str, Fail> {
     Ok(raw)
 }
 
-fn valid_select(raw: &str) -> Result<&str, Fail> {
+pub(crate) fn valid_select(raw: &str) -> Result<&str, Fail> {
     if raw.is_empty() {
         return Err(Fail::usage("--select is empty"));
     }
@@ -376,7 +435,7 @@ fn valid_column(raw: &str) -> bool {
         })
 }
 
-fn parse_query(raw: &str) -> Result<(String, String), Fail> {
+pub(crate) fn parse_query(raw: &str) -> Result<(String, String), Fail> {
     let (key, value) = raw
         .split_once('=')
         .ok_or_else(|| Fail::usage(format!("--query `{raw}` is not `key=value`")))?;
