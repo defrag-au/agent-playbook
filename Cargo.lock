@@ -706,6 +706,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fleet-sync"
+version = "0.1.0"
+dependencies = [
+ "at-core",
+ "at-reach",
+ "sha2",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

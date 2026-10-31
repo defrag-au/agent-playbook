@@ -82,7 +82,7 @@ Full resolution rules, including how `activation` and `overrides` are evaluated,
 
 ```
 Cargo.toml        the workspace manifest; the composer is std-only, deliberately
-flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot`, `tui-shot` and `image-shot`
+flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot`, `tui-shot`, `image-shot` and `fleet-sync`
 src/              resolution engine + CLI
   frontmatter.rs    flat `key: value` readers
   model.rs          Rule, Project, Target, Layer, Activation
@@ -105,6 +105,7 @@ tools/            the agent toolkit, plus the skill store
   browser-shot/     browser captures, scenarios and frame bursts
   tui-shot/         terminal captures and scenario runs in a PTY it owns
   image-shot/       image inspection, derived views and diffs on the IIIF grammar
+  fleet-sync/       payloads for a satellite — bundle, plan, apply (writes)
   skill-store/      OCFL publish and export for skills (writes, and fetches)
   zed-thread-tools/ thread auditing, recovery and a TUI
 tests/            spec tests for the resolution model
@@ -325,6 +326,27 @@ bytes, the canonical operation and the tool version. The build is `anyhow` plus 
 codecs and no native libraries. [`tools/image-shot/README.md`](tools/image-shot/README.md) is the
 full contract. The procedure an agent follows is
 [`skills/image-shot/SKILL.md`](skills/image-shot/SKILL.md), published into `.skill-store/`.
+
+## The satellite sync tool
+
+`tools/fleet-sync/` is outside the `at-` namespace because it writes. It turns a machine that
+has the work into a payload for a machine that reads it: `bundle` writes one git bundle per
+repository in the profile plus a flat manifest, and `plan`/`apply` run on the target, remove the
+fixed artifact directories and reset the checkouts to the commits in that manifest.
+
+```sh
+fleet-sync bundle defrag-air --out /Volumes/travel/air
+fleet-sync plan   defrag-air --from /Volumes/travel/air
+fleet-sync apply  defrag-air --from /Volumes/travel/air --clean artifacts
+```
+
+The target is not contacted. `apply` refuses unless the local hostname matches the profile and
+the profile does not write a repository; a checkout with tracked changes is blocked until
+`--force`, and the payload is refused when it does not fit with 256 MiB of headroom. `--clean
+artifacts` removes `target`, `.direnv`, `node_modules`, `.tmp` and `.venv`; `--clean reset` also
+runs `git clean -xfd` and protects `.env`. The profile keys are `sync: bundle|none` and
+`sync_clean: artifacts|reset|none`; see [`docs/fleet.md`](docs/fleet.md) and the `fleet-sync`
+skill in the private fleet repository.
 
 ## The Zed thread tools
 

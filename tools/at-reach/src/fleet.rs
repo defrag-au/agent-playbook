@@ -30,6 +30,11 @@ pub struct Profile {
     pub rebuild_repo: Option<String>,
     pub rebuild: String,
     pub writes: String,
+    /// How this machine receives work from the writer: `bundle` (a payload carried to it) or
+    /// `none`. Absent means `bundle`; `fleet-sync` owns the behaviour.
+    pub sync: Option<String>,
+    /// What `fleet-sync apply` may remove in a checkout: `artifacts`, `reset` or `none`.
+    pub sync_clean: Option<String>,
     pub notes: Option<String>,
 }
 
@@ -108,6 +113,8 @@ impl Profile {
             rebuild_repo: values.get("rebuild_repo").cloned(),
             rebuild: required("rebuild")?,
             writes: required("writes")?,
+            sync: values.get("sync").cloned(),
+            sync_clean: values.get("sync_clean").cloned(),
             notes: values.get("notes").cloned(),
         })
     }
@@ -328,6 +335,18 @@ notes: Example only.
             parsed.repo_paths().expect("repo paths"),
             [PathBuf::from("/srv/repos/compositor")]
         );
+    }
+
+    #[test]
+    fn a_sync_policy_is_optional() {
+        let parsed = profile(PROFILE);
+        assert_eq!(parsed.sync, None);
+        assert_eq!(parsed.sync_clean, None);
+
+        let raw = format!("{PROFILE}sync: bundle\nsync_clean: artifacts\n");
+        let parsed = profile(&raw);
+        assert_eq!(parsed.sync.as_deref(), Some("bundle"));
+        assert_eq!(parsed.sync_clean.as_deref(), Some("artifacts"));
     }
 
     #[test]

@@ -215,6 +215,32 @@
           '';
         };
 
+      # The satellite sync tool. Separate from `agent-tools` for the same reason the `*-shot`
+      # tools are: it writes. `bundle` reads the source checkouts and writes a payload; `apply`
+      # removes artifact directories and resets checkouts on the target. It is also separate
+      # from `playbook` because it is not part of rendering rules, and from `agent-tools`
+      # because the `at-` allowlist keeps its no-write-path promise.
+      fleetSyncFor =
+        rustPlatform:
+        rustPlatform.buildRustPackage {
+          pname = "fleet-sync";
+          version = (lib.importTOML ./tools/fleet-sync/Cargo.toml).package.version;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [ "-p" "fleet-sync" ];
+          # As with `agent-tools`: the workspace root is the composer, so the default install
+          # phase would install `playbook`, and cargoBuildHook's `--target <triple>` puts the
+          # artefact under `target/<triple>/release/`.
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            install -m755 \
+              "$(find target -maxdepth 3 -type f -name fleet-sync -perm -u+x | head -n1)" \
+              "$out/bin/fleet-sync"
+            runHook postInstall
+          '';
+        };
+
       # The skill store: publishes a plain skill directory as an OCFL version and exports a version
       # back out as an envelope. Not part of `agent-tools` — that derivation's contract is
       # read-only binaries with no write path, and this one writes a store and fetches from git.
@@ -289,6 +315,7 @@
           browser-shot = browserShotFor rustPlatform;
           tui-shot = tuiShotFor rustPlatform;
           image-shot = imageShotFor rustPlatform;
+          fleet-sync = fleetSyncFor rustPlatform;
           skill-store = skillStoreFor pkgs;
           zed-thread-tools = zedThreadToolsFor rustPlatform;
           # What this repository is *for*; the toolkit is what it also ships.
@@ -315,6 +342,9 @@
             packages = [
               (rustToolchainFor system)
               (composerFor rustPlatform)
+              # `fleet-sync` is here because preparing a satellite payload is this repository's
+              # own workflow; it is a separate package because it writes.
+              (fleetSyncFor rustPlatform)
               # `skill-store` is here for the same reason the composer is: publishing a skill and
               # checking an export are this repository's own workflow, and should not need a
               # `cargo run` wrapper. Wrapped with git, so a `github:` source resolves.
