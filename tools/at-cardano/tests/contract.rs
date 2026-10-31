@@ -51,7 +51,32 @@ fn the_help_lists_every_noun() {
     for noun in at_cardano::catalogue::nouns() {
         assert!(text.contains(noun.name), "{} is not listed", noun.name);
     }
+    assert!(text.contains("Scenarios"), "{text}");
+    assert!(text.contains("Discovery"), "{text}");
     assert!(text.contains("/submittx refused"), "{text}");
+}
+
+#[test]
+fn a_noun_help_lists_its_aspects() {
+    let out = at_cardano(&["pool", "--help"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(text.contains("delegators"), "{text}");
+    assert!(
+        text.contains("Run `at-cardano pool <aspect> --help`"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_single_aspect_noun_help_lists_its_flags() {
+    let out = at_cardano(&["tip", "--help"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(text.contains("--network"), "{text}");
+    assert!(text.contains("Where is the chain now"), "{text}");
 }
 
 #[test]

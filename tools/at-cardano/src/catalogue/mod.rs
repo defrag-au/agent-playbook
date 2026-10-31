@@ -301,17 +301,35 @@ pub fn help_all() -> String {
         out.push_str(&line);
         out.push('\n');
     }
+
+    out.push_str("\nScenarios\n");
+    out.push_str(&format!(
+        "  {} run --scenario <file.dsl> [--check]\n",
+        crate::TOOL
+    ));
+    out.push_str("    target <name> <noun> [<aspect>] [positionals…] [fields…]\n");
+    out.push_str("    save <target>.<row>.<column> as <name>\n");
+    out.push_str("    assert <name> count=3 | count>0 | contains=\"…\" | absent=\"…\"\n");
+    out.push_str("    echo \"a line with ${name}\"\n");
+    out.push_str(
+        "  `run --help` names the fields; `--check` parses the file and stops before a request.\n",
+    );
+
+    out.push_str("\nDiscovery (none of these makes a request)\n");
+    out.push_str(&format!(
+        "  {0} help <noun> [<aspect>]   one noun's aspects, or one aspect's flags\n  \
+         {0} endpoints [<text>]       every Koios path, and the verb that answers it\n  \
+         {0} auth                     the endpoint and the key source\n  \
+         {0} run --check --scenario <file.dsl>   validates a scenario without a request\n",
+        crate::TOOL
+    ));
+
     out.push_str("\nExit codes\n");
     for (code, meaning) in exit_codes() {
         out.push_str(&format!("  {code:<6} {meaning}\n"));
     }
+    out.push_str("  (`run` also exits 2 when a scenario check does not pass)\n");
     out.push_str("\nA `# ` line in the output is metadata: what was read, and what was not.\n");
-    out.push_str(&format!(
-        "Run `{} help <noun> [<aspect>]` for one noun's aspects, or `{} endpoints` for the \
-         complete Koios table.\n",
-        crate::TOOL,
-        crate::TOOL
-    ));
     out
 }
 
@@ -338,11 +356,19 @@ pub fn help_noun(noun: &Noun) -> String {
         out.push_str(&format!("  {aspect:<22} {}\n", verb.question));
         out.push_str(&format!("  {:<22} {}\n", "", verb.usage));
     }
-    out.push_str(&format!(
-        "\nRun `{} help {} <aspect>` for one aspect's flags.\n",
-        crate::TOOL,
-        noun.name
-    ));
+    if noun.verbs.len() > 1 {
+        out.push_str(&format!(
+            "\nRun `{} {} <aspect> --help` for one aspect's flags.\n",
+            crate::TOOL,
+            noun.name
+        ));
+    } else {
+        out.push_str(&format!(
+            "\nRun `{} {} --help` for its flags.\n",
+            crate::TOOL,
+            noun.name
+        ));
+    }
     out
 }
 

@@ -1,0 +1,25 @@
+{
+  "id": "urn:skill:at-cardano",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v1",
+  "manifest": {
+    "3c6ecf17638f81af5653f10a0575c889e01e301a140a7aa11e072e0f7049e000b603b537924568cc6d1d3457a178bfb4c2ea3193e1db21acd52df4b641aa1d2b": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-31T02:03:33Z",
+      "state": {
+        "3c6ecf17638f81af5653f10a0575c889e01e301a140a7aa11e072e0f7049e000b603b537924568cc6d1d3457a178bfb4c2ea3193e1db21acd52df4b641aa1d2b": [
+          "SKILL.md"
+        ]
+      },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}

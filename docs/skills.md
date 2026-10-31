@@ -37,8 +37,8 @@ contain whitespace — the lock is line-oriented.
 `container-compose/.skill-store/`, because that is the repository whose behaviour the procedure
 describes. `widget-screenshot` and `game-spike` ship in `shared-crates/.skill-store/` — the
 storybook and `macroquad-gamekit`. The skills whose subject is this repository's toolkit —
-`inspect-code`, `capture-rule`, `crate-research`, `browser-shot` — are authored in `skills/` and
-published into `.skill-store/` at the root, which is what
+`inspect-code`, `capture-rule`, `crate-research`, `browser-shot`, `at-cardano` — are authored in
+`skills/` and published into `.skill-store/` at the root, which is what
 `github:defrag-au/agent-playbook#inspect-code@v1` resolves to. `skills/` is the editable copy;
 `.skill-store/` is the artifact.
 

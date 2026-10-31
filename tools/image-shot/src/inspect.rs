@@ -4,7 +4,7 @@
 //! it is; `stats` answers questions the eye cannot; `diff` answers what changed.
 
 use std::collections::HashSet;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 
 use anyhow::{bail, Context, Result};
 use image::{DynamicImage, ImageDecoder, ImageFormat, Rgba, RgbaImage};
@@ -25,18 +25,28 @@ pub fn info(paths: &[String], cwd: &std::path::Path) -> Result<i32> {
             cwd.join(given)
         };
         let label = display(&path, cwd);
-        let bytes = std::fs::read(&path).with_context(|| format!("read {label}"))?;
-        let size = bytes_size(bytes.len());
+        let file = std::fs::File::open(&path).with_context(|| format!("open {label}"))?;
+        let byte_len = file
+            .metadata()
+            .with_context(|| format!("read the metadata of {label}"))?
+            .len();
+        let size = bytes_size(byte_len);
+        let mut head = [0_u8; 64];
+        let read = std::io::BufReader::new(file)
+            .read(&mut head)
+            .with_context(|| format!("read the header of {label}"))?;
+        let head = &head[..read];
 
-        let Some(format) = Format::from_magic(&bytes) else {
+        let Some(format) = Format::from_magic(head) else {
             println!(
                 "{label} · {} · {size} · dimensions unavailable — this build decodes png, jpeg, gif and webp",
-                unsupported(&bytes)
+                unsupported(head)
             );
             continue;
         };
 
-        let reader = image::ImageReader::new(Cursor::new(&bytes))
+        let reader = image::ImageReader::open(&path)
+            .with_context(|| format!("open {label}"))?
             .with_guessed_format()
             .with_context(|| format!("detect the format of {label}"))?;
         match reader.into_decoder() {
@@ -54,6 +64,7 @@ pub fn info(paths: &[String], cwd: &std::path::Path) -> Result<i32> {
     Ok(0)
 }
 
+#[derive(Debug, Clone)]
 pub struct Stats {
     pub width: u32,
     pub height: u32,
@@ -68,10 +79,14 @@ pub struct Stats {
 }
 
 pub fn stats(source: &Source) -> Result<Stats> {
-    let image = source.decode()?;
+    Ok(stats_image(&source.decode()?))
+}
+
+/// Measure an image already in memory, for the scenario runner.
+pub fn stats_image(image: &DynamicImage) -> Stats {
     let color = image.color();
     let rgba = image.to_rgba8();
-    Ok(measure(&rgba, color))
+    measure(&rgba, color)
 }
 
 fn measure(rgba: &RgbaImage, color: image::ColorType) -> Stats {
@@ -222,6 +237,7 @@ pub fn print_stats(label: &str, stats: &Stats) {
     println!("sharp  {:.1} (variance of Laplacian)", stats.sharpness);
 }
 
+#[derive(Debug, Clone)]
 pub struct Diff {
     pub changed: u64,
     pub total: u64,
@@ -320,7 +336,7 @@ pub fn diff_view(a: &DynamicImage, b: &DynamicImage, tolerance: u8) -> Result<Ve
     Ok(buffer)
 }
 
-pub fn bytes_size(bytes: usize) -> String {
+pub fn bytes_size(bytes: u64) -> String {
     let bytes = bytes as f64;
     if bytes >= 1_048_576.0 {
         format!("{:.1} MiB", bytes / 1_048_576.0)

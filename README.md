@@ -312,7 +312,12 @@ image-shot stats .tmp/capture.png         # mean/sd, alpha, colours, ink bbox, s
 image-shot crop .tmp/capture.png --box 0,0,780,200 --zoom 2
 image-shot fit .tmp/capture.png --edge 24
 image-shot diff .tmp/before.png .tmp/after.png --tolerance 2
+image-shot run  --scenario .tmp/review.dsl
 ```
+
+A scenario composes the same operations: `source`, `crop`, `fit`, `sheet`, `overlay`, `trim`,
+`stats`, `diff` and `assert`, with `run.txt` / `run.json` beside the images. It is line-oriented and
+has no shell action. The grammar is [`tools/image-shot/SCENARIO.md`](tools/image-shot/SCENARIO.md).
 
 It reads PNG, JPEG, GIF and WebP, and refuses BMP, TIFF, SVG, AVIF, HEIC and PDF by name. Writes go
 only into its artifacts directory, never over an input; a derived name is a hash of the source

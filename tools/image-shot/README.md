@@ -32,6 +32,8 @@ image-shot crop  .tmp/capture.png --box 0,0,780,200 --zoom 2
 image-shot fit   .tmp/capture.png --edge 24
 image-shot render .tmp/capture.png full/400,/0/gray.png
 image-shot diff  .tmp/before.png .tmp/after.png --tolerance 2
+image-shot run   --scenario .tmp/review.dsl
+image-shot check --scenario .tmp/review.dsl
 ```
 
 ```
@@ -41,7 +43,7 @@ OBSERVE
   info   <src>...                         header only: format, dimensions, colour type, size
   stats  <src>...                         mean/sd, alpha, colours, ink bbox, sharpness
   diff   <a> <b> [--out <path>] [--tolerance N]
-                                          0 identical · 1 different · 2 error
+                                          0 identical · 2 different · 1 error
 
 DERIVE
   render <src> <op> [--out <path>]        the full IIIF operation grammar
@@ -50,11 +52,21 @@ DERIVE
   cover  <src> --size W,H [--upscale]     centre-crop to the target aspect, then exact size
   square <src> --size N [--upscale]       centred square region, N px
 
+COMPOSE
+  run    --scenario <file> [--from DIR] [--json]
+                                          run a scenario; writes run.txt and run.json
+  check  --scenario <file>                parse and validate; reads no image
+  fmt    --scenario <file> [--write|--check]
+                                          print, rewrite, or check the canonical form
+
 COMMON
   --artifacts DIR        where derived views are written (default .tmp/image-shot)
   --max-pixels N         decode/encode cap (default 64000000)
-  --format F             png (default), jpg, webp or gif, for the intent verbs
+
+DERIVE OPTIONS
+  --format F             png (default), jpg, webp or gif
   --filter F             nearest, lanczos3 or catmullrom
+  --smooth               crop --zoom uses a smooth filter instead of nearest
   --compression N        JPEG quality, 1-100 (default 85)
   --background RRGGBB    required when a source with alpha is written as JPEG
 ```
@@ -88,7 +100,8 @@ approximated.
 
 The tool owns one directory. `--out` is relative to it, may not contain `..`, and may not name the
 source. The directory is created if needed, and its resolved path is checked again after the parent
-is canonicalised, so a symlinked subdirectory cannot point the write outside.
+is canonicalised, so a symlinked subdirectory cannot point the write outside; an existing
+destination that is itself a symlink is refused rather than followed.
 
 With no `--out`, the name is derived from the source bytes, the canonical operation and the tool
 version:
@@ -125,8 +138,9 @@ bbox   0,0–1199,629
 ```
 
 With `--out` it also writes a review image: the source dimmed, changed pixels in red. Exit `0` means
-identical, `1` means different, `2` is an operational error. A diff of two images with different
-dimensions is refused rather than resized implicitly.
+identical, `2` means different, and `1` is an operational error — the same convention as
+`browser-shot` and `tui-shot`, where `2` is a condition that did not hold. A diff of two images
+with different dimensions is refused rather than resized implicitly.
 
 `stats` reports mean and standard deviation per channel, the alpha fraction, the number of colours
 (capped at 4096), an ink bounding box, and the variance of a 3×3 Laplacian as a rough sharpness
@@ -150,6 +164,8 @@ number. It is an observation aid, not a focus score.
 - **WebP is lossless only** in the `image` build this tool links; lossy WebP is not offered rather
   than being silently encoded differently.
 - **GIF output is a single frame.** The report says so when it applies.
+- **`max` and `^max` stop at 4096 px.** An explicit `w,h` is bounded by `--max-pixels` instead,
+  matching the worker's distinction between a derived view and a deliberate size.
 - **`auto` resolves to PNG.** A derived view is for inspection, and lossless is the useful default;
   there is no art-kind classifier in this build.
 - **The decode cap is a decode cap, not a streaming decoder.** The file is read once, its header is
@@ -165,14 +181,49 @@ is text). The build stays cheap enough to install beside the other `*-shot` tool
 ## Build and test
 
 ```sh
+nix build .#image-shot
+
 direnv exec . cargo test -p image-shot
 direnv exec . cargo clippy -p image-shot --all-targets --all-features -- -D warnings
 ```
 
 The crate has unit tests for the grammar, containment, transform order, alpha flattening, the pixel
-cap, statistics and diff. `tests/cli.rs` drives the built binary against generated fixtures for
-`info`, `crop`, `diff` and the two output-containment refusals. There is no browser integration
-test: a `browser-shot` capture is an ordinary PNG, and so is a test fixture.
+cap, statistics and diff, plus parser and execution tests for the scenario DSL. `tests/cli.rs`
+drives the built binary against generated fixtures for `info`, `crop`, `diff`, `run`, `check`,
+`fmt` and the output-containment refusals. There is no browser integration test: a `browser-shot`
+capture is an ordinary PNG, and so is a test fixture.
+
+## Scenarios
+
+`run` composes the same operations in a line-oriented file. The grammar is in
+[`SCENARIO.md`](SCENARIO.md); this is the shape:
+
+```text
+run artifacts=.tmp/review-run from=.tmp/capture-run
+
+source home from=page/home.png
+crop  home box=0,0,390,120 as=top out=crops/top.png
+fit   top edge=24 as=top24 out=crops/top-24.png
+sheet cols=2 cell=64x64 from=top24,home out=sheets/home.png
+overlay home layer=top x=10 y=20 as=marked out=out/marked.png
+trim  marked as=trimmed out=out/trimmed.png
+stats trimmed
+diff  home marked out=diffs/marked.png
+assert same home marked max=0.001 message="the header did not move"
+```
+
+```sh
+image-shot run --scenario .tmp/review.dsl
+image-shot run --scenario .tmp/review.dsl --json   # report on stdout
+image-shot check --scenario .tmp/review.dsl        # parse only, reads no image
+image-shot fmt --scenario .tmp/review.dsl          # canonical form
+```
+
+`run` writes `run.txt` and `run.json` under the artifacts directory, plus every `out=` image. A
+failed assertion sets exit `2` and does not stop the run, so one report names every check that did
+not hold; an operational error sets exit `1` and stops at the step that failed. `check` exits `0`
+for a valid file and `1` for a file that cannot be read or parsed; `fmt --check` exits `2` when it
+would rewrite. There is no `spawn`, `eval`, shell or network action: a scenario is data.
 
 ## Why not a `browser-shot` sub-DSL
 
@@ -182,12 +233,13 @@ image axis, and an image-only review could not run without a browser. The seam i
 directory, which both tools already own and which a reader can inspect without either tool.
 
 The planned integration is additive and one-directional: `browser-shot` writes a typed `captures`
-array naming each capture's peer, step, path and sidecar in `run.json`; `image-shot` learns a
-`source` step that resolves a capture by that name. Until then, a scenario repeats the capture's
-path, and that is enough to review a screen.
+array naming each capture's peer, step, path and sidecar in `run.json`; `image-shot`'s `source`
+step can then resolve a capture by that name. Until then, a scenario repeats the capture's path,
+and that is enough to review a screen.
 
 ## Not in this build
 
-A scenario DSL (`run --scenario`) that composes several operations, writes `run.txt` / `run.json`,
-and carries values between steps is designed but not implemented. The per-image verbs above are the
-operations it will call; no grammar is promised here before it exists.
+`annotate` is not implemented. Text rendering needs either a font dependency or a hand-built
+bitmap font, and the dependency budget is a stated constraint; a rectangle-only annotation would
+not earn the action. `sheet`, `overlay` and `trim` are scenario actions, not one-shot verbs, so a
+composition does not need a second grammar.

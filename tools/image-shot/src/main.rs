@@ -4,8 +4,10 @@
 //! layer on top of the same operations. This build has the one-shot half.
 
 mod artifact;
+mod dsl;
 mod inspect;
 mod op;
+mod scenario;
 mod source;
 mod transform;
 
@@ -20,8 +22,8 @@ use transform::{Filter, RenderOptions};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The ceiling `max` and `^max` fit into. Explicit sizes are bounded by the pixel cap instead.
-const MAX_DIMENSION: u32 = 4096;
-const DEFAULT_MAX_PIXELS: u64 = 64_000_000;
+pub(crate) const MAX_DIMENSION: u32 = 4096;
+pub(crate) const DEFAULT_MAX_PIXELS: u64 = 64_000_000;
 
 const HELP: &str = r#"image-shot — derive, inspect and compose image views
 
@@ -32,7 +34,7 @@ OBSERVE
   info   <src>...                         header only: format, dimensions, colour type, size
   stats  <src>...                         mean/sd, alpha, colours, ink bbox, sharpness
   diff   <a> <b> [--out <path>] [--tolerance N]
-                                          0 identical · 1 different · 2 error
+                                          0 identical · 2 different · 1 error
 
 DERIVE
   render <src> <op> [--out <path>]        the full IIIF operation grammar
@@ -41,11 +43,21 @@ DERIVE
   cover  <src> --size W,H [--upscale]     centre-crop to the target aspect, then exact size
   square <src> --size N [--upscale]       centred square region, N px
 
+COMPOSE
+  run    --scenario <file> [--from DIR] [--json]
+                                          run a scenario; writes run.txt and run.json
+  check  --scenario <file>                parse and validate; reads no image
+  fmt    --scenario <file> [--write|--check]
+                                          print, rewrite, or check the canonical form
+
 COMMON
   --artifacts DIR        where derived views are written (default .tmp/image-shot)
   --max-pixels N         decode/encode cap (default 64000000)
-  --format F             png (default), jpg, webp or gif, for the intent verbs
+
+DERIVE OPTIONS
+  --format F             png (default), jpg, webp or gif
   --filter F             nearest, lanczos3 or catmullrom
+  --smooth               crop --zoom uses a smooth filter instead of nearest
   --compression N        JPEG quality, 1-100 (default 85)
   --background RRGGBB    required when a source with alpha is written as JPEG
 
@@ -59,6 +71,7 @@ THE OPERATION STRING
 
   Trailing segments may be omitted: 0,0,400,200/800, expands to
   0,0,400,200/800,/0/default.png and the report always prints the full form.
+  max and ^max stop at 4096 px; an explicit size is bounded by --max-pixels.
 
 EXAMPLES
   image-shot info .tmp/settled.png
@@ -66,9 +79,12 @@ EXAMPLES
   image-shot fit .tmp/vell.png --edge 24
   image-shot render .tmp/shot.png full/400,/0/gray.png
   image-shot diff .tmp/before.png .tmp/after.png --tolerance 2
+  image-shot run --scenario .tmp/review.dsl
+  image-shot check --scenario .tmp/review.dsl
 
   --out is relative to the artifacts directory and may not contain `..`.
   With no --out, the name is derived from the source bytes and the canonical op.
+  A scenario's actions and fields are in SCENARIO.md beside this tool.
 "#;
 
 fn main() {
@@ -76,7 +92,7 @@ fn main() {
         Ok(code) => code,
         Err(error) => {
             eprintln!("image-shot: {error:#}");
-            2
+            1
         }
     };
     std::process::exit(code);
@@ -101,12 +117,11 @@ fn run() -> Result<i32> {
     }
 
     let artifacts_dir = take_value(&mut args, "--artifacts")?;
-    let max_pixels = match take_value(&mut args, "--max-pixels")? {
-        Some(value) => value
-            .parse::<u64>()
-            .map_err(|_| anyhow::anyhow!("--max-pixels: `{value}` is not a number"))?,
-        None => DEFAULT_MAX_PIXELS,
+    let max_pixels_override = match take_value(&mut args, "--max-pixels")? {
+        Some(value) => Some(parse_pixels(&value)?),
+        None => None,
     };
+    let max_pixels = max_pixels_override.unwrap_or(DEFAULT_MAX_PIXELS);
     if max_pixels == 0 {
         bail!("--max-pixels must be positive");
     }
@@ -125,6 +140,9 @@ fn run() -> Result<i32> {
         "crop" => crop_cmd(&args, &cwd, max_pixels, artifacts_dir.as_deref()),
         "cover" => cover_cmd(&args, &cwd, max_pixels, artifacts_dir.as_deref()),
         "square" => square_cmd(&args, &cwd, max_pixels, artifacts_dir.as_deref()),
+        "run" => scenario::run_cmd(&args, &cwd, artifacts_dir.as_deref(), max_pixels_override),
+        "check" => scenario::check_cmd(&args, &cwd),
+        "fmt" => scenario::fmt_cmd(&args, &cwd),
         "help" => {
             print!("{HELP}");
             Ok(0)
@@ -211,7 +229,7 @@ fn diff_cmd(
         }
     }
 
-    Ok(if result.changed == 0 { 0 } else { 1 })
+    Ok(if result.changed == 0 { 0 } else { 2 })
 }
 
 fn render_cmd(
@@ -343,7 +361,7 @@ fn crop_cmd(
             source.height
         );
     }
-    if x + width > source.width || y + height > source.height {
+    if width > source.width - x || height > source.height - y {
         bail!(
             "--box: {}x{} at {x},{y} extends past the {}x{} source",
             width,
@@ -572,7 +590,7 @@ fn render_source(request: RenderRequest<'_>) -> Result<i32> {
         source.format,
         source.width,
         source.height,
-        inspect::bytes_size(source.bytes.len())
+        inspect::bytes_size(source.bytes.len() as u64)
     );
     println!("op     {}", request.op.canonical());
     println!(
@@ -581,7 +599,7 @@ fn render_source(request: RenderRequest<'_>) -> Result<i32> {
         rendered.format,
         rendered.width,
         rendered.height,
-        inspect::bytes_size(rendered.bytes.len())
+        inspect::bytes_size(rendered.bytes.len() as u64)
     );
     let mut notes = rendered.notes;
     notes.push(format!("filter {}", rendered.filter.as_str()));
@@ -591,7 +609,7 @@ fn render_source(request: RenderRequest<'_>) -> Result<i32> {
     Ok(0)
 }
 
-fn fit_dimensions(width: u32, height: u32, edge: u32) -> (u32, u32) {
+pub(crate) fn fit_dimensions(width: u32, height: u32, edge: u32) -> (u32, u32) {
     let scale = f64::from(edge) / f64::from(width.max(height));
     (
         ((f64::from(width) * scale).round() as u32).max(1),
@@ -599,7 +617,12 @@ fn fit_dimensions(width: u32, height: u32, edge: u32) -> (u32, u32) {
     )
 }
 
-fn cover_region(width: u32, height: u32, target_w: u32, target_h: u32) -> (u32, u32, u32, u32) {
+pub(crate) fn cover_region(
+    width: u32,
+    height: u32,
+    target_w: u32,
+    target_h: u32,
+) -> (u32, u32, u32, u32) {
     let source_ratio = f64::from(width) / f64::from(height);
     let target_ratio = f64::from(target_w) / f64::from(target_h);
     if source_ratio > target_ratio {
@@ -613,7 +636,7 @@ fn cover_region(width: u32, height: u32, target_w: u32, target_h: u32) -> (u32, 
     }
 }
 
-fn parse_box(text: &str) -> Result<(u32, u32, u32, u32)> {
+pub(crate) fn parse_box(text: &str) -> Result<(u32, u32, u32, u32)> {
     let parts: Vec<&str> = text.split(',').collect();
     if parts.len() != 4 {
         bail!("--box: `{text}` is not X,Y,W,H");
@@ -634,7 +657,7 @@ fn parse_box(text: &str) -> Result<(u32, u32, u32, u32)> {
     Ok((x, y, width, height))
 }
 
-fn parse_size_pair(text: &str) -> Result<(u32, u32)> {
+pub(crate) fn parse_size_pair(text: &str) -> Result<(u32, u32)> {
     let (width, height) = text
         .split_once('x')
         .or_else(|| text.split_once(','))
@@ -649,6 +672,26 @@ fn parse_size_pair(text: &str) -> Result<(u32, u32)> {
         bail!("--size: dimensions must be positive");
     }
     Ok((width, height))
+}
+
+pub(crate) fn parse_pixels(text: &str) -> Result<u64> {
+    let (digits, multiplier) =
+        if let Some(rest) = text.strip_suffix('M').or_else(|| text.strip_suffix('m')) {
+            (rest, 1_000_000_u64)
+        } else if let Some(rest) = text.strip_suffix('K').or_else(|| text.strip_suffix('k')) {
+            (rest, 1_000_u64)
+        } else if let Some(rest) = text.strip_suffix('G').or_else(|| text.strip_suffix('g')) {
+            (rest, 1_000_000_000_u64)
+        } else {
+            (text, 1_u64)
+        };
+    let value = digits
+        .parse::<u64>()
+        .map_err(|_| anyhow::anyhow!("--max-pixels: `{text}` is not a number"))?;
+    value
+        .checked_mul(multiplier)
+        .filter(|value| *value > 0)
+        .ok_or_else(|| anyhow::anyhow!("--max-pixels: `{text}` is not a positive size"))
 }
 
 fn format_option(args: &mut Vec<String>) -> Result<Format> {
@@ -685,7 +728,7 @@ fn background_option(args: &mut Vec<String>) -> Result<Option<[u8; 3]>> {
         .transpose()
 }
 
-fn take_value(args: &mut Vec<String>, name: &str) -> Result<Option<String>> {
+pub(crate) fn take_value(args: &mut Vec<String>, name: &str) -> Result<Option<String>> {
     let mut index = 0;
     while index < args.len() {
         if args[index] == name {
@@ -706,7 +749,7 @@ fn take_value(args: &mut Vec<String>, name: &str) -> Result<Option<String>> {
     Ok(None)
 }
 
-fn take_switch(args: &mut Vec<String>, name: &str) -> bool {
+pub(crate) fn take_switch(args: &mut Vec<String>, name: &str) -> bool {
     if let Some(index) = args.iter().position(|arg| arg == name) {
         args.remove(index);
         true

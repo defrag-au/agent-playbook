@@ -43,6 +43,20 @@ fn dispatch(args: &[String]) -> Result<Exit, Fail> {
     }
 
     let noun = catalogue::find_noun(first).ok_or_else(|| unknown_noun(first))?;
+
+    // `at-cardano pool --help` asks about the noun, not its principal aspect. A noun with one
+    // aspect has no aspects to list, so there the verb's flags are the useful answer.
+    if args.len() == 2 && matches!(args[1].as_str(), "-h" | "--help") {
+        match (noun.verbs.len() == 1)
+            .then_some(noun.default_verb())
+            .flatten()
+        {
+            Some(verb) => print!("{}", catalogue::help_for(verb)),
+            None => print!("{}", catalogue::help_noun(noun)),
+        }
+        return Ok(Exit::Results);
+    }
+
     let (verb, consumed) = resolve(noun, &args[1..])?;
     let parsed = parse(verb, &args[1 + consumed..])?;
 

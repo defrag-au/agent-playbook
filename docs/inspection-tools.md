@@ -78,8 +78,8 @@ GET and query-POST only, redirects off, and `/submittx` refused by name. Without
 eventually adds `at-edit`, and it inherits the trust the prefix earned while being the exact thing
 the prefix was supposed to guarantee.
 
-**Image inspection is not in this namespace.** `image-shot` inspects images and writes derived
-views, so it sits with `browser-shot` and `tui-shot` rather than pretending to be a read-only
+**Image inspection is not in this namespace.** `image-shot` inspects and composes images and writes
+derived views, so it sits with `browser-shot` and `tui-shot` rather than pretending to be a read-only
 `at-*` tool. It reads the same files an editor can and writes only under its artifacts directory;
 see [`tools/image-shot/README.md`](../tools/image-shot/README.md). A future `at-image` would have
 to be an observation-only subset with no derived-file path, which is not the tool the image work

@@ -67,6 +67,7 @@ impl Default for RenderOptions {
 }
 
 pub struct Rendered {
+    pub image: DynamicImage,
     pub bytes: Vec<u8>,
     pub width: u32,
     pub height: u32,
@@ -167,19 +168,22 @@ pub fn render(
 
     // ── format
     let format = op.format.resolve();
+    let width = image.width();
+    let height = image.height();
     let bytes = encode(&image, format, options, &mut notes)?;
 
     Ok(Rendered {
+        image,
         bytes,
-        width: image.width(),
-        height: image.height(),
+        width,
+        height,
         format,
         filter: options.filter,
         notes,
     })
 }
 
-fn encode(
+pub(crate) fn encode(
     image: &DynamicImage,
     format: Format,
     options: &RenderOptions,

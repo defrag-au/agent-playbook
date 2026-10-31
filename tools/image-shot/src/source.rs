@@ -104,12 +104,11 @@ pub(crate) fn unsupported(bytes: &[u8]) -> &'static str {
     if bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*") {
         return "a TIFF";
     }
-    let head = bytes
+    let start = bytes
         .iter()
-        .skip_while(|byte| byte.is_ascii_whitespace())
-        .copied()
-        .collect::<Vec<_>>();
-    if head.starts_with(b"<svg") || head.starts_with(b"<?xml") {
+        .position(|byte| !byte.is_ascii_whitespace())
+        .unwrap_or(bytes.len());
+    if bytes[start..].starts_with(b"<svg") || bytes[start..].starts_with(b"<?xml") {
         return "an SVG";
     }
     if bytes.len() >= 12 && &bytes[4..12] == b"ftypavif" {

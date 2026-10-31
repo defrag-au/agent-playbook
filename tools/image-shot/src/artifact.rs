@@ -109,6 +109,12 @@ impl Artifacts {
         };
 
         let destination = self.root.join(path);
+        if std::fs::symlink_metadata(&destination)
+            .map(|metadata| metadata.file_type().is_symlink())
+            .unwrap_or(false)
+        {
+            bail!("--out {given} is a symlink; refusing to follow it");
+        }
         let parent = destination.parent().unwrap_or(&self.root);
         std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
         let parent = std::fs::canonicalize(parent)
@@ -157,6 +163,21 @@ mod tests {
         assert_ne!(a, c);
         assert!(a.starts_with("home-view-"));
         assert!(a.ends_with(".png"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn out_may_not_follow_a_symlink() {
+        let cwd = std::env::temp_dir().join(format!("image-shot-symlink-{}", std::process::id()));
+        std::fs::create_dir_all(&cwd).unwrap();
+        let artifacts = Artifacts::new(Some(".tmp/image-shot"), &cwd).unwrap();
+        std::os::unix::fs::symlink(
+            cwd.join("outside.png"),
+            cwd.join(".tmp/image-shot/link.png"),
+        )
+        .unwrap();
+        assert!(artifacts.resolve(Some("link.png"), "x.png").is_err());
+        std::fs::remove_dir_all(&cwd).ok();
     }
 
     #[test]
