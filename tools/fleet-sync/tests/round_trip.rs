@@ -273,6 +273,78 @@ fn a_payload_that_cannot_fit_is_blocked() {
 }
 
 #[test]
+fn a_plan_on_a_fresh_target_does_not_create_it() {
+    let fixture = Fixture::new("plan-fresh");
+    let payload = fixture.bundle();
+
+    let outcome = target::plan(
+        "air",
+        &payload,
+        Some(Clean::Artifacts),
+        false,
+        false,
+        false,
+        &fixture.fleet,
+    )
+    .expect("plan");
+    assert_eq!(outcome.exit, Exit::Results);
+    assert!(!fixture.target().exists());
+}
+
+#[test]
+fn a_blocked_plan_does_not_touch_the_checkout() {
+    let fixture = Fixture::new("plan-dirty");
+    let payload = fixture.bundle();
+    fixture.apply(&payload, Clean::Artifacts);
+
+    let target = fixture.target();
+    fs::write(target.join("README.md"), "local edit\n").expect("edit");
+
+    let outcome = target::plan(
+        "air",
+        &payload,
+        Some(Clean::Artifacts),
+        false,
+        false,
+        false,
+        &fixture.fleet,
+    )
+    .expect("plan");
+    assert_eq!(outcome.exit, Exit::Refused);
+    assert_eq!(
+        fs::read_to_string(target.join("README.md")).expect("read"),
+        "local edit\n"
+    );
+}
+
+#[test]
+fn a_corrupt_bundle_is_refused_before_a_write() {
+    let fixture = Fixture::new("corrupt");
+    let payload = fixture.bundle();
+
+    let bundle = payload.join("repo.bundle");
+    let mut bytes = fs::read(&bundle).expect("bundle");
+    let last = bytes.len() - 1;
+    bytes[last] ^= 0xff;
+    fs::write(&bundle, bytes).expect("corrupt");
+
+    let error = match target::apply(
+        "air",
+        &payload,
+        Some(Clean::Artifacts),
+        false,
+        false,
+        false,
+        &fixture.fleet,
+    ) {
+        Ok(_) => panic!("a corrupt bundle must be refused"),
+        Err(error) => error,
+    };
+    assert_eq!(error.exit, Exit::Environment);
+    assert!(!fixture.target().exists());
+}
+
+#[test]
 fn a_writer_is_refused_without_allow_writer() {
     let fixture = Fixture::new("writer");
     let payload = fixture.bundle();

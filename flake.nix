@@ -241,6 +241,39 @@
           '';
         };
 
+      # The travel-secrets tool. Separate from `agent-tools` for the same reason the other
+      # writing tools are: it decrypts the source store and writes a re-encrypted payload. It is
+      # also separate from `fleet-sync` because the password store is deliberately not part of a
+      # worktree sync — the approval boundary for a git snapshot and the one for credentials are
+      # different, and they stay different binaries.
+      #
+      # `gpg` is wrapped onto PATH for the same reason `skill-store` wraps git: the tool's whole
+      # job is two gpg invocations, and a nix shell does not carry gpg otherwise. The wrapper
+      # resolves its own gpgconf/gpg-agent from the same store path, so a run cannot mix a nix gpg
+      # with an agent started by a different one.
+      travelSecretsFor =
+        pkgs:
+        (rustPlatformFor pkgs).buildRustPackage {
+          pname = "travel-secrets";
+          version = (lib.importTOML ./tools/travel-secrets/Cargo.toml).package.version;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [ "-p" "travel-secrets" ];
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+          # As with `agent-tools`: the workspace root is the composer, so the default install
+          # phase would install `playbook`, and cargoBuildHook's `--target <triple>` puts the
+          # artefact under `target/<triple>/release/`.
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            install -m755 \
+              "$(find target -maxdepth 3 -type f -name travel-secrets -perm -u+x | head -n1)" \
+              "$out/bin/travel-secrets"
+            wrapProgram $out/bin/travel-secrets --prefix PATH : ${pkgs.gnupg}/bin
+            runHook postInstall
+          '';
+        };
+
       # The skill store: publishes a plain skill directory as an OCFL version and exports a version
       # back out as an envelope. Not part of `agent-tools` — that derivation's contract is
       # read-only binaries with no write path, and this one writes a store and fetches from git.
@@ -316,6 +349,7 @@
           tui-shot = tuiShotFor rustPlatform;
           image-shot = imageShotFor rustPlatform;
           fleet-sync = fleetSyncFor rustPlatform;
+          travel-secrets = travelSecretsFor pkgs;
           skill-store = skillStoreFor pkgs;
           zed-thread-tools = zedThreadToolsFor rustPlatform;
           # What this repository is *for*; the toolkit is what it also ships.
@@ -345,6 +379,11 @@
               # `fleet-sync` is here because preparing a satellite payload is this repository's
               # own workflow; it is a separate package because it writes.
               (fleetSyncFor rustPlatform)
+              # `travel-secrets` is the payload's credential half, and is here for the same
+              # reason. Its gpg is wrapped, but `gpg` is also here directly because the gpg
+              # integration test drives it, which a wrapper inside the tool cannot cover.
+              (travelSecretsFor pkgs)
+              pkgs.gnupg
               # `skill-store` is here for the same reason the composer is: publishing a skill and
               # checking an export are this repository's own workflow, and should not need a
               # `cargo run` wrapper. Wrapped with git, so a `github:` source resolves.
@@ -370,13 +409,18 @@
           # `cargoLock` the packages use.
           #
           # `git` is on the PATH for the same reason it is in a devshell: the contract tests drive
-          # the real binary, and the binary runs `git` against a fixture repository.
+          # the real binary, and the binary runs `git` against a fixture repository. `gnupg` is
+          # there for the same reason: `travel-secrets`'s round-trip test generates throwaway keys
+          # in a temporary GNUPGHOME, never the real keyring.
           tests = rustPlatform.buildRustPackage {
             pname = "agent-playbook-tests";
             version = (lib.importTOML ./Cargo.toml).package.version;
             src = ./.;
             cargoLock.lockFile = ./Cargo.lock;
-            nativeBuildInputs = [ pkgs.git ];
+            nativeBuildInputs = [
+              pkgs.git
+              pkgs.gnupg
+            ];
             buildPhase = "cargo build --workspace --offline";
             doCheck = true;
             checkPhase = "cargo test --workspace --offline";

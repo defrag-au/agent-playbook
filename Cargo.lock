@@ -2072,6 +2072,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
 
 [[package]]
+name = "travel-secrets"
+version = "0.1.0"
+dependencies = [
+ "at-core",
+ "sha2",
+]
+
+[[package]]
 name = "tui-shot"
 version = "0.1.0"
 dependencies = [

@@ -82,7 +82,7 @@ Full resolution rules, including how `activation` and `overrides` are evaluated,
 
 ```
 Cargo.toml        the workspace manifest; the composer is std-only, deliberately
-flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot`, `tui-shot`, `image-shot` and `fleet-sync`
+flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot`, `tui-shot`, `image-shot`, `fleet-sync` and `travel-secrets`
 src/              resolution engine + CLI
   frontmatter.rs    flat `key: value` readers
   model.rs          Rule, Project, Target, Layer, Activation
@@ -106,6 +106,7 @@ tools/            the agent toolkit, plus the skill store
   tui-shot/         terminal captures and scenario runs in a PTY it owns
   image-shot/       image inspection, derived views and diffs on the IIIF grammar
   fleet-sync/       payloads for a satellite — bundle, plan, apply (writes)
+  travel-secrets/   a whitelisted, re-encrypted pass-store subset for travel (writes, decrypts)
   skill-store/      OCFL publish and export for skills (writes, and fetches)
   zed-thread-tools/ thread auditing, recovery and a TUI
 tests/            spec tests for the resolution model
@@ -347,6 +348,34 @@ artifacts` removes `target`, `.direnv`, `node_modules`, `.tmp` and `.venv`; `--c
 runs `git clean -xfd` and protects `.env`. The profile keys are `sync: bundle|none` and
 `sync_clean: artifacts|reset|none`; see [`docs/fleet.md`](docs/fleet.md) and the `fleet-sync`
 skill in the private fleet repository.
+
+## The travel credentials tool
+
+`tools/travel-secrets/` is the credential half of the same trip, and it is separate from
+`fleet-sync` on purpose: moving commits and decrypting a password store are different approvals,
+and their payloads belong in different directories.
+
+```sh
+travel-secrets --store ~/.password-store --whitelist fleet/travel/defrag-air.md \
+               --recipient <TRAVEL_FPR> --out /Volumes/travel/air-secrets
+```
+
+The binary is this repository's devshell package; run the command there, or
+`nix run .#travel-secrets -- …` from the checkout.
+
+Every whitelisted `pass` entry is decrypted with the caller's keyring and re-encrypted to the
+travel recipient through a pipe, so plaintext never reaches a file and the source store is read
+only. The output is a self-contained store — entries plus a root `.gpg-id` naming the travel key
+— and a flat `manifest` with the recipient, entry count, size and SHA-256 per entry. Symlinks are
+refused, the source's nested `.gpg-id` files are not copied, and the output directory must be
+empty.
+
+It reads the `pass:` line of `fleet/travel/<host>.md`, which is a per-trip selection and nothing
+else; the inventory and the procedure stay in the private fleet repository. The tool refuses a
+non-terminal stdin unless `--allow-non-tty` is explicit, because its job is to decrypt secrets.
+**An agent must not run it, `pass`, or `gpg --decrypt` against a real keyring** — prepare the
+selection, then hand the command over. The crate's gpg round-trip test uses throwaway keys in a
+temporary `GNUPGHOME`; it is still the human's command, not the agent's.
 
 ## The Zed thread tools
 
