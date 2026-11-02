@@ -1,0 +1,21 @@
+[package]
+name = "android-shot"
+version = "0.1.0"
+edition = "2021"
+description = "Build or take an APK, install it on an Android device, launch it, and write the logs and screen beside a report"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "android-shot"
+path = "src/main.rs"
+
+# A `*-shot` tool, separate from `agent-tools` for the same reason `browser-shot`
+# and `tui-shot` are: it owns processes (adb, and the packager it composes),
+# installs software on a device, and writes an image beside a report. It carries
+# no packaging code of its own — `mq-apk` builds the APK, and this finds it on
+# PATH or runs it with cargo.
+#
+# std only, like the composer: there is nothing here worth a dependency.
+
+[dependencies]

@@ -82,7 +82,7 @@ Full resolution rules, including how `activation` and `overrides` are evaluated,
 
 ```
 Cargo.toml        the workspace manifest; the composer is std-only, deliberately
-flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot`, `tui-shot`, `image-shot`, `fleet-sync` and `travel-secrets`
+flake.nix         the devshell, and packages: `playbook`, `agent-tools`, `browser-shot`, `tui-shot`, `android-shot`, `image-shot`, `fleet-sync` and `travel-secrets`
 src/              resolution engine + CLI
   frontmatter.rs    flat `key: value` readers
   model.rs          Rule, Project, Target, Layer, Activation
@@ -104,6 +104,7 @@ tools/            the agent toolkit, plus the skill store
   at-describe/      the catalogue, which opens nothing
   browser-shot/     browser captures, scenarios and frame bursts
   tui-shot/         terminal captures and scenario runs in a PTY it owns
+  android-shot/     build/install/launch an APK on a device, with logs and a screen
   image-shot/       image inspection, derived views and diffs on the IIIF grammar
   fleet-sync/       payloads for a satellite — bundle, plan, apply (writes)
   travel-secrets/   a whitelisted, re-encrypted pass-store subset for travel (writes, decrypts)
@@ -300,6 +301,25 @@ The verbs above are built. `tree`, `find`, `outline` and `scope` in `at-peek`; `
 `why` and `churn` in `at-recall`; and the `review` and `release` recipes are designed and not
 written — [`docs/inspection-tools.md`](docs/inspection-tools.md) is the design record, and
 `at-describe` answers with what exists rather than what was planned.
+
+## The Android tool
+
+`tools/android-shot/` is the device half of the macroquad Android loop. It builds through
+shared-crates' `mq-apk` (or takes an `--apk`), installs with `adb install -r`, force-stops,
+wakes the screen through a charging screensaver, starts the activity, waits, reads `SAPP` and
+the crash buffer, optionally captures the framebuffer, and writes `<shot>.txt` beside it.
+
+```sh
+android-shot --package au.defrag.x --library x_mq --crate x-mq \
+    --icon icon.png --banner banner.png --abi arm64-v8a \
+    --shot .tmp/phone.png --expect "cycle 0"
+```
+
+It exits 2 when the app ran but the report has problems — a crash, no `SAPP`, a missing
+`--expect` line, or an activity that is not the top resumed one (a locked device is the usual
+cause). The packaging stays in shared-crates: `android-shot` finds `mq-apk` on `PATH` or runs
+`cargo run -q -p mq-apk --` in the app's workspace, and `--mq-apk` names a built binary. It
+needs `adb`, so run it inside defrag-nix's `android` shell.
 
 ## The image tool
 
