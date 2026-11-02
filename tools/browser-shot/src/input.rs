@@ -186,7 +186,12 @@ pub fn dispatch(
     modifiers: u32,
     timeout: Duration,
 ) -> Result<InputRecord> {
-    let (target, locator) = resolve(tab, &action.target, timeout)?;
+    let (target, locator) = match (&action.target, action.kind) {
+        (Target::Selector(selector), Kind::Click | Kind::Tap) => {
+            resolve_enabled(tab, selector, timeout)?
+        }
+        _ => resolve(tab, &action.target, timeout)?,
+    };
     let steps = steps.max(1);
     let mut stamps = Vec::new();
 
@@ -318,6 +323,26 @@ fn resolve(tab: &Tab, target: &Target, timeout: Duration) -> Result<(Point, Stri
         Target::Coordinates { x, y } => Ok((Point { x: *x, y: *y }, "coordinates".to_owned())),
         Target::Selector(selector) => Ok((centre(tab, selector, timeout)?, selector.clone())),
     }
+}
+
+/// Wait until a selector is enabled (visible and not disabled), then return its centre.
+/// Used for `click`/`tap` so a button that appears disabled briefly is not clicked early —
+/// the same auto-wait Playwright applies, bounded by the step timeout.
+fn resolve_enabled(tab: &Tab, selector: &str, timeout: Duration) -> Result<(Point, String)> {
+    let predicate = crate::probe::wait_for_selector(
+        tab,
+        selector,
+        crate::probe::SelectorState::Enabled,
+        timeout,
+    );
+    if !predicate.passed {
+        anyhow::bail!(
+            "selector {selector:?} was not enabled within {} ms (last: {})",
+            timeout.as_millis(),
+            predicate.value
+        );
+    }
+    Ok((centre(tab, selector, timeout)?, selector.to_owned()))
 }
 
 fn origin(action: &Action, pointer: &Pointer) -> Point {

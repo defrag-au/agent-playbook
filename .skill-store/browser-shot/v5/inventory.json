@@ -1,0 +1,85 @@
+{
+  "id": "urn:skill:browser-shot",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v5",
+  "manifest": {
+    "6ea6e5a596b5226f81f8ae9c7c2d60815d48b350022871b20941b44ef1d5a233da793d87a91876e8455423ace6e4e59ee429af982b4a53f68679c36578d4a97f": [
+      "v2/content/SKILL.md"
+    ],
+    "79826f28b5fc3b94e2f37073ba2dedf874b8b0edb9de9993b135d7a4f0210db6efa052d8a4170df4a87bbb5559e73cb0b0a776d0eb4f1e6e12c07979499e825c": [
+      "v5/content/SKILL.md"
+    ],
+    "948942687431ac2b4f0e552e20897d0dcd3f3be08975512b712a348bfd843c14ddac9419420946a76a927502df8db6d7d770cbaf830bfef732e6f5d9e57a2a3a": [
+      "v3/content/SKILL.md"
+    ],
+    "a1738eae83e7bada7113db12f1e9908f65eeb59ba239fdb4cca6b2ce274902a4bb9f9feaa2769c90602b064255e5619c81c6aad3fdd72a596b0cf19725c635ad": [
+      "v1/content/SKILL.md"
+    ],
+    "a281250234efc6edc042fabf5db777529f0deca4fbd352c37efd675bafc2c2292b081e57d678fd5b36838281caa15f2f33c027bd302b03ebd539e97a53b3adae": [
+      "v4/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-25T06:00:42Z",
+      "state": {
+        "a1738eae83e7bada7113db12f1e9908f65eeb59ba239fdb4cca6b2ce274902a4bb9f9feaa2769c90602b064255e5619c81c6aad3fdd72a596b0cf19725c635ad": [
+          "SKILL.md"
+        ]
+      },
+      "message": "first published version",
+      "user": {
+        "name": "damo"
+      }
+    },
+    "v2": {
+      "created": "2026-10-25T07:54:27Z",
+      "state": {
+        "6ea6e5a596b5226f81f8ae9c7c2d60815d48b350022871b20941b44ef1d5a233da793d87a91876e8455423ace6e4e59ee429af982b4a53f68679c36578d4a97f": [
+          "SKILL.md"
+        ]
+      },
+      "message": "document spawn and wait_for"
+    },
+    "v3": {
+      "created": "2026-10-27T13:34:33Z",
+      "state": {
+        "948942687431ac2b4f0e552e20897d0dcd3f3be08975512b712a348bfd843c14ddac9419420946a76a927502df8db6d7d770cbaf830bfef732e6f5d9e57a2a3a": [
+          "SKILL.md"
+        ]
+      },
+      "message": "navigation failures still write a sidecar",
+      "user": {
+        "name": "Grok Bot",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    },
+    "v4": {
+      "created": "2026-10-27T14:09:29Z",
+      "state": {
+        "a281250234efc6edc042fabf5db777529f0deca4fbd352c37efd675bafc2c2292b081e57d678fd5b36838281caa15f2f33c027bd302b03ebd539e97a53b3adae": [
+          "SKILL.md"
+        ]
+      },
+      "message": "navigation completes at load plus network quiet",
+      "user": {
+        "name": "Grok Bot",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    },
+    "v5": {
+      "created": "2026-10-29T02:14:16Z",
+      "state": {
+        "79826f28b5fc3b94e2f37073ba2dedf874b8b0edb9de9993b135d7a4f0210db6efa052d8a4170df4a87bbb5559e73cb0b0a776d0eb4f1e6e12c07979499e825c": [
+          "SKILL.md"
+        ]
+      },
+      "message": "Selenium-style waits; prefer selector waits over sleeps",
+      "user": {
+        "name": "Grok Bot",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}

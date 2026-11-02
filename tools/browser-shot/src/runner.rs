@@ -111,6 +111,22 @@ enum WaitKind {
     Frames(u32),
     Rate(f64),
     NetworkIdle(u64),
+    Selector {
+        selector: String,
+        state: crate::probe::SelectorState,
+    },
+    Text {
+        text: String,
+        selector: Option<String>,
+    },
+    Url {
+        exact: Option<String>,
+        contains: Option<String>,
+    },
+    Stable {
+        quiet_ms: u64,
+        selector: Option<String>,
+    },
 }
 
 #[derive(Clone)]
@@ -796,6 +812,12 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                 frames,
                 rate,
                 network_idle,
+                selector,
+                state,
+                text,
+                url,
+                url_contains,
+                stable_ms,
                 timeout_ms,
             } => {
                 let indices = selected_indices(peer, selected, &names, peers.len())?;
@@ -805,7 +827,18 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                 let predicate = predicate
                     .as_ref()
                     .map(|predicate| substitute(predicate, &captures));
-                let kinds = wait_kinds(&predicate, frames, rate, network_idle)?;
+                let kinds = wait_kinds(
+                    &predicate,
+                    frames,
+                    rate,
+                    network_idle,
+                    selector,
+                    state,
+                    text,
+                    url,
+                    url_contains,
+                    stable_ms,
+                )?;
                 let step_timeout = timeout_ms.map_or(timeout, Duration::from_millis);
                 let tasks = indices
                     .iter()
@@ -845,6 +878,31 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                                                 timeout,
                                             )
                                         }
+                                        WaitKind::Selector { selector, state } => {
+                                            probe::wait_for_selector(
+                                                &tab, &selector, state, timeout,
+                                            )
+                                        }
+                                        WaitKind::Text { text, selector } => probe::wait_for_text(
+                                            &tab,
+                                            &text,
+                                            selector.as_deref(),
+                                            timeout,
+                                        ),
+                                        WaitKind::Url { exact, contains } => probe::wait_for_url(
+                                            &tab,
+                                            exact.as_deref(),
+                                            contains.as_deref(),
+                                            timeout,
+                                        ),
+                                        WaitKind::Stable { quiet_ms, selector } => {
+                                            probe::wait_for_stable(
+                                                &tab,
+                                                Duration::from_millis(quiet_ms),
+                                                selector.as_deref(),
+                                                timeout,
+                                            )
+                                        }
                                     });
                                 }
                                 (index, predicates)
@@ -860,6 +918,16 @@ pub fn run(args: Vec<String>) -> Result<bool> {
                 for (index, predicates) in results {
                     peers[index].add_predicates(predicates);
                 }
+            }
+            Step::Sleep { peer, duration_ms } => {
+                let index = peer_index(peer, &names)?;
+                let started = Instant::now();
+                std::thread::sleep(Duration::from_millis(*duration_ms));
+                peers[index].add_predicates(vec![crate::report::Predicate::passed(
+                    "sleep",
+                    format!("{duration_ms} ms"),
+                    started,
+                )]);
             }
             Step::Eval {
                 peer,
@@ -1993,11 +2061,18 @@ fn loss_snapshot(tab: &Tab) -> Option<(f64, u64, u64)> {
     Some((rate, sent as u64, dropped as u64))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn wait_kinds(
     predicate: &Option<String>,
     frames: &Option<u32>,
     rate: &Option<f64>,
     network_idle: &Option<u64>,
+    selector: &Option<String>,
+    state: &Option<String>,
+    text: &Option<String>,
+    url: &Option<String>,
+    url_contains: &Option<String>,
+    stable_ms: &Option<u64>,
 ) -> Result<Vec<WaitKind>> {
     let mut kinds = Vec::new();
     if let Some(expression) = predicate {
@@ -2012,8 +2087,47 @@ fn wait_kinds(
     if let Some(window) = network_idle {
         kinds.push(WaitKind::NetworkIdle(*window));
     }
+    // `selector=` alone (or with `state=`) waits for that element state. When `text=` is set
+    // without `state=`, the selector only scopes the text search — no separate selector wait.
+    let selector_scopes_text_only = text.is_some() && selector.is_some() && state.is_none();
+    if let Some(selector) = selector {
+        if !selector_scopes_text_only {
+            let parsed = match state.as_deref() {
+                None => probe::SelectorState::Visible,
+                Some(value) => probe::SelectorState::parse(value).ok_or_else(|| {
+                    anyhow!(
+                        "state must be present, visible, hidden, gone or enabled, got {value:?}"
+                    )
+                })?,
+            };
+            kinds.push(WaitKind::Selector {
+                selector: selector.clone(),
+                state: parsed,
+            });
+        }
+    }
+    if let Some(text) = text {
+        kinds.push(WaitKind::Text {
+            text: text.clone(),
+            selector: selector.clone(),
+        });
+    }
+    if url.is_some() || url_contains.is_some() {
+        kinds.push(WaitKind::Url {
+            exact: url.clone(),
+            contains: url_contains.clone(),
+        });
+    }
+    if let Some(quiet_ms) = stable_ms {
+        kinds.push(WaitKind::Stable {
+            quiet_ms: *quiet_ms,
+            selector: selector.clone(),
+        });
+    }
     if kinds.is_empty() {
-        bail!("wait needs predicate, frames, rate or network_idle");
+        bail!(
+            "wait needs predicate, frames, rate, network_idle, selector, text, url, url~ or stable"
+        );
     }
     Ok(kinds)
 }

@@ -447,3 +447,269 @@ mod tests {
         assert!(truthy(&Value::from("ready")));
     }
 }
+
+/// How a CSS selector is matched by a scenario wait (and by a pointer auto-wait).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectorState {
+    Present,
+    Visible,
+    Hidden,
+    Gone,
+    Enabled,
+}
+
+impl SelectorState {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "present" => Some(Self::Present),
+            "visible" => Some(Self::Visible),
+            "hidden" => Some(Self::Hidden),
+            "gone" => Some(Self::Gone),
+            "enabled" => Some(Self::Enabled),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Present => "present",
+            Self::Visible => "visible",
+            Self::Hidden => "hidden",
+            Self::Gone => "gone",
+            Self::Enabled => "enabled",
+        }
+    }
+}
+
+/// Inspect one element for a selector wait. Returns a short last-observed label and whether
+/// the wanted state holds. `visible` is a non-empty box, not `display:none` /
+/// `visibility:hidden`, and opacity &gt; 0. `enabled` is visible and not disabled/aria-disabled.
+const SELECTOR_STATE_JS: &str = r#"((selector, want) => {
+  const el = document.querySelector(selector);
+  if (!el) {
+    return JSON.stringify({ ok: want === 'gone', last: 'absent', want });
+  }
+  if (want === 'gone') {
+    return JSON.stringify({ ok: false, last: 'present', want });
+  }
+  const style = window.getComputedStyle(el);
+  const rect = el.getBoundingClientRect();
+  const opacity = Number(style.opacity);
+  const visible = rect.width > 0 && rect.height > 0
+    && style.display !== 'none'
+    && style.visibility !== 'hidden'
+    && Number.isFinite(opacity) && opacity > 0;
+  const disabled = el.disabled === true
+    || el.getAttribute('aria-disabled') === 'true'
+    || el.getAttribute('disabled') !== null;
+  let ok = false;
+  let last = visible ? 'visible' : 'hidden';
+  if (want === 'present') { ok = true; last = 'present'; }
+  else if (want === 'visible') { ok = visible; }
+  else if (want === 'hidden') { ok = !visible; last = visible ? 'visible' : 'hidden'; }
+  else if (want === 'enabled') {
+    ok = visible && !disabled;
+    last = !visible ? 'hidden' : (disabled ? 'disabled' : 'enabled');
+  }
+  return JSON.stringify({ ok, last, want });
+})"#;
+
+pub fn wait_for_selector(
+    tab: &Tab,
+    selector: &str,
+    state: SelectorState,
+    timeout: Duration,
+) -> Predicate {
+    let name = format!("selector {selector:?} {}", state.as_str());
+    let started = Instant::now();
+    let mut last;
+    let script = format!(
+        "({SELECTOR_STATE_JS})({selector}, {want})",
+        selector = serde_json::to_string(selector).unwrap_or_else(|_| "\"\"".to_owned()),
+        want = serde_json::to_string(state.as_str()).unwrap_or_else(|_| "\"\"".to_owned()),
+    );
+
+    loop {
+        match evaluate_labeled(tab, &script) {
+            Ok((_, label)) => {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&label) {
+                    last = value
+                        .get("last")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(&label)
+                        .to_owned();
+                    if value.get("ok").and_then(|v| v.as_bool()) == Some(true) {
+                        return Predicate::passed(name, last, started);
+                    }
+                } else {
+                    last = label;
+                }
+            }
+            Err(error) => last = format!("error: {error}"),
+        }
+        if started.elapsed() >= timeout {
+            return Predicate::failed(name, last, started);
+        }
+        std::thread::sleep(POLL);
+    }
+}
+
+/// Wait until visible text contains `text`. When `selector` is set, only that element's
+/// `innerText` is searched; otherwise the document body is.
+pub fn wait_for_text(
+    tab: &Tab,
+    text: &str,
+    selector: Option<&str>,
+    timeout: Duration,
+) -> Predicate {
+    let name = match selector {
+        Some(selector) => format!("text {text:?} in {selector:?}"),
+        None => format!("text {text:?}"),
+    };
+    let started = Instant::now();
+    let mut last;
+    let script = format!(
+        r#"((needle, selector) => {{
+  const root = selector ? document.querySelector(selector) : document.body;
+  if (!root) return JSON.stringify({{ ok: false, last: selector ? 'scope absent' : 'no body' }});
+  const haystack = root.innerText || '';
+  const ok = haystack.includes(needle);
+  const preview = haystack.length > 120 ? haystack.slice(0, 117) + '…' : haystack;
+  return JSON.stringify({{ ok, last: ok ? 'matched' : (preview || '(empty)') }});
+}})({needle}, {selector})"#,
+        needle = serde_json::to_string(text).unwrap_or_else(|_| "\"\"".to_owned()),
+        selector = selector
+            .map(|s| serde_json::to_string(s).unwrap_or_else(|_| "null".to_owned()))
+            .unwrap_or_else(|| "null".to_owned()),
+    );
+
+    loop {
+        match evaluate_labeled(tab, &script) {
+            Ok((_, label)) => {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&label) {
+                    last = value
+                        .get("last")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(&label)
+                        .to_owned();
+                    if value.get("ok").and_then(|v| v.as_bool()) == Some(true) {
+                        return Predicate::passed(name, last, started);
+                    }
+                } else {
+                    last = label;
+                }
+            }
+            Err(error) => last = format!("error: {error}"),
+        }
+        if started.elapsed() >= timeout {
+            return Predicate::failed(name, last, started);
+        }
+        std::thread::sleep(POLL);
+    }
+}
+
+pub fn wait_for_url(
+    tab: &Tab,
+    exact: Option<&str>,
+    contains: Option<&str>,
+    timeout: Duration,
+) -> Predicate {
+    let name = if let Some(exact) = exact {
+        format!("url {exact:?}")
+    } else {
+        format!("url~ {:?}", contains.unwrap_or(""))
+    };
+    let started = Instant::now();
+    let mut last;
+
+    loop {
+        match evaluate_labeled(tab, "location.href") {
+            Ok((_, href)) => {
+                last = href.clone();
+                let ok = if let Some(exact) = exact {
+                    href == exact
+                } else if let Some(contains) = contains {
+                    href.contains(contains)
+                } else {
+                    false
+                };
+                if ok {
+                    return Predicate::passed(name, last, started);
+                }
+            }
+            Err(error) => last = format!("error: {error}"),
+        }
+        if started.elapsed() >= timeout {
+            return Predicate::failed(name, last, started);
+        }
+        std::thread::sleep(POLL);
+    }
+}
+
+/// Wait until there are no DOM mutations for `quiet` under the document (or under `selector`).
+pub fn wait_for_stable(
+    tab: &Tab,
+    quiet: Duration,
+    selector: Option<&str>,
+    timeout: Duration,
+) -> Predicate {
+    let name = match selector {
+        Some(selector) => format!("stable {}ms in {selector:?}", quiet.as_millis()),
+        None => format!("stable {}ms", quiet.as_millis()),
+    };
+    let started = Instant::now();
+    let script = format!(
+        r#"(async (quietMs, timeoutMs, selector) => {{
+  const root = selector ? document.querySelector(selector) : document.documentElement;
+  if (!root) return JSON.stringify({{ ok: false, last: 'scope absent' }});
+  let last = performance.now();
+  const observer = new MutationObserver(() => {{ last = performance.now(); }});
+  observer.observe(root, {{ subtree: true, childList: true, attributes: true, characterData: true }});
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() - last < quietMs) {{
+    if (performance.now() > deadline) {{
+      observer.disconnect();
+      return JSON.stringify({{
+        ok: false,
+        last: 'still mutating; last change ' + Math.round(performance.now() - last) + 'ms ago'
+      }});
+    }}
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }}
+  observer.disconnect();
+  return JSON.stringify({{ ok: true, last: 'quiet for ' + quietMs + 'ms' }});
+}})({quiet}, {timeout}, {selector})"#,
+        quiet = quiet.as_millis(),
+        timeout = timeout.as_millis(),
+        selector = selector
+            .map(|s| serde_json::to_string(s).unwrap_or_else(|_| "null".to_owned()))
+            .unwrap_or_else(|| "null".to_owned()),
+    );
+
+    match tab.evaluate(&script, true) {
+        Ok(object) => {
+            let label = object
+                .value
+                .map(|value| match value {
+                    Value::String(text) => text,
+                    other => other.to_string(),
+                })
+                .unwrap_or_else(|| "no value".to_owned());
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&label) {
+                let last = value
+                    .get("last")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&label)
+                    .to_owned();
+                if value.get("ok").and_then(|v| v.as_bool()) == Some(true) {
+                    Predicate::passed(name, last, started)
+                } else {
+                    Predicate::failed(name, last, started)
+                }
+            } else {
+                Predicate::failed(name, label, started)
+            }
+        }
+        Err(error) => Predicate::failed(name, format!("error: {error}"), started),
+    }
+}

@@ -93,7 +93,44 @@ capture a out=a.png select=canvas
 Each peer is a separate browser process with its own storage and WebRTC stack. `check` validates
 peer names and required fields and names the line; `fmt` only lays the file out.
 
+## Waiting, not sleeping
+
+Wait on what the page shows. Do **not** reach for coordinate clicks or
+`eval "new Promise(r => setTimeout(r, N))" await` as a sleep.
+
+```text
+wait page selector="#wallet-button" state=enabled
+pointer page click selector="#wallet-button"
+wait page selector="#wallet-modal" state=visible
+wait page text="Connect" selector="#wallet-modal"
+wait page url~="#/wallet"
+wait page stable=500ms selector="#wallet-modal"
+```
+
+- `selector=` states: `present`, `visible` (default), `hidden`, `gone`, `enabled`.
+- `text=` matches a visible substring; combine with `selector=` to limit the scope.
+- `url=` (exact) / `url~=` (substring) watch `location.href`.
+- `stable=500ms` waits for no DOM mutations (optionally under `selector=`).
+- Several conditions on one `wait` all have to hold.
+- `pointer … selector=` for `click`/`tap` waits until the element is enabled first.
+- `sleep page 1s` is an explicit, reported pause — use it only when a condition wait cannot express the need.
+
+Rewriting a wallet modal that used coordinates (`1054,132`, `578,445`, …) and `setTimeout` sleeps:
+
+```text
+peer page url="http://127.0.0.1:8095/?nav=0#/wallet-button" viewport=1280x800
+
+wait page selector="[data-testid=wallet-button]" state=enabled
+pointer page click selector="[data-testid=wallet-button]"
+wait page selector="[data-testid=wallet-modal]" state=visible
+wait page text="Choose a wallet" selector="[data-testid=wallet-modal]"
+pointer page click selector="[data-testid=wallet-option-injected]"
+wait page url~="#/wallet/connected" timeout=10s
+capture page out=wallet-connected.png
+```
+
 ## Starting the server it tests
+
 
 A scenario can run the origin it captures. Starting and being ready are separate steps because they
 fail differently:

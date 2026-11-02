@@ -16,9 +16,10 @@ file       = { line } ;
 line       = blank | comment | run | peer | step ;
 run        = "run" { field } ;
 peer       = "peer" name { flag } { field } ;
-step       = wait | eval | key | pointer | capture | burst | assert | network
+step       = wait | sleep | eval | key | pointer | capture | burst | assert | network
            | spawn | wait_for | goto ;
 wait       = "wait" peer-list { field } ;
+sleep      = "sleep" peer duration ;
 eval       = "eval" peer expression { flag } { field } ;
 key        = "key" peer code state { field } ;
 pointer    = "pointer" peer kind { field } ;
@@ -77,12 +78,27 @@ Durations are milliseconds by default; `ms` and `s` suffixes are accepted (`time
 | `frames=60` | wait for N frames of the peer's counter |
 | `rate=30` | wait until the page sustains at least this many frames per second over a one-second sample |
 | `network_idle=500` | wait for no in-flight requests for this window |
+| `selector="…"` | wait for a CSS selector; `state=` defaults to `visible` |
+| `state=present` / `visible` / `hidden` / `gone` / `enabled` | element state for `selector=` (`visible`: non-empty box, not `display:none`/`visibility:hidden`, opacity > 0; `enabled`: visible and not disabled/`aria-disabled`) |
+| `text="…"` | wait until visible text (`innerText`) contains this substring; combine with `selector=` to limit the scope |
+| `url="…"` | wait until `location.href` equals this string |
+| `url~="…"` | wait until `location.href` contains this substring |
+| `stable=500ms` | wait until there are no DOM mutations for this long (under `selector=` when set) |
 | `timeout=15s` | override the run timeout |
 
-A failed `rate` wait names the rate it last measured and fails the peer, so a scenario can require
-30 fps rather than asserting a frame count. The sidecar's `frame rate` line uses the same
-measurement and, when it cannot take one, names the precondition that failed — for example
+Several conditions on one `wait` all have to hold (they run in order). `url` and `url~` cannot be
+combined. `state=` needs `selector=`. When `text=` is set with `selector=` and no `state=`, the
+selector only scopes the text search.
+
+A failed wait names what it was waiting for and the last value it saw. A failed `rate` wait names
+the rate it last measured and fails the peer, so a scenario can require 30 fps rather than
+asserting a frame count. The sidecar's `frame rate` line uses the same measurement and, when it
+cannot take one, names the precondition that failed — for example
 `not measured: frame counter "window.__frames" is not a finite number`.
+
+`sleep` — `sleep <peer> 1s` (or `500ms`). An explicit pause that shows up in the peer's report as
+`sleep = N ms`. Prefer a condition wait; use sleep only when nothing else applies so the pause is
+visible in the scenario.
 
 `eval`
 
@@ -126,7 +142,7 @@ ordered against them directly.
 
 | Field | Meaning |
 | --- | --- |
-| `selector=canvas` | resolve the target from the DOM |
+| `selector=canvas` | resolve the target from the DOM; `click`/`tap` wait until the element is **enabled**, bounded by the step timeout |
 | `at=200,400` | use explicit viewport coordinates |
 | `steps=8` | interpolate the move (or drag/swipe) over N steps |
 | `button=left` | `left`, `right` or `middle`; belongs on `click` and `drag` |
