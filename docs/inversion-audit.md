@@ -537,6 +537,18 @@ Still open:
 | 2026-10-25 | `montager` | org/ecosystems `defrag`, renders `egui`, languages `rust`, target `claude-code` | 0 | both | 30 rules; both `check` ok |
 | 2026-10-25 | `viewer` (new) | org `hodlcroft`, ecosystem `defrag`, languages `rust`, target `claude-code` | 0 | both (created) | 19 rules; both `check` ok |
 | 2026-10-25 | `personal` (in `fleet`) | no org, ecosystems, renders or languages; target `zed-personal` | 0 | `~/.config/zed/AGENTS.md` | 0 rules, 2 memory sections; `check` ok |
+| 2026-11-02 | `agent-playbook` models | `zed` excludes `activation: always`; `zed-personal` carries it and the Zed addenda | 13 core rules and 2 addenda moved out of every repository block | `~/.config/zed/AGENTS.md` (29,112 B) + ten repository `AGENTS.md` blocks | personal: 13 rules / 2 memory / 2 addenda; ten repository blocks 436,586 B → 242,342 B; net 171,496 B less per prompt; all `check` ok |
+
+The 2026-11-02 row is a target change, not a layer move. Zed concatenates one instruction file per
+worktree root, so a multi-root workspace resolved the universal layer once per root,
+byte-identically. `zed-personal` is the one file Zed loads once, so it now carries
+`activation: always`, the memory layer and the Zed addenda; `models/zed/overlay.conf` sets
+`exclude_activation: always`. Repository blocks carry only what differs. The trade-off is that a
+repository's Zed block is no longer self-contained; the `claude-code` block keeps the full set.
+Across the ten generated Zed blocks the installed payload fell from 436,586 B to 242,342 B — the
+stale blocks were refreshed in the same pass, so the "before" figure is the older rule set — and
+the personal file rose from 6,364 B to 29,112 B. The net is 171,496 B less per prompt, about 43k
+tokens at four characters per token.
 
 The `archivist` move required two upstream pointer fixes: `rules/rust/devshell-first.md` and
 `memory/README.md` no longer name `projects/archivist/rules/devshell-commands.md`; they name the

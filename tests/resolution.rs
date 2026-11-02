@@ -224,15 +224,13 @@ fn layer_order_is_core_then_language_then_org_then_project() {
 }
 
 #[test]
-fn the_personal_target_carries_no_rules_and_the_memory_layer() {
-    // Zed's personal instructions file loads for every project the user opens, and an agent
-    // reads it *alongside* the project's own file. So it must carry no rules at all: the
-    // universal rules ship in each repository's block, because a repo is bootstrapped with
-    // them and its `AGENTS.md` is committed and shared. Repeating them here would be
-    // duplication with no reader.
-    //
-    // What it carries is the `memory/` layer — facts about the person and the machine that
-    // are true regardless of repository, and that no repo's block should hold.
+fn the_personal_target_carries_the_universal_rules_and_the_memory_layer() {
+    // Zed's personal instructions file loads for every project the user opens — and, unlike a
+    // repository block, it loads **once** in a multi-root workspace. That is why the `always`
+    // rules and the harness addenda live here: a repository block that repeated them would be
+    // byte-identical to every sibling root's block. The manifest declares no org, ecosystem,
+    // renders or languages, so the safety property holds — nothing narrower than `always` can
+    // resolve into a file that loads everywhere.
     //
     // The manifest itself lives in the fleet repository; this fixture is the same shape, so the
     // test does not depend on a checkout outside this one.
@@ -243,17 +241,51 @@ fn the_personal_target_carries_no_rules_and_the_memory_layer() {
     let resolved = repo.resolve_with("zed-personal");
     assert!(!resolved.has_errors(), "{:?}", resolved.diagnostics);
     assert!(
-        resolved.rules.is_empty(),
-        "the personal file must carry no rules, but resolved: {:?}",
+        !resolved.rules.is_empty(),
+        "the personal file carries no rules, so the universal layer is delivered nowhere"
+    );
+    assert!(
         resolved
             .rules
             .iter()
+            .all(|rule| rule.activation == Activation::Always),
+        "a repository-specific rule resolved into the global personal file: {:?}",
+        resolved
+            .rules
+            .iter()
+            .filter(|rule| rule.activation != Activation::Always)
             .map(|rule| rule.rel.as_str())
             .collect::<Vec<_>>()
     );
     assert!(
         !resolved.memory.is_empty(),
         "the personal instructions file would be empty"
+    );
+    assert!(
+        !resolved.addenda.is_empty(),
+        "the Zed harness mechanics must travel with the personal file"
+    );
+}
+
+#[test]
+fn repo_targets_exclude_the_universal_layer() {
+    // The counterpart to the personal target: a repository block that kept the `always` rules
+    // would put a second copy of every one of them in a multi-root workspace.
+    let repo = ManifestedRepo::new("repo-excludes-always", EVERYTHING);
+    let resolved = repo.resolve_with("zed");
+    let repeated: Vec<&str> = resolved
+        .rules
+        .iter()
+        .filter(|rule| rule.activation == Activation::Always)
+        .map(|rule| rule.rel.as_str())
+        .collect();
+    assert!(
+        repeated.is_empty(),
+        "the zed repo block repeated the universal layer: {repeated:?}"
+    );
+    assert!(
+        !resolved.rules.is_empty(),
+        "the repository still carries its own org, language and renderer rules"
     );
 }
 
@@ -453,11 +485,11 @@ fn the_block_names_every_rule_it_contains() {
 }
 
 #[test]
-fn addenda_are_demoted_below_the_rules() {
-    let repo = ManifestedRepo::new("addenda", EVERYTHING);
-    let block = render::render(&repo.resolve_with("zed"));
-    // The zed addenda carry `#` titles of their own; they must not compete with the
-    // document title.
+fn personal_addenda_are_demoted_below_the_rules() {
+    // The addenda travel with the personal target now, so that is where the demotion is
+    // checked: they carry `#` titles of their own and must not compete with the document title.
+    let repo = ManifestedRepo::new("addenda", "project: personal\n");
+    let block = render::render(&repo.resolve_with("zed-personal"));
     assert!(block.contains("## Zed mechanics"));
     assert!(!block.contains("\n# Zed mechanics"));
 }

@@ -319,7 +319,8 @@ It exits 2 when the app ran but the report has problems — a crash, no `SAPP`, 
 `--expect` line, or an activity that is not the top resumed one (a locked device is the usual
 cause). The packaging stays in shared-crates: `android-shot` finds `mq-apk` on `PATH` or runs
 `cargo run -q -p mq-apk --` in the app's workspace, and `--mq-apk` names a built binary. It
-needs `adb`, so run it inside defrag-nix's `android` shell.
+needs `adb`, so run it inside defrag-nix's `android` shell. The procedure an agent follows is
+[`skills/android-shot/SKILL.md`](skills/android-shot/SKILL.md), published into `.skill-store/`.
 
 ## The image tool
 

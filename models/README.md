@@ -11,12 +11,13 @@ Each target is a directory with an `overlay.conf` and an optional `addenda/`.
 | `claude-code/` | model + harness | Claude via the Claude Code harness |
 | `deepseek-flash/` | model | DeepSeek Flash, whichever harness |
 | `zed/` | harness | Zed's agent, whichever model. Composes *with* a model overlay |
-| `zed-personal/` | harness | Zed's **personal** instructions file, `~/.config/zed/AGENTS.md`. Carries the `memory/` layer and **no rules** |
+| `zed-personal/` | harness | Zed's **personal** instructions file, `~/.config/zed/AGENTS.md`. Carries the `activation: always` rules, the `memory/` layer and the Zed addenda |
 
 ### The personal target
 
 `zed-personal` writes `~/.config/zed/AGENTS.md`, which Zed loads for **every** project —
-including repositories the playbook knows nothing about.
+including repositories the playbook knows nothing about — and loads **once**, not once per
+worktree.
 
 ```sh
 playbook install --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project.conf \
@@ -28,18 +29,25 @@ playbook check   --manifest ~/code/DamonOehlman/fleet/personal/.playbook/project
 The manifest lives in the private `fleet` repository, not in `~/.config/zed`, so `--manifest`
 names it explicitly and `--repo` names the directory the generated file belongs in.
 
-It carries **no rules**, and that is the point. An agent reads the personal file *and* the
-project's file, so the two are meant to be complementary, not overlapping. The universal rules
-ship in each repository's block — a repo is bootstrapped with them and its `AGENTS.md` is
-committed and shared — so repeating them here would be duplication with no reader. The
-mechanism is `exclude_activation: always`.
+It carries the universal layer: the rules with `activation: always`, the `memory/` layer, and
+the Zed addenda. That is a multi-root decision. Zed concatenates one instruction file per
+worktree root, so a workspace with N roots would otherwise resolve the same 13 rules and the
+same two addenda N times — byte-identical, with N readers. The personal file is the one place
+Zed loads once, so the universal layer lives here, and `models/zed/overlay.conf` excludes that
+activation from every repository block.
 
-What is left is the `memory/` layer: facts about the person and the machine that are true
-regardless of repository. That is the content this file exists for.
+What a repository block carries is therefore only what differs between repositories. The
+trade-off is real: a repository's `AGENTS.md` is no longer self-contained for Zed. `claude-code`
+keeps the full set, so `CLAUDE.md` still is. A Zed user without the personal file gets the
+repository's delta and none of the universal layer.
 
-Verified 2026-09-21 that both files load — see `models/zed/addenda/zed-mechanics.md`.
-`the_personal_target_carries_no_rules_and_the_memory_layer` and
-`repo_targets_do_not_carry_the_memory_layer` hold the line.
+The safety property is that the manifest declares no org, ecosystems, renders or languages.
+A rule narrower than `always` therefore cannot resolve into a file that loads everywhere.
+`the_personal_target_carries_the_universal_rules_and_the_memory_layer` and
+`repo_targets_exclude_the_universal_layer` hold the line.
+
+Verified 2026-09-21 that both files load — see
+`models/zed-personal/addenda/zed-mechanics.md`.
 
 `zed/` and a model overlay are not mutually exclusive — a Zed session running DeepSeek Flash
 wants both. Where that matters, the model overlay names the harness in `model:`/`harness:`
@@ -107,9 +115,11 @@ playbook install --target zed         --repo <repo>   # AGENTS.md
 playbook install --target claude-code --repo <repo>   # CLAUDE.md
 ```
 
-Two blocks is not duplication to be avoided: each is generated from the same rule set, and
-`playbook check` verifies both, so they cannot drift. The hand-maintained duplication this
-repository exists to remove was two files that nothing kept in sync.
+Two blocks is not duplication to be avoided: each is generated from the same rule tree, and
+`playbook check` verifies both, so they cannot drift. They are not identical by design — the
+Zed block omits the universal layer because the personal file carries it, while the Claude
+Code block keeps the full set. The hand-maintained duplication this repository exists to
+remove was two files that nothing kept in sync.
 
 ## Model overlays make claims
 

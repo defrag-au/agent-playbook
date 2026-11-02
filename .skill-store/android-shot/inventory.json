@@ -1,0 +1,40 @@
+{
+  "id": "urn:skill:android-shot",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v2",
+  "manifest": {
+    "145d50fae6623fd872a2f044576d0674611f9f24c83d985001d77cb70ae244165747691811761b2f34abf28716506b9d14d6bf4898789921cc617294898b610e": [
+      "v2/content/SKILL.md"
+    ],
+    "3b8a48b0244c90aa3d882a8d52aaf3b1c829e6603c6776d8813970e1b263b658eb9a2b856b27dc322c2bb9439018d4abf851231d908d873c8ce5e2e6f14528b4": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-11-02T00:20:42Z",
+      "state": {
+        "3b8a48b0244c90aa3d882a8d52aaf3b1c829e6603c6776d8813970e1b263b658eb9a2b856b27dc322c2bb9439018d4abf851231d908d873c8ce5e2e6f14528b4": [
+          "SKILL.md"
+        ]
+      },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    },
+    "v2": {
+      "created": "2026-11-02T00:23:41Z",
+      "state": {
+        "145d50fae6623fd872a2f044576d0674611f9f24c83d985001d77cb70ae244165747691811761b2f34abf28716506b9d14d6bf4898789921cc617294898b610e": [
+          "SKILL.md"
+        ]
+      },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}
