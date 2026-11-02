@@ -21,19 +21,14 @@ into any pane and `attach` to sessions it did not start, so it cannot be granted
 
 ```sh
 tui-shot run --scenario .tmp/factotum.dsl
-tui-shot check --scenario .tmp/factotum.dsl      # parse only, launch nothing
-./target/release/<tui> --state fixtures/x.json --plan examples/x.dsl
+tui-shot check --scenario .tmp/factotum.dsl
 ```
 
-- One plan file drives both: `tui-shot` through the PTY, the harness against a captured view. The
-  grammar is `tools/tui-shot/SCENARIO.md` in `agent-playbook`.
-- A harness-only field (`at=`, `status=`) is refused by `tui-shot` by name — omit it in a plan
-  that is meant to run under both.
 - Wait for content, never sleep: `wait … contains=`, `absent=`, `idle=`, `exit=true`.
-- Not: a hand-started tmux session, `send-keys`, `capture-pane`, or a fixed `sleep` between a key
-  and a screen read.
+- Not: a hand-started tmux session, `send-keys`, `capture-pane`, or a fixed `sleep`.
+- The `tui-shot` skill has the grammar, fields and failures.
 
-## Why
+## Rationale
 
 The factotum agent thread drove `factotum-tui` with `tmux new-session`, `send-keys`, a sleep, then
 `capture-pane` for every state. The loop's speed was the sleeps, and every approval covered an

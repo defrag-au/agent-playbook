@@ -15,14 +15,12 @@ Blocks of text are the wrong tool in egui — reach for an encoding instead:
 | Instead of | Use |
 | --- | --- |
 | state described in a sentence | a pip track or progress marks |
-| composition spelled out | shaped or coloured marks — see `PartyBadge`'s filled/half/hollow basis language, reused as support pips on `ClaimCard` |
+| composition spelled out | shaped or coloured marks — `PartyBadge`'s filled/half/hollow language, reused as support pips on `ClaimCard` |
 | a number the reader must compare by eye | bar height or width |
 | long-form detail | behind an expand, on hover, or in a side panel |
 
-- A list of twenty should be **scannable** — if reading twenty means reading twenty paragraphs,
-  redesign.
-- Keep at most one line of irreducible text (a title, a statement); put the rest on demand.
-- Storybook captions to the same standard: one or two short lines, not an essay.
+- A list of twenty should be scannable; keep at most one line of irreducible text.
+- Storybook captions: one or two short lines, not an essay.
 
 ## Rationale
 

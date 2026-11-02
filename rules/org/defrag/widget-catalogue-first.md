@@ -12,23 +12,16 @@ targets:
 
 **Before writing any widget, read the catalogue.**
 
-- `ui/egui-widgets/CATALOG.md` in the `shared-crates` repository — ~100 widgets, one line each
-- `ui/macroquad-widgets/CATALOG.md` in `shared-crates` — the macroquad set
+- `ui/egui-widgets/CATALOG.md` in `shared-crates` — ~100 widgets, one line each.
+- `ui/macroquad-widgets/CATALOG.md` — the macroquad set.
 
-Read the whole file. **Do not grep instead.**
+Read the whole file. Do not grep instead.
 
-- About to hand-build something widget-shaped — a chip, an id display, a label-value grid, a card,
-  a chart, a stat strip → scan first. It probably exists.
-- New widget genuinely warranted → build it in `egui-widgets` with a `//!` header, add a storybook
-  story, regenerate the catalogue. The three-step checklist is at the bottom of `WIDGETS.md`.
-- Both catalogues are generated from each module's own `//!` header by `tests/catalog.rs`, and a
-  test asserts the committed copy matches. A module without a
-  `//! \`Name\` — one-line purpose.` header **fails** the test. Keep the first sentence a summary:
-  it is cut at the first full stop, so detail belongs in the paragraphs below.
-
-```sh
-UPDATE_CATALOG=1 nix develop -c cargo test -p egui-widgets --test catalog
-```
+- Hand-building something widget-shaped — a chip, an id display, a label-value grid, a card, a
+  chart, a stat strip → scan first. It probably exists.
+- A new widget → build it in `egui-widgets` with a `//!` header, add a storybook story, and run
+  `UPDATE_CATALOG=1 nix develop -c cargo test -p egui-widgets --test catalog`. A module without
+  the header fails that test.
 
 ## Rationale
 
