@@ -8,6 +8,7 @@ members = [
     "tools/at-peek",
     "tools/at-recall",
     "tools/at-reach",
+    "tools/android-shot",
     "tools/browser-shot",
     "tools/fleet-sync",
     "tools/image-shot",

@@ -1,0 +1,25 @@
+{
+  "id": "urn:skill:android-shot",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v1",
+  "manifest": {
+    "3b8a48b0244c90aa3d882a8d52aaf3b1c829e6603c6776d8813970e1b263b658eb9a2b856b27dc322c2bb9439018d4abf851231d908d873c8ce5e2e6f14528b4": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-11-02T00:20:42Z",
+      "state": {
+        "3b8a48b0244c90aa3d882a8d52aaf3b1c829e6603c6776d8813970e1b263b658eb9a2b856b27dc322c2bb9439018d4abf851231d908d873c8ce5e2e6f14528b4": [
+          "SKILL.md"
+        ]
+      },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}

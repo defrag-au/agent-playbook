@@ -11,20 +11,18 @@ targets:
 ## Directive
 
 **Build and verify on the workstation; run the transfer on the arm box.** The workstation's
-uplink sets the ceiling for a GB-scale write to R2, so a large upload from here is a validation
-step and never the production one.
+uplink sets the ceiling for a GB-scale write to R2.
 
 | step | where |
 | --- | --- |
 | build the artifact · dry-run the publish · check the bytes | workstation |
 | the `rclone`/`publish` run that moves GB to R2 | arm box |
 
-- `--run`-gated publishers (`mithril-snapshot publish`, `tx-index publish`) print their exact
-  `rclone` invocation without `--run` · copy that line to the box rather than re-running it here.
-- The box already holds the chunk store, so an artifact derived from chunks is **rebuilt** there,
-  never copied to it — copying it spends the same uplink twice.
-- Native build on the box, not `aarch64-unknown-linux-musl`: the musl build measured 2.2× slower
-  on one thread and *slower with eight than with one*.
+- `--run`-gated publishers print their exact `rclone` invocation without `--run`; copy that line
+  to the box rather than re-running it here.
+- The box already holds the chunk store, so an artifact derived from chunks is rebuilt there,
+  never copied to it.
+- Native build on the box, not `aarch64-unknown-linux-musl`: the musl build is slower.
 
 ## Rationale
 

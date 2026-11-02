@@ -77,9 +77,12 @@ mechanical per-rule resolution. So do not rely on precedence to settle a contrad
 **avoid the overlap**. Keep personal instructions to rules that are true of every repository
 and let project files carry the rest.
 
-That is still a *duplication* win rather than a token win: personal and project instructions
-both load, so a session pays for both. Use it so a core rule is maintained in one place
-rather than reinstalled in five.
+**Pay for it once.** Personal and project instructions both load, so anything that appears in
+both is paid twice in a single-root session and N+1 times in an N-root workspace. The universal
+`activation: always` rules and this file's own mechanics therefore live here, and a repository's
+`AGENTS.md` carries only what differs between repositories. That is the rule: something true of
+every project belongs in this file, and something true of one repository belongs in that
+repository's block.
 
 ## Rendering
 

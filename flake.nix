@@ -190,6 +190,32 @@
           '';
         };
 
+      # The Android device tool. Separate from `agent-tools` for the same reason the other
+      # `*-shot` tools are: it owns processes (adb, and the packager it composes), installs
+      # software on a device, and writes an image beside a report. It carries no packaging
+      # code — shared-crates' `mq-apk` builds the APK, found on PATH or run with
+      # `cargo run -p mq-apk --` in the app's workspace.
+      androidShotFor =
+        rustPlatform:
+        rustPlatform.buildRustPackage {
+          pname = "android-shot";
+          version = (lib.importTOML ./tools/android-shot/Cargo.toml).package.version;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [ "-p" "android-shot" ];
+          # As with `agent-tools`: the workspace root is the composer, so the default install
+          # phase would install `playbook`, and cargoBuildHook's `--target <triple>` puts the
+          # artefact under `target/<triple>/release/`.
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            install -m755 \
+              "$(find target -maxdepth 3 -type f -name android-shot -perm -u+x | head -n1)" \
+              "$out/bin/android-shot"
+            runHook postInstall
+          '';
+        };
+
       # The image tool. Separate from `agent-tools` for the same reason as the other `*-shot`
       # tools: it writes derived views, where every `at-*` binary has no write path. It is also
       # separate from `browser-shot` and `tui-shot` because it reads files that already exist and
@@ -347,6 +373,7 @@
           inherit playbook agent-tools;
           browser-shot = browserShotFor rustPlatform;
           tui-shot = tuiShotFor rustPlatform;
+          android-shot = androidShotFor rustPlatform;
           image-shot = imageShotFor rustPlatform;
           fleet-sync = fleetSyncFor rustPlatform;
           travel-secrets = travelSecretsFor pkgs;
