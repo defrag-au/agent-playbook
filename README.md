@@ -305,9 +305,9 @@ written — [`docs/inspection-tools.md`](docs/inspection-tools.md) is the design
 ## The Android tool
 
 `tools/android-shot/` is the device half of the macroquad Android loop. It builds through
-shared-crates' `mq-apk` (or takes an `--apk`), installs with `adb install -r`, force-stops,
-wakes the screen through a charging screensaver, starts the activity, waits, reads `SAPP` and
-the crash buffer, optionally captures the framebuffer, and writes `<shot>.txt` beside it.
+shared-crates' `mq-apk` (or takes an `--apk`), installs with `adb install -r`, wakes the screen
+through a charging screensaver, starts the activity cold (`am start -W -S`), waits, reads `SAPP`
+and the crash buffer, optionally captures the framebuffer, and writes `<shot>.txt` beside it.
 
 ```sh
 android-shot --package au.defrag.x --library x_mq --crate x-mq \

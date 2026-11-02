@@ -219,18 +219,16 @@ impl Adb {
         self.run("install", &["install", "-r", &apk]).map(|_| ())
     }
 
-    /// Stop the package before starting it, so the run is a cold start rather
-    /// than `am start` handing the intent to whatever instance was already at
-    /// the top of its task.
-    pub fn force_stop(&self, package: &str) -> Result<(), String> {
-        self.run("stop the app", &["shell", "am", "force-stop", package])
-            .map(|_| ())
-    }
-
-    /// Start the activity and wait for the launch to settle. The output is
-    /// `am start -W`'s status block, which the report keeps.
+    /// Start the activity and wait for the launch to settle. `-S` stops the
+    /// process first, so the run is a cold start rather than `am start`
+    /// handing the intent to whatever instance was already at the top of its
+    /// task. The output is `am start -W`'s status block, which the report
+    /// keeps.
     pub fn launch(&self, component: &str) -> Result<String, String> {
-        self.run("launch", &["shell", "am", "start", "-W", "-n", component])
+        self.run(
+            "launch",
+            &["shell", "am", "start", "-W", "-S", "-n", component],
+        )
     }
 
     /// miniquad logs on Android under `SAPP`; a Java crash is `AndroidRuntime`.

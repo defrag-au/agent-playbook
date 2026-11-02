@@ -66,7 +66,6 @@ fn run() -> Result<ExitCode, String> {
     adb.clear_logs()?;
     println!("→ install {}", apk.display());
     adb.install(&apk)?;
-    adb.force_stop(&opts.package)?;
 
     // The build outlasts the screen timeout on a phone left on a desk.
     adb.wake()?;
@@ -148,11 +147,10 @@ fn print_plan(opts: &cli::Options) -> Result<(), String> {
         "install  {adb} install -r {}",
         packager::quote(&apk.display().to_string())
     );
-    println!("stop     {adb} shell am force-stop {}", opts.package);
     println!("wake     {adb} shell input keyevent KEYCODE_WAKEUP");
     println!("keyguard {adb} shell wm dismiss-keyguard");
     println!(
-        "launch   {adb} shell am start -W -n {}",
+        "launch   {adb} shell am start -W -S -n {}",
         opts.activity_component()
     );
     println!("logs     {adb} logcat -d -s SAPP AndroidRuntime");
