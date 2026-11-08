@@ -123,9 +123,18 @@ references/       crate cheat sheets and API notes
 models/           compose-time overlays: generic, claude-code, deepseek-flash, zed
                   (models/zed-personal writes the personal instructions file)
 templates/        scaffolds for new rules, skills, projects and overlays
-docs/             precedence model, rule format, skills delivery, migration inventory, inspection and browser tools
+integrations/     consumers of the playbook, outside the workspace; rig/ is the rig plugin
+docs/             precedence model, rule format, skills delivery, migration inventory, inspection and browser tools;
+                  docs/design/ holds design records: rig, and the toolkit's typed core
 dist/             generated output (gitignored)
 ```
+
+Design records live in [`docs/design/`](docs/design/). [`rig.md`](docs/design/rig.md) is what
+rig's kernel makes possible, what was verified against which commit, and the commitment to build
+against it. [`toolkit-core.md`](docs/design/toolkit-core.md) is the seam it stands on: the `at-*`
+verbs return typed facts, and the CLI and a harness render the same text from them. The plugin they
+describe is in `integrations/rig`, outside this workspace so the composer and `cargo test` stay
+dependency-light.
 
 `models/` holds **targets**, not just models. A target is whatever consumes rules — usually
 a model+harness pair. `claude-code/` declares `model: claude`, `harness: claude-code`;

@@ -1,0 +1,6 @@
+# at-peek search · <root> · /alpha/ in .
+docs/readme.md  1
+src/a.rs        1
+src/b.rs        1
+# walked 3 files · skipped by rule: .git
+# 3 matches in 3 files

@@ -1,0 +1,24 @@
+# Its own workspace, deliberately: the playbook's composer builds with no dependencies, and
+# `cargo test` at the root must not start building Bevy. rig loads this crate as a
+# `[[plugins.extra]]`; it is checked and tested from this directory.
+[workspace]
+
+[package]
+name = "rig-playbook"
+version = "0.1.0"
+edition = "2021"
+description = "The agent-playbook enforced in rig: a gate that refuses shell reads"
+license = "MIT"
+
+[dependencies]
+# The exact harness the generated agent is built against. A plugin and its app must share a Bevy
+# version, so this is pinned rather than ranged.
+rig-harness = "=0.46.0"
+# The verb catalogues: a tool's description is the same text its help renders. Paths, because the
+# toolkit is not published.
+at-peek = { path = "../../tools/at-peek" }
+at-recall = { path = "../../tools/at-recall" }
+# The tool schemas derive from the argument types.
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

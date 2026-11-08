@@ -415,6 +415,9 @@
               # checking an export are this repository's own workflow, and should not need a
               # `cargo run` wrapper. Wrapped with git, so a `github:` source resolves.
               (skillStoreFor pkgs)
+              # Reading a rig session: the effect log is JSONL, and DuckDB is the first reader.
+              # `skills/rig-session-query` is the procedure; this is the tool it runs.
+              pkgs.duckdb
             ];
           };
         }

@@ -9,7 +9,7 @@
 use std::path::Path;
 
 use crate::catalogue::{self, Verb};
-use crate::contract::{Exit, Fail, DEFAULT_LIMIT, DEFAULT_MAX_FILES, MAX_FILES, MAX_LIMIT};
+use crate::contract::{Exit, Fail};
 use crate::paths::Root;
 use crate::verbs::{self, Opts};
 
@@ -197,50 +197,29 @@ fn options(parsed: &Parsed) -> Result<Opts, Fail> {
         }
     };
 
-    let (limit, limit_clamped_from) = match parsed.value("--limit") {
-        Some(raw) => {
-            let asked = raw
-                .parse::<usize>()
-                .map_err(|_| Fail::usage(format!("--limit {raw} is not a number")))?;
-            if asked == 0 {
-                return Err(Fail::usage(
-                    "--limit 0 asks for no output · the smallest useful limit is 1",
-                ));
-            }
-            if asked > MAX_LIMIT {
-                (MAX_LIMIT, Some(asked))
-            } else {
-                (asked, None)
-            }
-        }
-        None => (DEFAULT_LIMIT, None),
+    let limit = match parsed.value("--limit") {
+        Some(raw) => Some(
+            raw.parse::<usize>()
+                .map_err(|_| Fail::usage(format!("--limit {raw} is not a number")))?,
+        ),
+        None => None,
+    };
+    let max_files = match parsed.value("--max-files") {
+        Some(raw) => Some(
+            raw.parse::<usize>()
+                .map_err(|_| Fail::usage(format!("--max-files {raw} is not a number")))?,
+        ),
+        None => None,
     };
 
-    let (max_files, max_files_clamped_from) = match parsed.value("--max-files") {
-        Some(raw) => {
-            let asked = raw
-                .parse::<usize>()
-                .map_err(|_| Fail::usage(format!("--max-files {raw} is not a number")))?;
-            if asked == 0 {
-                return Err(Fail::usage("--max-files 0 considers no files"));
-            }
-            if asked > MAX_FILES {
-                (MAX_FILES, Some(asked))
-            } else {
-                (asked, None)
-            }
-        }
-        None => (DEFAULT_MAX_FILES, None),
-    };
-
-    Ok(Opts {
+    // The clamps and the zero checks live on `Opts`, so a harness constructing options cannot
+    // disagree with the CLI about what `--limit` means.
+    Opts::resolve(
         root,
-        root_was_explicit: named_root.is_some(),
+        named_root.is_some(),
         limit,
-        limit_clamped_from,
         max_files,
-        max_files_clamped_from,
-        include_secret_paths: parsed.has("--include-secret-paths"),
-        summary: parsed.has("--summary"),
-    })
+        parsed.has("--include-secret-paths"),
+        parsed.has("--summary"),
+    )
 }
