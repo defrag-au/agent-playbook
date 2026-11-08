@@ -46,6 +46,34 @@ substring is an error rather than a guess. `--limit 0` shows every result.
 This is the first command after a session has compacted unexpectedly: it names
 the page or file that cost the context, not just the tool that fetched it.
 
+### Behaviour
+
+```sh
+zed-thread-audit --behaviour <thread-id-or-title>
+zed-thread-audit --behaviour "mithril snapshot" --limit 0 --json
+```
+
+`--behaviour` counts what the agent *did*, not what it cost. Four measures, each
+with the message index and request argument behind it:
+
+| Measure | Definition |
+| --- | --- |
+| Dead ends | results the tool reported as an error, and results that carried no text at all |
+| Repetitions | a call whose `(tool, argument)` already appeared earlier in the thread |
+| Habits | a terminal command piping into `head` or `tail`, or echoing a `===`/`---` separator |
+| Exits | `# next:` lines a tool printed, whether a later call ran one as printed, and the call that came next |
+
+A read repeated after a write to the same path is a re-read, not a re-derivation,
+and is not counted. Only tools that carry a structured `path` can be paired this
+way.
+
+`--limit` truncates each site list; `0` lists every site. Counts are always
+complete.
+
+This verb reads result bodies, unlike `--explain`, because a followed exit exists
+only in the text a tool printed. It never stores or prints a body: the report
+carries counts, message indices and request arguments.
+
 ## TUI
 
 ```sh

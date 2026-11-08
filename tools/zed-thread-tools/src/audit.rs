@@ -86,26 +86,7 @@ pub struct ToolOutputDetail {
 pub fn explain(db_path: &Path, thread: &str, limit: usize) -> Result<ThreadExplanation, Error> {
     let connection = db::open_read_only(db_path)?;
     let headers = db::list_headers(&connection)?;
-
-    let header = if let Some(header) = headers.iter().find(|header| header.id == thread) {
-        header
-    } else {
-        let needle = thread.to_lowercase();
-        let matches: Vec<&ThreadHeader> = headers
-            .iter()
-            .filter(|header| header.summary.to_lowercase().contains(&needle))
-            .collect();
-        match matches.as_slice() {
-            [only] => *only,
-            [] => return Err(Error::ThreadNotFound(thread.to_owned())),
-            _ => {
-                return Err(Error::InvalidThread(format!(
-                    "{thread:?} matches {} threads; pass the id from the audit table",
-                    matches.len()
-                )));
-            }
-        }
-    };
+    let header = resolve_thread(&headers, thread)?;
 
     let record = db::load_record(&connection, &header.id)?;
     let decoded = db::decode_thread(&record.header.data_type, &record.data)?;
@@ -174,6 +155,31 @@ pub fn explain(db_path: &Path, thread: &str, limit: usize) -> Result<ThreadExpla
 
 /// Render the explanation. Like the audit table, this is the only place it
 /// prints, so `--json` and the human view cannot disagree.
+/// Resolve a thread by id, or by a unique substring of its title. An ambiguous
+/// substring is an error rather than a guess.
+fn resolve_thread<'a>(
+    headers: &'a [ThreadHeader],
+    thread: &str,
+) -> Result<&'a ThreadHeader, Error> {
+    if let Some(header) = headers.iter().find(|header| header.id == thread) {
+        return Ok(header);
+    }
+
+    let needle = thread.to_lowercase();
+    let matches: Vec<&ThreadHeader> = headers
+        .iter()
+        .filter(|header| header.summary.to_lowercase().contains(&needle))
+        .collect();
+    match matches.as_slice() {
+        [only] => Ok(only),
+        [] => Err(Error::ThreadNotFound(thread.to_owned())),
+        _ => Err(Error::InvalidThread(format!(
+            "{thread:?} matches {} threads; pass the id from the audit table",
+            matches.len()
+        ))),
+    }
+}
+
 pub fn print_explanation(explanation: &ThreadExplanation) {
     println!("# zed-thread-audit --explain · {}", explanation.title);
     println!(
@@ -195,6 +201,546 @@ pub fn print_explanation(explanation: &ThreadExplanation) {
             output.argument.as_deref().unwrap_or("-"),
             if output.is_error { "  [error]" } else { "" },
         );
+    }
+}
+
+// --- behaviour -------------------------------------------------------------
+
+/// What an agent *did* in a thread, counted rather than sized.
+///
+/// Unlike [`ThreadExplanation`], this reads result bodies: a followed exit exists
+/// only in the text a tool printed. It never stores or prints a body — the
+/// report carries counts, message indices and request arguments.
+#[derive(Debug, Clone, Serialize)]
+pub struct BehaviourReport {
+    pub id: String,
+    pub title: String,
+    pub updated_at: String,
+    pub messages: usize,
+    pub tool_calls: usize,
+    pub tool_results: usize,
+    pub dead_ends: DeadEnds,
+    pub repetitions: Repetitions,
+    pub habits: Habits,
+    pub exits: Exits,
+}
+
+/// Results that told the agent nothing: an error, or no text at all.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DeadEnds {
+    pub errors: usize,
+    /// Results with no text content. Not filtered by whether a fact was
+    /// expected, because nothing in the trace says what was expected.
+    pub empty: usize,
+    pub sites: Vec<CallSite>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CallSite {
+    pub message: usize,
+    pub tool: String,
+    pub argument: Option<String>,
+    pub kind: DeadEndKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeadEndKind {
+    Error,
+    Empty,
+}
+
+/// Calls whose request had already been made earlier in the thread.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct Repetitions {
+    pub repeated: usize,
+    pub sites: Vec<RepeatSite>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RepeatSite {
+    pub message: usize,
+    pub first_message: usize,
+    pub tool: String,
+    pub argument: String,
+}
+
+/// Shell habits the toolkit exists to make unnecessary.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct Habits {
+    pub pipe_head: usize,
+    pub pipe_tail: usize,
+    pub separator_echo: usize,
+    pub sites: Vec<HabitSite>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Habit {
+    PipeHead,
+    PipeTail,
+    SeparatorEcho,
+}
+
+impl Habit {
+    fn label(self) -> &'static str {
+        match self {
+            Self::PipeHead => "| head",
+            Self::PipeTail => "| tail",
+            Self::SeparatorEcho => "echo ===",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct HabitSite {
+    pub message: usize,
+    pub habit: Habit,
+    pub command: String,
+}
+
+/// `# next:` footers printed by the inspection tools, and whether a later call
+/// ran one as printed.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct Exits {
+    pub printed: usize,
+    pub followed: usize,
+    pub sites: Vec<ExitSite>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExitSite {
+    pub message: usize,
+    pub command: String,
+    pub followed: bool,
+    /// The call immediately after the one that printed this exit. Without it,
+    /// "not followed" cannot be told apart from "answered a better way".
+    pub next: Option<NextCall>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct NextCall {
+    pub message: usize,
+    pub tool: String,
+    pub argument: Option<String>,
+}
+
+/// One tool call, in message order, with its result paired by `tool_use_id`.
+struct Call<'a> {
+    message: usize,
+    tool: String,
+    argument: Option<String>,
+    input: ToolInput,
+    result: Option<&'a ToolResult>,
+}
+
+/// Count what happened in one thread. `limit` truncates each site list; `0`
+/// lists every site. Counts are always complete.
+pub fn behaviour(db_path: &Path, thread: &str, limit: usize) -> Result<BehaviourReport, Error> {
+    let connection = db::open_read_only(db_path)?;
+    let headers = db::list_headers(&connection)?;
+    let header = resolve_thread(&headers, thread)?;
+
+    let record = db::load_record(&connection, &header.id)?;
+    let decoded = db::decode_thread(&record.header.data_type, &record.data)?;
+    let data: ThreadData = serde_json::from_slice(&decoded)?;
+
+    let (calls, tool_results) = collect_calls(&data);
+
+    let mut report = BehaviourReport {
+        id: header.id.clone(),
+        title: data.title.clone().unwrap_or_else(|| header.summary.clone()),
+        updated_at: header.updated_at.clone(),
+        messages: data.messages.len(),
+        tool_calls: calls.len(),
+        tool_results,
+        dead_ends: DeadEnds::default(),
+        repetitions: Repetitions::default(),
+        habits: Habits::default(),
+        exits: Exits::default(),
+    };
+
+    collect_dead_ends(&calls, &mut report.dead_ends);
+    collect_repetitions(&calls, &mut report.repetitions);
+    collect_habits(&calls, &mut report.habits);
+    collect_exits(&calls, &mut report.exits);
+
+    if limit > 0 {
+        report.dead_ends.sites.truncate(limit);
+        report.repetitions.sites.truncate(limit);
+        report.habits.sites.truncate(limit);
+        report.exits.sites.truncate(limit);
+    }
+
+    Ok(report)
+}
+
+/// Render the behaviour report. Like the other views, this is the only place it
+/// prints, so `--json` and the human report cannot disagree.
+pub fn print_behaviour(report: &BehaviourReport) {
+    println!("# zed-thread-audit --behaviour · {}", report.title);
+    println!(
+        "# {} · {} messages · {} tool calls · {} results · updated {}",
+        report.id,
+        report.messages,
+        report.tool_calls,
+        report.tool_results,
+        date_part(&report.updated_at)
+    );
+    println!(
+        "# counts, message indices and request arguments only · result bodies are never printed"
+    );
+    println!();
+
+    println!(
+        "dead ends      {:>3} errors · {:>3} empty",
+        report.dead_ends.errors, report.dead_ends.empty
+    );
+    for site in &report.dead_ends.sites {
+        println!(
+            "  message {:<5} {:<14} {:<8} {}",
+            site.message,
+            site.tool,
+            match site.kind {
+                DeadEndKind::Error => "[error]",
+                DeadEndKind::Empty => "[empty]",
+            },
+            truncate(site.argument.as_deref().unwrap_or("-"), 100)
+        );
+    }
+
+    println!(
+        "repetitions    {:>3} calls repeated an earlier argument",
+        report.repetitions.repeated
+    );
+    for site in &report.repetitions.sites {
+        println!(
+            "  message {:<5} {:<14} {}   first at message {}",
+            site.message,
+            site.tool,
+            truncate(&site.argument, 80),
+            site.first_message
+        );
+    }
+
+    println!(
+        "habits         {:>3} | head · {:>3} | tail · {:>3} echo ===",
+        report.habits.pipe_head, report.habits.pipe_tail, report.habits.separator_echo
+    );
+    for site in &report.habits.sites {
+        println!(
+            "  message {:<5} {:<14} {}",
+            site.message,
+            site.habit.label(),
+            truncate(&site.command, 100)
+        );
+    }
+
+    let ratio = match (report.exits.printed, report.exits.followed) {
+        (0, _) => String::new(),
+        (printed, followed) => format!(" ({}%)", followed * 100 / printed),
+    };
+    println!(
+        "exits          {:>3} printed · {:>3} followed{}",
+        report.exits.printed, report.exits.followed, ratio
+    );
+    for site in &report.exits.sites {
+        println!(
+            "  message {:<5} {:<13} {}",
+            site.message,
+            if site.followed {
+                "followed"
+            } else {
+                "not followed"
+            },
+            truncate(&site.command, 80)
+        );
+        if let Some(next) = &site.next {
+            println!(
+                "        next: {:<12} {}",
+                next.tool,
+                truncate(next.argument.as_deref().unwrap_or("-"), 100)
+            );
+        }
+    }
+}
+
+fn collect_calls(data: &ThreadData) -> (Vec<Call<'_>>, usize) {
+    let mut calls: Vec<Call<'_>> = Vec::new();
+    let mut index_by_id: HashMap<&str, usize> = HashMap::new();
+
+    for (message_index, message) in data.messages.iter().enumerate() {
+        let Message::Agent(agent) = message else {
+            continue;
+        };
+        for part in &agent.content {
+            let Some(tool_use) = &part.tool_use else {
+                continue;
+            };
+            if let Some(id) = tool_use.id.as_deref() {
+                index_by_id.insert(id, calls.len());
+            }
+            calls.push(Call {
+                message: message_index,
+                tool: tool_use.name.clone().unwrap_or_else(|| "?".to_owned()),
+                argument: tool_argument(tool_use),
+                input: tool_input(tool_use),
+                result: None,
+            });
+        }
+    }
+
+    let mut tool_results = 0;
+    for message in &data.messages {
+        let Message::Agent(agent) = message else {
+            continue;
+        };
+        for (id, result) in &agent.tool_results {
+            tool_results += 1;
+            if let Some(index) = index_by_id.get(id.as_str()).copied() {
+                calls[index].result = Some(result);
+            }
+        }
+    }
+
+    (calls, tool_results)
+}
+
+fn collect_dead_ends(calls: &[Call<'_>], dead_ends: &mut DeadEnds) {
+    for call in calls {
+        let Some(result) = call.result else {
+            continue;
+        };
+        if result.is_error {
+            dead_ends.errors += 1;
+            dead_ends.sites.push(call_site(call, DeadEndKind::Error));
+        } else if !is_path_write(&call.tool) && result_text(&result.content).is_none() {
+            // A successful write returns little by design. Only an observation
+            // that returned nothing is a dead end.
+            dead_ends.empty += 1;
+            dead_ends.sites.push(call_site(call, DeadEndKind::Empty));
+        }
+    }
+}
+
+fn call_site(call: &Call<'_>, kind: DeadEndKind) -> CallSite {
+    CallSite {
+        message: call.message,
+        tool: call.tool.clone(),
+        argument: call.argument.clone(),
+        kind,
+    }
+}
+
+fn collect_repetitions(calls: &[Call<'_>], repetitions: &mut Repetitions) {
+    let mut first_seen: HashMap<(&str, &str), usize> = HashMap::new();
+
+    for (index, call) in calls.iter().enumerate() {
+        // A write repeats its path on purpose. It is not a question whose answer
+        // was already in the transcript.
+        if is_path_write(&call.tool) {
+            continue;
+        }
+
+        let Some(argument) = call
+            .argument
+            .as_deref()
+            .filter(|argument| !argument.is_empty())
+        else {
+            continue;
+        };
+        let key = (call.tool.as_str(), argument);
+
+        let Some(first) = first_seen.get(&key).copied() else {
+            first_seen.insert(key, index);
+            continue;
+        };
+
+        if changed_between(calls, first, index, call) {
+            first_seen.insert(key, index);
+            continue;
+        }
+
+        repetitions.repeated += 1;
+        repetitions.sites.push(RepeatSite {
+            message: call.message,
+            first_message: calls[first].message,
+            tool: call.tool.clone(),
+            argument: argument.to_owned(),
+        });
+    }
+}
+
+/// A repeat after a write is a re-read, not a re-derivation. A path-carrying
+/// read is narrowed to a write of the same path; a shell observation carries no
+/// path to pair on, so any intervening write is taken as a possible change.
+fn changed_between(calls: &[Call<'_>], first: usize, current: usize, call: &Call<'_>) -> bool {
+    let between = &calls[first + 1..current];
+
+    if is_path_read(&call.tool) {
+        if let Some(path) = call.input.path.as_deref() {
+            return between.iter().any(|other| {
+                is_path_write(&other.tool) && other.input.path.as_deref() == Some(path)
+            });
+        }
+    }
+
+    between.iter().any(|other| is_path_write(&other.tool))
+}
+
+fn is_path_read(tool: &str) -> bool {
+    matches!(tool, "read_file" | "list_directory" | "find_path" | "grep")
+}
+
+fn is_path_write(tool: &str) -> bool {
+    matches!(tool, "edit_file" | "write_file" | "delete_path")
+}
+
+fn collect_habits(calls: &[Call<'_>], habits: &mut Habits) {
+    for call in calls {
+        let Some(command) = call.input.command.as_deref() else {
+            continue;
+        };
+
+        if pipe_targets(command, "head") {
+            habits.pipe_head += 1;
+            habits
+                .sites
+                .push(habit_site(call, Habit::PipeHead, command));
+        }
+        if pipe_targets(command, "tail") {
+            habits.pipe_tail += 1;
+            habits
+                .sites
+                .push(habit_site(call, Habit::PipeTail, command));
+        }
+        if separator_echo(command) {
+            habits.separator_echo += 1;
+            habits
+                .sites
+                .push(habit_site(call, Habit::SeparatorEcho, command));
+        }
+    }
+}
+
+fn habit_site(call: &Call<'_>, habit: Habit, command: &str) -> HabitSite {
+    HabitSite {
+        message: call.message,
+        habit,
+        command: command.to_owned(),
+    }
+}
+
+/// True when the command pipes into `program`, matched on a word boundary so
+/// `header` does not read as `head`.
+fn pipe_targets(command: &str, program: &str) -> bool {
+    let mut rest = command;
+    while let Some(index) = rest.find('|') {
+        let after = rest[index + 1..].trim_start();
+        if let Some(remainder) = after.strip_prefix(program) {
+            let boundary = remainder.chars().next().is_none_or(|character| {
+                character.is_whitespace() || matches!(character, '-' | ';' | '|' | '&')
+            });
+            if boundary {
+                return true;
+            }
+        }
+        rest = &rest[index + 1..];
+    }
+    false
+}
+
+fn separator_echo(command: &str) -> bool {
+    [
+        "echo \"===",
+        "echo '===",
+        "echo ===",
+        "echo \"---",
+        "echo '---",
+        "echo ---",
+    ]
+    .iter()
+    .any(|pattern| command.contains(pattern))
+}
+
+fn collect_exits(calls: &[Call<'_>], exits: &mut Exits) {
+    for (index, call) in calls.iter().enumerate() {
+        let Some(result) = call.result else {
+            continue;
+        };
+        let Some(text) = result_text(&result.content) else {
+            continue;
+        };
+
+        for command in exits_in(&text) {
+            let followed = calls[index + 1..]
+                .iter()
+                .any(|later| ran_as_printed(later, &command));
+            exits.printed += 1;
+            if followed {
+                exits.followed += 1;
+            }
+            exits.sites.push(ExitSite {
+                message: call.message,
+                command,
+                followed,
+                next: calls.get(index + 1).map(next_call),
+            });
+        }
+    }
+}
+
+fn next_call(call: &Call<'_>) -> NextCall {
+    NextCall {
+        message: call.message,
+        tool: call.tool.clone(),
+        argument: call.argument.clone(),
+    }
+}
+
+/// An exit is followed when a later call ran its command. Matching is on the
+/// command text, not the tool name: the point of an exit is that any tool that
+/// can run it is enough.
+fn ran_as_printed(call: &Call<'_>, exit: &str) -> bool {
+    call.input
+        .command
+        .as_deref()
+        .is_some_and(|command| command.contains(exit))
+        || call
+            .argument
+            .as_deref()
+            .is_some_and(|argument| argument.contains(exit))
+}
+
+/// A printed footer, with its gloss removed. The format is
+/// `# next: <command> · <what it answers>`.
+fn exits_in(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|line| line.trim().strip_prefix("# next:"))
+        .map(|rest| rest.split(" · ").next().unwrap_or(rest).trim())
+        .filter(|command| !command.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The text a result carried, or `None` when it carried none. Both stored
+/// content shapes are handled; images and other non-text parts are absent here.
+fn result_text(content: &ToolResultContent) -> Option<String> {
+    match content {
+        ToolResultContent::One(item) => item
+            .text
+            .as_deref()
+            .filter(|text| !text.is_empty())
+            .map(str::to_owned),
+        ToolResultContent::Many(items) => {
+            let text: String = items
+                .iter()
+                .filter_map(|item| item.text.as_deref())
+                .collect::<Vec<&str>>()
+                .join("\n");
+            (!text.is_empty()).then_some(text)
+        }
+        ToolResultContent::Text(text) => (!text.is_empty()).then(|| text.clone()),
     }
 }
 
@@ -508,16 +1054,21 @@ fn result_bytes(content: &ToolResultContent) -> u64 {
     bytes as u64
 }
 
-/// The request side of a call, parsed from `raw_input` (which is where most
-/// tools put it) and falling back to the structured `input` field.
-fn tool_argument(tool_use: &ToolUse) -> Option<String> {
-    let parsed = tool_use
+/// The structured request fields, parsed from `raw_input` (which is where most
+/// tools put them) and falling back to the `input` field.
+fn tool_input(tool_use: &ToolUse) -> ToolInput {
+    tool_use
         .raw_input
         .as_deref()
         .and_then(|raw| serde_json::from_str::<ToolInput>(raw).ok())
         .filter(|input| !input.is_empty())
         .or_else(|| tool_use.input.clone())
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+/// The request side of a call, as one readable line.
+fn tool_argument(tool_use: &ToolUse) -> Option<String> {
+    let parsed = tool_input(tool_use);
 
     let argument = match tool_use.name.as_deref().unwrap_or_default() {
         "fetch" => parsed.url.clone(),

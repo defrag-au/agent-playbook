@@ -23,7 +23,8 @@ use std::fmt;
 use std::path::PathBuf;
 
 pub use audit::{
-    audit, explain, AuditOptions, AuditReport, ThreadAudit, ThreadExplanation, ToolOutputDetail,
+    audit, behaviour, explain, AuditOptions, AuditReport, BehaviourReport, ThreadAudit,
+    ThreadExplanation, ToolOutputDetail,
 };
 pub use db::{default_db_path, ThreadHeader, ThreadRecord};
 pub use recover::{

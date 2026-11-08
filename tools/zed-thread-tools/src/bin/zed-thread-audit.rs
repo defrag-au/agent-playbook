@@ -15,7 +15,9 @@ use zed_thread_tools::db;
     long_about = "Read-only audit of Zed agent thread transcripts.\n\n\
                   Reports thread size, message and tool-call counts, tool-output bytes, \
                   compaction state, model and project paths. Use --explain to attribute \
-                  a thread's largest outputs to a tool and message. It never prints message \
+                  a thread's largest outputs to a tool and message, and --behaviour to \
+                  count what the agent did in it: dead ends, repeated calls, shell habits \
+                  and whether printed exits were followed. It never prints message \
                   content and never opens the database read-write."
 )]
 struct Cli {
@@ -42,6 +44,10 @@ struct Cli {
     /// Explain one thread's largest tool outputs: size, message, tool and request argument
     #[arg(long, value_name = "THREAD_ID_OR_TITLE")]
     explain: Option<String>,
+
+    /// Count what the agent did in one thread: dead ends, repeated calls, shell habits and exits
+    #[arg(long, value_name = "THREAD_ID_OR_TITLE")]
+    behaviour: Option<String>,
 
     /// Number of outputs shown by --explain (0 = all)
     #[arg(long, default_value_t = 10)]
@@ -79,6 +85,17 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         older_than,
         project: cli.project,
     };
+
+    if let Some(thread) = cli.behaviour.as_deref() {
+        let report = audit::behaviour(&db_path, thread, cli.limit)?;
+        if cli.json {
+            serde_json::to_writer_pretty(std::io::stdout(), &report)?;
+            println!();
+        } else {
+            audit::print_behaviour(&report);
+        }
+        return Ok(());
+    }
 
     if let Some(thread) = cli.explain.as_deref() {
         let explanation = audit::explain(&db_path, thread, cli.limit)?;

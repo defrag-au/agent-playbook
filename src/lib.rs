@@ -3,6 +3,7 @@
 //! The resolution model is documented in `docs/precedence.md`; the rule format in
 //! `docs/rule-format.md`. This crate is the single implementation of both.
 
+pub mod findings;
 pub mod frontmatter;
 pub mod init;
 pub mod install;

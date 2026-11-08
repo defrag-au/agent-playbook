@@ -155,6 +155,11 @@ playbook check --target claude-code
 # Every shared rule, and the activation that reaches it.
 playbook rules
 
+# Every finding captured across repositories, and the decision on it.
+playbook findings
+playbook findings --dir ~/code/defrag    # every repository below a directory
+playbook findings --stale 30             # open, and captured over a month ago
+
 # Deliver the skills this repository declares, into its harness's project directory.
 playbook skills sync  --target zed
 playbook skills check --target zed
@@ -168,6 +173,12 @@ byte. A manifest with `skills_scope: global` delivers into `~/.agents/skills` an
 catalogue in `fleet` keeps every harness current in one command. An edit you have not published
 is delivered from a gitignored `.playbook/skills.patch`, and every line it affects says
 `(patched)`. See [`docs/skills.md`](docs/skills.md).
+
+`playbook findings` is the read side of the loop in [`docs/findings.md`](docs/findings.md): it
+walks `.playbook/` below `--dir`, reads the open findings and the decision log in
+`.playbook/FINDINGS.md`, and prints what is open. It needs no manifest and no playbook root, so a
+repository that has never adopted the composer can carry findings. A record that does not parse is
+a warning, not a silent drop.
 
 A repository that has no manifest yet gets one with `playbook init`, which writes
 `.playbook/project.conf` and an empty `.playbook/rules/`:
@@ -220,8 +231,8 @@ could run on a machine before its devshell existed. It was replaced after it pro
    match". The exclusion feature never worked.
 
 Neither failed loudly, and neither was the kind of thing a script could be tested for
-cheaply. The Rust version has 106 tests, an exhaustive `match` on activation, and a rule that
-will not compile if a variant is unhandled. The dependency-free property survives — the
+cheaply. The Rust version has an extensive test suite, an exhaustive `match` on activation, and a
+rule that will not compile if a variant is unhandled. The dependency-free property survives — the
 crate has no dependencies at all, so it still builds with no network and no registry cache.
 
 ## The inspection toolkit
@@ -417,6 +428,10 @@ allowlist keeps its promise.
 
 ## Adding a rule
 
+0. **Capture the finding first.** If you are reacting to something that just happened, write it
+   into the repository you were working in as `.playbook/findings/<date>-<slug>.md` — shape and
+   classes in [`docs/findings.md`](docs/findings.md). A rule is written after a decision, not at
+   the moment of noticing.
 1. Copy [`templates/rule.md`](templates/rule.md) into the right layer directory.
 2. Fill the frontmatter and write the body. The `id` is the contract — other files
    reference it in `overrides:` and `emphasis:`.
