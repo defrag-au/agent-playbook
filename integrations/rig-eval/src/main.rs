@@ -1,10 +1,11 @@
-//! Run the playbook's rig homes over real-work scenarios and score them.
+//! Run the playbook's harness comparison over real-work scenarios and score it.
 //!
-//! `tests/redirect.rs` proves the mechanics with a scripted model. This binary answers the next
-//! question: over a task that needs several reads, does the harness cost less than the same tools
-//! without enforcement? Each run is `rig -p --json "<prompt>"` in a scenario's working directory,
-//! under a named `RIG_HOME`. The JSON stream is kept verbatim beside the score, so every number in
-//! the summary can be re-derived from a file.
+//! `integrations/rig/tests/redirect.rs` proves the plugin mechanics with a scripted model. This
+//! binary answers the next question: over a task that needs several reads, how do rig (with and
+//! without the playbook plugin), opencode and Pi compare? Each run is the harness's own headless
+//! mode in a scenario's working directory, with the same model and the same sealed corpus. The
+//! raw stream is kept verbatim beside the score, so every number in the summary can be re-derived
+//! from a file.
 //!
 //! The corpus ships at `integrations/rig-eval/scenarios`; `--scenarios` points elsewhere if you
 //! keep a private copy. A corpus inside the checkout is only run where the macOS sandbox is
@@ -19,26 +20,30 @@
 //! cargo run --manifest-path integrations/rig-eval/Cargo.toml -- --out /tmp/rig-eval
 //! ```
 //!
-//! It is a separate package on purpose: a runner inside `integrations/rig` is part of the thing the
-//! scenarios investigate, and a model asked about the plugin reads it.
+//! It is a separate package on purpose: a runner inside `integrations/rig` is part of the thing
+//! the scenarios investigate, and a model asked about the plugin reads it.
 //!
-//! The homes default to `.tmp/rig-home` (gated) and `.tmp/rig-home-baseline` (tools only). The
-//! model key is read from `.tmp/rig-home/model.env` and never printed.
+//! The rig homes default to `.tmp/rig-home` (gated) and `.tmp/rig-home-baseline` (tools only);
+//! `--target rig:vanilla` is the no-plugin control. The model key is read from
+//! `.tmp/rig-home/model.env` and never printed.
 
 mod cli;
+mod driver;
+mod process;
 mod report;
-mod runner;
 mod sandbox;
 mod scenario;
 mod score;
 mod stream;
+mod tag;
+mod target;
 
 use std::process::ExitCode;
 
 use anyhow::{bail, Context, Result};
 
 use crate::cli::Args;
-use crate::runner::RunContext;
+use crate::driver::RunContext;
 
 fn main() -> ExitCode {
     match run() {
@@ -58,7 +63,7 @@ fn run() -> Result<()> {
     }
 
     if args.dry_run {
-        runner::print_plan(&args, &scenarios);
+        report::print_plan(&args, &scenarios);
         return Ok(());
     }
 
@@ -85,13 +90,15 @@ fn run() -> Result<()> {
     let mut results = Vec::new();
     for scenario in &scenarios {
         let workdir = args.root.join(&scenario.workdir);
-        for home in &args.homes {
+        for target in &args.targets {
             for repeat in 1..=args.repeat {
                 println!(
                     "· {} · {} · run {repeat}/{}",
-                    scenario.name, home.label, args.repeat
+                    scenario.name,
+                    target.label(),
+                    args.repeat
                 );
-                let result = runner::run_one(scenario, &workdir, home, repeat, &context)?;
+                let result = target::run_one(target, scenario, &workdir, repeat, &context)?;
                 report::print_run(&result);
                 results.push(result);
             }

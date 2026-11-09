@@ -84,6 +84,24 @@ fn same_path(cited: &str, gold: &str) -> bool {
     cited == gold || cited.ends_with(&format!("/{gold}")) || gold.ends_with(&format!("/{cited}"))
 }
 
+/// A path is named by itself, or by a directory that contains it. `git status` collapses an
+/// untracked tree to its top directory, and that is as correct an answer as listing every file.
+fn names_path(answer: &str, path: &str) -> bool {
+    if answer.contains(path) {
+        return true;
+    }
+    answer
+        .split(|c: char| {
+            c.is_whitespace()
+                || matches!(
+                    c,
+                    '`' | '"' | '\'' | '(' | ')' | '[' | ']' | ',' | ';' | ':'
+                )
+        })
+        .filter(|token| token.ends_with('/'))
+        .any(|directory| path.starts_with(directory))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Source {
@@ -125,7 +143,21 @@ pub fn score(scenario: &Scenario, answer: Option<&str>, tool_output: &str) -> Sc
         checks.push(Check {
             required: path.clone(),
             source: Source::Path,
-            found: answer.is_some_and(|answer| answer.contains(path)),
+            found: answer.is_some_and(|answer| names_path(answer, path)),
+        });
+    }
+    if let Some(branch) = &scenario.git_branch {
+        checks.push(Check {
+            required: branch.clone(),
+            source: Source::Answer,
+            found: answer.is_some_and(|answer| answer.contains(branch)),
+        });
+    }
+    for path in &scenario.git_paths {
+        checks.push(Check {
+            required: path.clone(),
+            source: Source::Path,
+            found: answer.is_some_and(|answer| names_path(answer, path)),
         });
     }
     for text in &scenario.must_say {
@@ -204,5 +236,12 @@ mod tests {
         assert!(!check_gold("integrations/rig/src/lib.rs:82", &found));
         assert_eq!(found.len(), 1);
         assert_eq!(found.iter().next().and_then(|citation| citation.line), None);
+    }
+
+    #[test]
+    fn a_directory_names_the_paths_under_it() {
+        assert!(names_path("?? src/driver/", "src/driver/mod.rs"));
+        assert!(names_path("src/driver/", "src/driver/nested/file.rs"));
+        assert!(!names_path("src/other/", "src/driver/mod.rs"));
     }
 }

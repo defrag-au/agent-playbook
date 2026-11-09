@@ -135,10 +135,13 @@ cargo run --manifest-path integrations/rig-eval/Cargo.toml -- --out /tmp/rig-eva
 
 The corpus ships at `integrations/rig-eval/scenarios`; `--scenarios` points elsewhere for a private
 copy, and `--out` is required. A corpus inside the checkout is only run where the macOS sandbox is
-available: `sandbox-exec` denies the agent every read of the corpus, its parent (the eval crate),
-the output directory and `.tmp/rig-eval`. Without it a repo-wide search would find the content,
-and a model that reads its own gold scores itself, so the runner refuses an in-checkout corpus
-rather than pretend the run is evidence.
+available: `sandbox-exec` denies the agent every read of the corpus directory, the output
+directory and `.tmp/rig-eval`. It denies the corpus itself, not the eval crate around it: a
+harness may walk the crate at startup, and an unreadable directory in that walk can kill it.
+Without the seal a repo-wide search would find the content, and a model that reads its own gold
+scores itself, so the runner refuses an in-checkout corpus rather than pretend the run is
+evidence. This is measurement integrity, not a safety sandbox; see
+`harness-comparison.md#isolation-is-not-an-arm`.
 
 A scenario is JSON:
 
@@ -156,14 +159,27 @@ A scenario is JSON:
 ```
 
 Every check is validated before a run: a gold line past the end of its file is an error rather
-than a model failure. The score is checks passed. Precision is `path:line` hits over every
+than a model failure. A scenario whose expectation is the working tree itself uses
+`"git": "status"` instead of the static lists: the runner reads the branch and every changed
+path from `git status --branch -uall`, removes the sealed corpus and output directory from the
+result, and refuses to run on a clean tree because there is nothing to list. `pre-edit-state`
+is that scenario.
+
+The score is checks passed. Precision is `path:line` hits over every
 citation the answer makes; recall is hits over gold. Precision is a weak signal when gold is a
 small set — an answer that cites ten correct lines and three gold ones scores 0.3 — so read it
 beside the score, not instead of it. Turns are not a metric.
 
+A path check is satisfied by the path itself or by a directory above it: `git status` collapses
+an untracked tree to its top directory, and that is as correct an answer as listing every file
+under it.
+
 Each run keeps its raw stream, stderr, and a copy of `effects.jsonl`, and the directory gets
-`results.json` and `summary.md`. A run whose tool arguments name the corpus, or whose tool output
-contains a scenario or a results document, is marked contaminated and excluded.
+`results.json` and `summary.md`. A run whose tool **output** contains a scenario or a results
+document is marked contaminated and excluded from the tables and medians. A tool call that merely
+names the sealed corpus is recorded as `inspected-corpus` instead: the sandbox refuses the read,
+so a blocked probe says the agent noticed the seal, not that it saw the gold. Both appear in the
+run's `tags` in `results.json`, and the summary names the excluded and inspected runs.
 
 ## The first result
 

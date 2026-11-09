@@ -3,18 +3,5 @@
   "why": "The status read that precedes every edit.",
   "prompt": "What is uncommitted in this working tree right now? Name the current branch and list every changed path, marking which are under `integrations/rig`.",
   "workdir": ".",
-  "gold": [],
-  "extra_paths": [
-    "integrations/rig/Cargo.toml",
-    "integrations/rig/Cargo.lock",
-    "integrations/rig/README.md",
-    "integrations/rig/src/lib.rs",
-    "integrations/rig/src/tools.rs",
-    "integrations/rig/src/redirect.rs",
-    "integrations/rig/tests/"
-  ],
-  "must_say": [
-    "damon-mcp"
-  ],
-  "tool_says": []
+  "git": "status"
 }

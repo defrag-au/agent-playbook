@@ -1,10 +1,11 @@
 //! The seatbelt profile that seals the eval data from the agent.
 //!
 //! The corpus now ships in the repository, so a repo-wide search can see its path. The content is
-//! what matters: `sandbox-exec` denies the agent every read of the corpus, its parent (the eval
-//! crate), the output directory, and the repository's eval scratch. Without the sandbox the runner
-//! still reports contamination, but it refuses an in-checkout corpus rather than pretend the run is
-//! evidence.
+//! what matters: `sandbox-exec` denies the agent every read of the corpus, the output directory,
+//! and the repository's eval scratch. It denies the corpus **directory**, not its parent — a
+//! harness may walk the eval crate at startup, and an unreadable directory in that walk can kill
+//! it. Without the sandbox the runner still reports contamination, but it refuses an in-checkout
+//! corpus rather than pretend the run is evidence.
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -20,12 +21,10 @@ pub fn profile(args: &Args) -> Option<String> {
         return None;
     }
 
+    // Deny the corpus itself, not its parent: a harness may walk the eval crate at startup, and
+    // an unreadable directory in that walk can kill it. The corpus directory is the only thing
+    // that holds the gold.
     let mut denied = vec![args.scenario_dir.clone(), args.out.clone()];
-    if let Some(parent) = args.scenario_dir.parent() {
-        // The parent covers a sibling archive of earlier runs and, for the in-repo corpus, the
-        // runner's own source. Neither is part of the task the agent is given.
-        denied.push(parent.to_path_buf());
-    }
     // A copy of an earlier run kept under the repository's scratch directory is still a leak.
     let scratch = args.root.join(".tmp/rig-eval");
     if scratch.exists() {
@@ -64,9 +63,11 @@ mod tests {
             root: root.clone(),
             scenario_dir: root.join("integrations/rig-eval/scenarios"),
             only: Vec::new(),
-            homes: Vec::new(),
+            targets: Vec::new(),
             model: "model".to_owned(),
             rig: root.join("rig"),
+            opencode_config: root.join(".tmp/opencode/opencode.json"),
+            pi: root.join(".tmp/pi/bin/pi"),
             env_file: root.join(".env"),
             out: root.join(".tmp/rig-eval/run"),
             repeat: 1,

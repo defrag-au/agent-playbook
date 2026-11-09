@@ -4,12 +4,15 @@
 //! events a score reads are modelled; everything else is `Other`, and a line that does not parse is
 //! counted rather than dropped.
 
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
+
+use crate::tag::RunTag;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -112,7 +115,8 @@ pub struct Facts {
     pub exit_code: Option<i32>,
     pub exit_error: Option<String>,
     pub session: Option<String>,
-    pub contaminated: bool,
+    /// Why this run is excluded, or what it inspected. Nothing else is a tag.
+    pub tags: BTreeSet<RunTag>,
 }
 
 impl Facts {
@@ -128,7 +132,7 @@ impl Facts {
                 self.tool_call_total += 1;
                 if let Some(args) = args {
                     if serde_json::to_string(&args).is_ok_and(|text| names_eval_data(&text)) {
-                        self.contaminated = true;
+                        self.tags.insert(RunTag::InspectedCorpus);
                     }
                 }
             }
@@ -153,11 +157,8 @@ impl Facts {
                 if cancelled {
                     self.cancelled += 1;
                 }
-                // A corpus document or a scored result, pretty-printed: the array opens at the end
-                // of a line. The design doc's schema example keeps the array on one line, so
-                // reading the design is not a false positive.
-                if output.contains("\"gold\": [\n") || output.contains("\"checks\": [\n") {
-                    self.contaminated = true;
+                if contains_eval_document(&output) {
+                    self.tags.insert(RunTag::Contaminated);
                 }
             }
             Event::TurnEnd { answer, error } => {
@@ -221,10 +222,47 @@ pub fn parse(path: &Path) -> Result<Facts> {
     Ok(facts)
 }
 
+/// A corpus document or a scored result, pretty-printed: the array opens at the end of a line. The
+/// design doc's schema example keeps the array on one line, so reading the design is not a false
+/// positive.
+pub fn contains_eval_document(text: &str) -> bool {
+    text.contains("\"gold\": [\n") || text.contains("\"checks\": [\n")
+}
+
 /// A command that names the corpus or a prior run. Searching for a file called `summary.md` is not
 /// a read of one; `find` cannot reach the corpus when it lives outside the checkout.
-fn names_eval_data(text: &str) -> bool {
+pub fn names_eval_data(text: &str) -> bool {
     ["/scenarios/", "rig-eval/archive", "/rig-eval/run-"]
         .iter()
         .any(|needle| text.contains(needle))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn facts(lines: &[&str]) -> Facts {
+        let mut facts = Facts::default();
+        for line in lines {
+            facts.absorb(serde_json::from_str(line).expect("a rig event"));
+        }
+        facts
+    }
+
+    #[test]
+    fn naming_the_corpus_is_inspected_not_contaminated() {
+        let facts = facts(&[
+            r#"{"type":"tool_call","name":"bash","args":{"command":"ls integrations/rig-eval/scenarios/x.json"}}"#,
+        ]);
+        assert!(facts.tags.contains(&RunTag::InspectedCorpus));
+        assert!(!facts.tags.contains(&RunTag::Contaminated));
+    }
+
+    #[test]
+    fn a_corpus_document_in_the_output_is_contamination() {
+        let facts =
+            facts(&[r#"{"type":"tool_result","name":"bash","output":"{\n  \"gold\": [\n"}"#]);
+        assert!(facts.tags.contains(&RunTag::Contaminated));
+        assert!(!facts.tags.contains(&RunTag::InspectedCorpus));
+    }
 }

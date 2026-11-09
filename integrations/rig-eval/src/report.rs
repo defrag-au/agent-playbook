@@ -1,4 +1,4 @@
-//! What a run produced, and the summary written beside the streams.
+//! What a run produced, the summary written beside the streams, and the dry-run plan.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -8,17 +8,19 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 
 use crate::cli::Args;
+use crate::scenario::Scenario;
 use crate::score::Check;
+use crate::tag::RunTag;
+use crate::target::Target;
 
 #[derive(Debug, Serialize)]
 pub struct RunResult {
     pub scenario: String,
-    pub home: String,
+    pub target: String,
     pub repeat: u32,
     pub model: String,
     pub workdir: String,
     pub wall_ms: u64,
-    pub timed_out: bool,
     pub exit_code: Option<i32>,
     pub exit_error: Option<String>,
     pub session: Option<String>,
@@ -36,7 +38,8 @@ pub struct RunResult {
     pub cancelled: usize,
     pub output_bytes: usize,
     pub unparsed_lines: usize,
-    pub contaminated: bool,
+    /// Why this run is excluded, or what it inspected.
+    pub tags: BTreeSet<RunTag>,
     pub answer: Option<String>,
     pub citations: Vec<String>,
     pub checks: Vec<Check>,
@@ -74,10 +77,14 @@ pub fn print_run(result: &RunResult) {
             result.unparsed_lines
         );
     }
-    if result.contaminated {
-        println!("  CONTAMINATED: a tool read the scenario corpus; this run is not evidence");
+    if result.tags.contains(&RunTag::Contaminated) {
+        println!(
+            "  CONTAMINATED: a tool output contained the expected answer; this run is excluded"
+        );
+    } else if result.tags.contains(&RunTag::InspectedCorpus) {
+        println!("  inspected: a tool call named the sealed corpus; the read was refused");
     }
-    if result.timed_out {
+    if result.tags.contains(&RunTag::TimedOut) {
         println!("  TIMED OUT: the launcher was killed");
     }
     if let Some(error) = &result.exit_error {
@@ -98,17 +105,82 @@ pub fn write(args: &Args, results: &[RunResult]) -> Result<()> {
     Ok(())
 }
 
+pub fn print_plan(args: &Args, scenarios: &[Scenario]) {
+    println!(
+        "# rig-eval · {} scenario(s) · {} target(s) · {} run(s) each",
+        scenarios.len(),
+        args.targets.len(),
+        args.repeat
+    );
+    println!("rig      {}", args.rig.display());
+    println!(
+        "opencode bunx {} ({})",
+        crate::driver::opencode::PACKAGE,
+        args.opencode_config.display()
+    );
+    println!("pi       {}", args.pi.display());
+    println!("model    {}", args.model);
+    match crate::cli::read_env(&args.env_file) {
+        Ok(vars) => {
+            let keys: Vec<&str> = vars.iter().map(|(key, _)| key.as_str()).collect();
+            println!("env      {} ({})", args.env_file.display(), keys.join(", "));
+        }
+        Err(why) => println!("env      {why}"),
+    }
+    println!("out      {}", args.out.display());
+    for target in &args.targets {
+        match target {
+            Target::Rig(home) => {
+                let state = if home.path.join("settings.toml").is_file() {
+                    "settings.toml"
+                } else {
+                    "MISSING settings.toml"
+                };
+                println!("{:12} {} ({state})", target.label(), home.path.display());
+            }
+            Target::Opencode => {
+                println!("{:12} {}", target.label(), args.opencode_config.display())
+            }
+            Target::Pi => println!("{:12} {}", target.label(), args.pi.display()),
+        }
+    }
+    println!(
+        "sandbox  {}",
+        if crate::sandbox::profile(args).is_some() {
+            "the corpus and results are unreadable to the agent"
+        } else {
+            "NOT available: the agent can read the corpus and the results"
+        }
+    );
+    println!();
+    for scenario in scenarios {
+        println!(
+            "{:28} workdir {:<6} {:>2} check(s)  {}",
+            scenario.name,
+            scenario.workdir,
+            scenario.checks(),
+            scenario.why
+        );
+    }
+}
+
 fn summary(args: &Args, results: &[RunResult]) -> String {
+    // A run that saw the expected answer is not evidence. Keep it in `results.json` and name it
+    // below, but never let it into a table or a median.
+    let clean: Vec<&RunResult> = results
+        .iter()
+        .filter(|result| !result.tags.contains(&RunTag::Contaminated))
+        .collect();
     let mut text = String::new();
     let _ = writeln!(
         text,
-        "# rig-eval · {} scenario(s) · {} home(s) · {} repeat(s)\n",
-        results
+        "# rig-eval · {} scenario(s) · {} target(s) · {} repeat(s)\n",
+        clean
             .iter()
             .map(|result| result.scenario.as_str())
             .collect::<BTreeSet<_>>()
             .len(),
-        args.homes.len(),
+        args.targets.len(),
         args.repeat
     );
     let _ = writeln!(
@@ -125,18 +197,18 @@ fn summary(args: &Args, results: &[RunResult]) -> String {
 
     let _ = writeln!(
         text,
-        "| Scenario | Home | Score | Recall | Prec | Model calls | Compactions | Tool calls | Refused | Output | Time |"
+        "| Scenario | Target | Score | Recall | Prec | Model calls | Compactions | Tool calls | Refused | Output | Time |"
     );
     let _ = writeln!(
         text,
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
     );
-    for result in results {
+    for result in &clean {
         let _ = writeln!(
             text,
             "| {} | {} | {:.2} | {}/{} | {} | {} | {} | {} | {} | {} | {:.1}s |",
             result.scenario,
-            result.home,
+            result.target,
             result.score,
             result.passed,
             result.checks_total,
@@ -153,31 +225,28 @@ fn summary(args: &Args, results: &[RunResult]) -> String {
         );
     }
 
-    let _ = writeln!(text, "\n## Paired\n");
+    let _ = writeln!(text, "\n## By target\n");
     let _ = writeln!(
         text,
-        "| Scenario | Tool calls (gated / baseline) | Output bytes | Model calls | Score |"
+        "| Target | Runs | Median score | Median tool calls | Median output | Median model calls |"
     );
-    let _ = writeln!(text, "| --- | --- | --- | --- | --- |");
-    for pairing in pairings(results) {
+    let _ = writeln!(text, "| --- | --- | --- | --- | --- | --- |");
+    for summary in by_target(clean.iter().copied()) {
         let _ = writeln!(
             text,
-            "| {} | {} / {} | {} / {} | {} / {} | {:.2} / {:.2} |",
-            pairing.scenario,
-            pairing.gated_tool_calls,
-            pairing.baseline_tool_calls,
-            human_bytes(pairing.gated_output_bytes),
-            human_bytes(pairing.baseline_output_bytes),
-            pairing.gated_model_calls,
-            pairing.baseline_model_calls,
-            pairing.gated_score,
-            pairing.baseline_score,
+            "| {} | {} | {:.2} | {} | {} | {} |",
+            summary.target,
+            summary.runs,
+            summary.score,
+            summary.tool_calls,
+            human_bytes(summary.output_bytes),
+            summary.model_calls,
         );
     }
 
     let _ = writeln!(text, "\n## Misses\n");
     let mut missed_any = false;
-    for result in results {
+    for result in &clean {
         let missed: Vec<String> = result
             .checks
             .iter()
@@ -192,7 +261,7 @@ fn summary(args: &Args, results: &[RunResult]) -> String {
             text,
             "- {} · {} · run {}: {}",
             result.scenario,
-            result.home,
+            result.target,
             result.repeat,
             missed.join(", ")
         );
@@ -201,71 +270,89 @@ fn summary(args: &Args, results: &[RunResult]) -> String {
         let _ = writeln!(text, "None: every check passed in every run.");
     }
 
+    if clean.len() != results.len() {
+        let _ = writeln!(
+            text,
+            "\n{} contaminated run(s) are excluded from the tables and medians above.",
+            results.len() - clean.len()
+        );
+    }
+
     let contaminated: Vec<&RunResult> = results
         .iter()
-        .filter(|result| result.contaminated)
+        .filter(|result| result.tags.contains(&RunTag::Contaminated))
         .collect();
     if !contaminated.is_empty() {
         let _ = writeln!(text, "\n## Contaminated\n");
         for result in contaminated {
             let _ = writeln!(
                 text,
-                "- {} · {} · run {}: a tool read `scenarios/`; exclude this run.",
-                result.scenario, result.home, result.repeat
+                "- {} · {} · run {}: a tool output contained `scenarios/`; excluded.",
+                result.scenario, result.target, result.repeat
+            );
+        }
+    }
+
+    let inspected: Vec<&RunResult> = results
+        .iter()
+        .filter(|result| {
+            result.tags.contains(&RunTag::InspectedCorpus)
+                && !result.tags.contains(&RunTag::Contaminated)
+        })
+        .collect();
+    if !inspected.is_empty() {
+        let _ = writeln!(text, "\n## Inspected the corpus\n");
+        for result in inspected {
+            let _ = writeln!(
+                text,
+                "- {} · {} · run {}: a tool call named the sealed corpus; the read was refused.",
+                result.scenario, result.target, result.repeat
             );
         }
     }
 
     let _ = writeln!(
         text,
-        "\nStreams, stderr and effect logs are beside this file as `<scenario>-<home>-r<n>.*`."
+        "\nStreams, stderr and effect logs are beside this file as `<scenario>-<target>-r<n>.*`."
     );
     text
 }
 
-struct Pairing {
-    scenario: String,
-    gated_tool_calls: usize,
-    baseline_tool_calls: usize,
-    gated_output_bytes: usize,
-    baseline_output_bytes: usize,
-    gated_model_calls: usize,
-    baseline_model_calls: usize,
-    gated_score: f64,
-    baseline_score: f64,
+struct TargetSummary {
+    target: String,
+    runs: usize,
+    score: f64,
+    tool_calls: usize,
+    output_bytes: usize,
+    model_calls: usize,
 }
 
-fn pairings(results: &[RunResult]) -> Vec<Pairing> {
-    let mut pairings = Vec::new();
-    let scenarios: BTreeSet<&str> = results
+fn by_target<'a>(results: impl Iterator<Item = &'a RunResult>) -> Vec<TargetSummary> {
+    let results: Vec<&RunResult> = results.collect();
+    let mut summaries = Vec::new();
+    let targets: BTreeSet<&str> = results
         .iter()
-        .map(|result| result.scenario.as_str())
+        .map(|result| result.target.as_str())
         .collect();
-    for scenario in scenarios {
-        let of = |home: &str| -> Vec<&RunResult> {
-            results
-                .iter()
-                .filter(|result| result.scenario == scenario && result.home == home)
-                .collect()
-        };
-        let gated = of("gated");
-        let baseline = of("baseline");
-        if gated.is_empty() || baseline.is_empty() {
+    for target in targets {
+        let runs: Vec<&RunResult> = results
+            .iter()
+            .copied()
+            .filter(|result| result.target == target)
+            .collect();
+        if runs.is_empty() {
             continue;
         }
-        pairings.push(Pairing {
-            scenario: scenario.to_owned(),
-            gated_tool_calls: median(gated.iter().map(|result| result.tool_call_total)),
-            baseline_tool_calls: median(baseline.iter().map(|result| result.tool_call_total)),
-            gated_output_bytes: median(gated.iter().map(|result| result.output_bytes)),
-            baseline_output_bytes: median(baseline.iter().map(|result| result.output_bytes)),
-            gated_model_calls: median(gated.iter().map(|result| result.model_calls)),
-            baseline_model_calls: median(baseline.iter().map(|result| result.model_calls)),
-            gated_score: median_f64(gated.iter().map(|result| result.score)),
-            baseline_score: median_f64(baseline.iter().map(|result| result.score)),
+        summaries.push(TargetSummary {
+            target: target.to_owned(),
+            runs: runs.len(),
+            score: median_f64(runs.iter().map(|result| result.score)),
+            tool_calls: median(runs.iter().map(|result| result.tool_call_total)),
+            output_bytes: median(runs.iter().map(|result| result.output_bytes)),
+            model_calls: median(runs.iter().map(|result| result.model_calls)),
         });
     }
-    pairings
+    summaries
 }
 
 fn median(values: impl Iterator<Item = usize>) -> usize {
@@ -303,6 +390,8 @@ fn human_bytes(bytes: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
 
     #[test]
@@ -315,5 +404,71 @@ mod tests {
     fn the_median_of_one_value_is_that_value() {
         assert_eq!(median([7].into_iter()), 7);
         assert_eq!(median_f64([0.5].into_iter()), 0.5);
+    }
+
+    #[test]
+    fn a_contaminated_run_is_not_in_the_tables() {
+        let clean = result("pi", BTreeSet::new());
+        let contaminated = result("rig:gated", BTreeSet::from([RunTag::Contaminated]));
+        let text = summary(&args(), &[clean, contaminated]);
+        assert!(text.contains("| s | pi |"));
+        assert!(!text.contains("| s | rig:gated |"));
+        assert!(text.contains("1 contaminated run(s) are excluded"));
+        assert!(text.contains("## Contaminated"));
+    }
+
+    fn args() -> Args {
+        let root = PathBuf::from("/repo");
+        Args {
+            root: root.clone(),
+            scenario_dir: root.join("scenarios"),
+            only: Vec::new(),
+            targets: Vec::new(),
+            model: "model".to_owned(),
+            rig: root.join("rig"),
+            opencode_config: root.join("opencode.json"),
+            pi: root.join("pi"),
+            env_file: root.join("env"),
+            out: root.join("out"),
+            repeat: 1,
+            timeout: None,
+            dry_run: false,
+        }
+    }
+
+    fn result(target: &str, tags: BTreeSet<RunTag>) -> RunResult {
+        RunResult {
+            scenario: "s".to_owned(),
+            target: target.to_owned(),
+            repeat: 1,
+            model: "model".to_owned(),
+            workdir: ".".to_owned(),
+            wall_ms: 0,
+            exit_code: Some(0),
+            exit_error: None,
+            session: None,
+            effects: None,
+            model_calls: 0,
+            compactions: 0,
+            input_tokens: 0,
+            output_tokens: 0,
+            cost_usd: 0.0,
+            tool_calls: Default::default(),
+            tool_call_total: 0,
+            tool_results: 0,
+            refused: 0,
+            failed: 0,
+            cancelled: 0,
+            output_bytes: 0,
+            unparsed_lines: 0,
+            tags,
+            answer: None,
+            citations: Vec::new(),
+            checks: Vec::new(),
+            passed: 0,
+            checks_total: 0,
+            score: 1.0,
+            precision: None,
+        }
     }
 }

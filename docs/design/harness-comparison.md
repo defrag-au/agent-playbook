@@ -43,6 +43,32 @@ harness or the policy layer, and we could not say which.
 - **Same prompt.** The scenario prompt verbatim, with a tag only where a harness needs one to find
   the run afterwards (Zed).
 
+## Isolation is not an arm
+
+None of the harnesses provides an OS-level sandbox in the mode this comparison drives, and the
+runner does not ask one to.
+
+- **rig** exposes the seam: every child process starts through `Processes`, so a plugin can wrap
+  it, and `corpus/base/src/shell_sandbox.rs` shows the shape (`sandbox-exec` on macOS, `bwrap` on
+  Linux). No sandbox plugin is in `built_in_plugins!`, and none of our homes enables one.
+  `ApprovalPlugin` and `PreviewPlugin` are policy, and off.
+- **opencode** permission rules are an approval policy. `--auto` approves them, and its docs say
+  shell runs with the host user's filesystem, process and network authority.
+- **Pi** has no permission system or sandbox by design; its docs recommend running the whole
+  process in a container.
+- **Zed** asks for tool approval interactively; that is not confinement either.
+
+Sandboxing is therefore a deployment concern that sits outside the harness, and outside this
+comparison. The seatbelt profile in `sandbox.rs` is not a safety sandbox: it denies reads of the
+corpus, the output directory and `.tmp/rig-eval`, so an arm cannot read the gold it is scored
+against. It must be identical across arms, and delegating it to each harness is impossible for Pi
+and opencode. Equal ambient authority is the only fair baseline: a sandbox enabled on the rig arm
+alone would measure refused commands, not a better harness.
+
+An unattended harness would sandbox at launch (container, VM or seatbelt), or inside rig with a
+plugin that sets `Processes`. The Gate is policy above either. That work starts after the
+comparison.
+
 ## What each harness exposes
 
 | Measure | rig | opencode | pi | zed |

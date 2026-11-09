@@ -6,18 +6,23 @@ use std::time::Duration;
 use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
 
+use crate::target::Target;
+
 const DEFAULT_MODEL: &str = "deepseek/deepseek-flash";
 const DEFAULT_RIG: &str = ".tmp/rig-fork/bin/rig";
 const DEFAULT_ENV: &str = ".tmp/rig-home/model.env";
 const DEFAULT_SCENARIOS: &str = "integrations/rig-eval/scenarios";
+const DEFAULT_OPENCODE: &str = "bunx";
+const DEFAULT_OPENCODE_CONFIG: &str = ".tmp/opencode/opencode.json";
+const DEFAULT_PI: &str = ".tmp/pi/bin/pi";
 
 /// The command line. Clap owns `--help`, `--version` and the usage errors.
 #[derive(Debug, Parser)]
 #[command(
     name = "rig-eval",
     version,
-    about = "Run the playbook's rig homes over real-work scenarios and score them",
-    after_help = "Every scenario is run under every home. The result is a score (checks passed),\n\
+    about = "Run the harness comparison over real-work scenarios and score it",
+    after_help = "Every scenario is run under every target. The result is a score (checks passed),\n\
                   recall and precision over `path:line` citations, model calls, compactions,\n\
                   tool calls by name, refusals, output bytes and wall time. The raw `--json`\n\
                   stream and a copy of the effect log sit beside `results.json`."
@@ -27,7 +32,11 @@ struct Cli {
     #[arg(long = "scenario", value_name = "NAME")]
     only: Vec<String>,
 
-    /// A RIG_HOME to run under, as LABEL=PATH; repeatable
+    /// A target: rig:gated, rig:baseline, rig:vanilla, opencode, pi; repeatable
+    #[arg(long = "target", value_name = "NAME")]
+    targets: Vec<String>,
+
+    /// A custom rig home, as LABEL=PATH; repeatable
     #[arg(long = "home", value_name = "LABEL=PATH")]
     homes: Vec<String>,
 
@@ -38,6 +47,14 @@ struct Cli {
     /// The rig launcher [default: .tmp/rig-fork/bin/rig]
     #[arg(long, value_name = "PATH")]
     rig: Option<PathBuf>,
+
+    /// The opencode provider config [default: .tmp/opencode/opencode.json]
+    #[arg(long = "opencode-config", value_name = "PATH")]
+    opencode_config: Option<PathBuf>,
+
+    /// The Pi launcher [default: .tmp/pi/bin/pi]
+    #[arg(long, value_name = "PATH")]
+    pi: Option<PathBuf>,
 
     /// A file of KEY=VALUE lines holding the model key [default: .tmp/rig-home/model.env]
     #[arg(long = "env", value_name = "PATH")]
@@ -51,7 +68,7 @@ struct Cli {
     #[arg(long, required = true, value_name = "DIR")]
     out: PathBuf,
 
-    /// Runs per scenario and home
+    /// Runs per scenario and target
     #[arg(long, value_name = "N", default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
     repeat: u32,
 
@@ -59,7 +76,7 @@ struct Cli {
     #[arg(long, value_name = "SECONDS")]
     timeout: Option<u64>,
 
-    /// Validate the scenarios and homes, print the plan, run nothing
+    /// Validate the scenarios and targets, print the plan, run nothing
     #[arg(long)]
     dry_run: bool,
 }
@@ -69,9 +86,11 @@ pub struct Args {
     pub root: PathBuf,
     pub scenario_dir: PathBuf,
     pub only: Vec<String>,
-    pub homes: Vec<Home>,
+    pub targets: Vec<Target>,
     pub model: String,
     pub rig: PathBuf,
+    pub opencode_config: PathBuf,
+    pub pi: PathBuf,
     pub env_file: PathBuf,
     pub out: PathBuf,
     pub repeat: u32,
@@ -94,31 +113,40 @@ impl Args {
             .map(|path| absolute(&path))
             .unwrap_or_else(|| root.join(DEFAULT_SCENARIOS));
 
-        let homes = if cli.homes.is_empty() {
-            default_homes(&root)
-        } else {
-            cli.homes
-                .iter()
-                .map(|value| parse_home(value))
-                .collect::<Result<Vec<_>>>()?
-        };
-        let rig = cli
-            .rig
-            .map(|path| absolute(&path))
-            .unwrap_or_else(|| root.join(DEFAULT_RIG));
-        let env_file = cli
-            .env_file
-            .map(|path| absolute(&path))
-            .unwrap_or_else(|| root.join(DEFAULT_ENV));
+        let mut targets = cli
+            .targets
+            .iter()
+            .map(|spec| parse_target(&root, spec))
+            .collect::<Result<Vec<_>>>()?;
+        for value in &cli.homes {
+            targets.push(Target::Rig(parse_home(value)?));
+        }
+        if targets.is_empty() {
+            targets = default_targets(&root);
+        }
 
         let args = Self {
-            root,
+            root: root.clone(),
             scenario_dir,
             only: cli.only,
-            homes,
+            targets,
             model: cli.model,
-            rig,
-            env_file,
+            rig: cli
+                .rig
+                .map(|path| absolute(&path))
+                .unwrap_or_else(|| root.join(DEFAULT_RIG)),
+            opencode_config: cli
+                .opencode_config
+                .map(|path| absolute(&path))
+                .unwrap_or_else(|| root.join(DEFAULT_OPENCODE_CONFIG)),
+            pi: cli
+                .pi
+                .map(|path| absolute(&path))
+                .unwrap_or_else(|| root.join(DEFAULT_PI)),
+            env_file: cli
+                .env_file
+                .map(|path| absolute(&path))
+                .unwrap_or_else(|| root.join(DEFAULT_ENV)),
             out: absolute(&cli.out),
             repeat: cli.repeat,
             timeout: cli.timeout.map(Duration::from_secs),
@@ -128,7 +156,7 @@ impl Args {
         Ok(args)
     }
 
-    /// A dry run may be planned before the launcher or a home exists; a real run may not.
+    /// A dry run may be planned before a launcher or a home exists; a real run may not.
     fn validate(&self) -> Result<()> {
         if self.dry_run {
             return Ok(());
@@ -143,17 +171,43 @@ impl Args {
                 self.scenario_dir.display()
             );
         }
-        for home in &self.homes {
-            let settings = home.path.join("settings.toml");
-            if !settings.is_file() {
-                bail!(
-                    "home `{}` has no settings.toml at {}",
-                    home.label,
-                    settings.display()
-                );
+        for target in &self.targets {
+            match target {
+                Target::Rig(home) => {
+                    let settings = home.path.join("settings.toml");
+                    if !settings.is_file() {
+                        bail!(
+                            "home `{}` has no settings.toml at {}",
+                            home.label,
+                            settings.display()
+                        );
+                    }
+                }
+                Target::Opencode => {
+                    if !self.opencode_config.is_file() {
+                        bail!(
+                            "no opencode provider config at {}",
+                            self.opencode_config.display()
+                        );
+                    }
+                    if !on_path(Path::new(DEFAULT_OPENCODE)) {
+                        bail!(
+                            "no `{DEFAULT_OPENCODE}` on PATH; opencode runs through it, pinned to \
+                             opencode-ai@1.19.5"
+                        );
+                    }
+                }
+                Target::Pi => {
+                    if !self.pi.is_file() {
+                        bail!(
+                            "no Pi launcher at {}; install it with `npm install -g --prefix .tmp/pi --ignore-scripts @earendil-works/pi-coding-agent`",
+                            self.pi.display()
+                        );
+                    }
+                }
             }
         }
-        if !self.rig.is_file() {
+        if self.targets.iter().any(Target::is_rig) && !self.rig.is_file() {
             bail!(
                 "no rig launcher at {}; build it with `cargo install --path \
                  ~/code/defrag/rig/crates/rig-cli --locked --force --root .tmp/rig-fork`",
@@ -191,17 +245,31 @@ fn repo_root() -> Result<PathBuf> {
         .ok_or_else(|| anyhow!("the crate is not inside a checkout"))
 }
 
-fn default_homes(root: &Path) -> Vec<Home> {
+fn default_targets(root: &Path) -> Vec<Target> {
     vec![
-        Home {
-            label: "gated".to_owned(),
-            path: root.join(".tmp/rig-home"),
-        },
-        Home {
-            label: "baseline".to_owned(),
-            path: root.join(".tmp/rig-home-baseline"),
-        },
+        rig_target(root, "gated", ".tmp/rig-home"),
+        rig_target(root, "baseline", ".tmp/rig-home-baseline"),
     ]
+}
+
+fn rig_target(root: &Path, label: &str, path: &str) -> Target {
+    Target::Rig(Home {
+        label: label.to_owned(),
+        path: root.join(path),
+    })
+}
+
+fn parse_target(root: &Path, spec: &str) -> Result<Target> {
+    match spec {
+        "rig:gated" => Ok(rig_target(root, "gated", ".tmp/rig-home")),
+        "rig:baseline" => Ok(rig_target(root, "baseline", ".tmp/rig-home-baseline")),
+        "rig:vanilla" => Ok(rig_target(root, "vanilla", ".tmp/rig-home-vanilla")),
+        "opencode" => Ok(Target::Opencode),
+        "pi" => Ok(Target::Pi),
+        other => bail!(
+            "unknown target `{other}`; known: rig:gated, rig:baseline, rig:vanilla, opencode, pi"
+        ),
+    }
 }
 
 fn parse_home(value: &str) -> Result<Home> {
@@ -235,6 +303,15 @@ fn absolute(path: &Path) -> PathBuf {
     }
 }
 
+fn on_path(program: &Path) -> bool {
+    if program.is_absolute() || program.components().count() > 1 {
+        return program.is_file();
+    }
+    std::env::var_os("PATH").is_some_and(|paths| {
+        std::env::split_paths(&paths).any(|directory| directory.join(program).is_file())
+    })
+}
+
 fn is_inside(root: &Path, path: &Path) -> bool {
     let (Ok(root), Ok(path)) = (root.canonicalize(), path.canonicalize()) else {
         return false;
@@ -259,5 +336,19 @@ mod tests {
     #[test]
     fn an_empty_label_is_refused() {
         assert!(parse_home("=/tmp/rig-home").is_err());
+    }
+
+    #[test]
+    fn the_named_targets_resolve_to_their_homes() {
+        let root = Path::new("/repo");
+        let Target::Rig(home) = parse_target(root, "rig:vanilla").expect("a target") else {
+            panic!("rig:vanilla is a rig home");
+        };
+        assert_eq!(home.label, "vanilla");
+        assert_eq!(home.path, PathBuf::from("/repo/.tmp/rig-home-vanilla"));
+        assert!(matches!(
+            parse_target(root, "opencode").expect("a target"),
+            Target::Opencode
+        ));
     }
 }
