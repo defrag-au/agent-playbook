@@ -418,6 +418,10 @@
               # Reading a rig session: the effect log is JSONL, and DuckDB is the first reader.
               # `skills/rig-session-query` is the procedure; this is the tool it runs.
               pkgs.duckdb
+              # Node 22.19+ is what the Pi coding agent requires, and Pi is one arm of the
+              # harness comparison in `docs/design/harness-comparison.md`. It is a shell tool,
+              # not a repository package: `pi` itself is installed from npm into `.tmp/pi`.
+              pkgs.nodejs_22
             ];
           };
         }

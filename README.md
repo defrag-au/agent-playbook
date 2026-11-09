@@ -132,9 +132,12 @@ dist/             generated output (gitignored)
 Design records live in [`docs/design/`](docs/design/). [`rig.md`](docs/design/rig.md) is what
 rig's kernel makes possible, what was verified against which commit, and the commitment to build
 against it. [`toolkit-core.md`](docs/design/toolkit-core.md) is the seam it stands on: the `at-*`
-verbs return typed facts, and the CLI and a harness render the same text from them. The plugin they
-describe is in `integrations/rig`, outside this workspace so the composer and `cargo test` stay
-dependency-light.
+verbs return typed facts, and the CLI and a harness render the same text from them.
+[`rig-eval.md`](docs/design/rig-eval.md) is the measurement plan, the runner, and the first result:
+scenarios drawn from real Zed threads, scored under two homes. [`harness-comparison.md`](docs/design/harness-comparison.md)
+is the four-way comparison — rig, opencode, Pi and Zed — with the fairness controls and what each
+harness can report. The plugin is in `integrations/rig` and the runner in `integrations/rig-eval`,
+both outside this workspace so the composer and `cargo test` stay dependency-light.
 
 `models/` holds **targets**, not just models. A target is whatever consumes rules — usually
 a model+harness pair. `claude-code/` declares `model: claude`, `harness: claude-code`;

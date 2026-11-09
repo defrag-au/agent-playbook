@@ -1,0 +1,17 @@
+{
+  "name": "devshell-tests",
+  "why": "The devshell rule: a bare cargo fails, and the tool output has to carry the totals.",
+  "prompt": "Run the tests for the `rig-playbook` plugin crate in `integrations/rig`, using this repository's own toolchain, and report the pass and fail totals. Name the file that contains the deterministic harness test, citing it as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "integrations/rig/tests/redirect.rs:29"
+  ],
+  "extra_paths": [],
+  "must_say": [
+    "0 failed"
+  ],
+  "tool_says": [
+    "test result: ok",
+    "0 failed"
+  ]
+}

@@ -1,20 +1,37 @@
 //! The agent-playbook, enforced in rig.
 //!
-//! Two halves, both on the kernel's public API:
+//! Three parts, all on the kernel's public API:
 //!
 //! - **Tools.** The `at-*` verbs as native rig tools: typed arguments, a schema derived from the
 //!   argument type, a `Footprint` that says they only read, and the agent's own directory as the
 //!   root. A call is an effect, so it is recorded with its turn, its parent and its outcome.
-//! - **A Gate.** A `shell` call that is really a read is refused, and the refusal names the tool
-//!   that replaces it. The model reads the refusal and retries with the tool.
+//! - **A redirect.** A plain `rg`/`grep` shell call is answered in `Prepare` by `at-peek search`
+//!   in process. The model sees the bounded answer as the shell's result, with no refusal to
+//!   read and no second call.
+//! - **A Gate.** Any other shell read is refused, and the refusal names the tool that replaces
+//!   it. The model reads the refusal and retries with the tool.
 //!
 //! The playbook's rule stays in `AGENTS.md` as the human-readable copy. This is the same rule the
 //! harness applies.
 
+mod redirect;
 mod spawn;
 mod tools;
 
+pub use redirect::Redirection;
+pub use tools::PublishedSearch;
+
 use rig_harness::prelude::*;
+
+/// A failure from the toolkit's own contract: a usage error reaches the model as a usage error and
+/// a refusal as a refusal, rather than everything becoming "other".
+pub(crate) fn fail(failure: at_peek::contract::Fail) -> ToolExecutionError {
+    match failure.exit {
+        at_peek::contract::Exit::Usage => ToolExecutionError::invalid_args(failure.message),
+        at_peek::contract::Exit::Refused => ToolExecutionError::refused(failure.message),
+        _ => ToolExecutionError::other(failure.message),
+    }
+}
 
 /// The plugin: the tools, and the gate that points at them.
 #[derive(Default)]
@@ -23,7 +40,21 @@ pub struct PlaybookPlugin;
 impl Plugin for PlaybookPlugin {
     fn build(&self, app: &mut App) {
         tools::add(app);
+        redirect::add(app);
         app.add_systems(AgentPass, refuse_shell_reads.in_set(Stage::Gate));
+    }
+}
+
+/// The same tools with no gate: the baseline for measuring what enforcement costs.
+///
+/// Load it under `[[plugins.extra]] plugin = "rig_playbook::ToolsOnlyPlugin"` and run the same
+/// prompt as [`PlaybookPlugin`]. It exists for the comparison, not for daily use.
+#[derive(Default)]
+pub struct ToolsOnlyPlugin;
+
+impl Plugin for ToolsOnlyPlugin {
+    fn build(&self, app: &mut App) {
+        tools::add(app);
     }
 }
 
@@ -38,17 +69,28 @@ fn refuse_shell_reads(mut calls: Query<(&ToolRequest, &mut Decision), (ReadyToSt
             .as_str()
             .unwrap_or_default();
 
-        if let Some(replacement) = replacement(command) {
-            decision.decide(
-                Decider::plugin("playbook"),
-                Outcome::refused(format!(
-                    "`{}` is a read the toolkit replaces · use {replacement}. \
-                     The inspect-code skill maps the rest of the grammar.",
-                    program(command).unwrap_or("that command"),
-                )),
-            );
+        if let Some(why) = refusal(command) {
+            decision.decide(Decider::plugin("playbook"), Outcome::refused(why));
         }
     }
+}
+
+/// The message a refused read gets. It names the tool, and says what the model would otherwise
+/// do next: a retry through `shell`, or the same command with `; echo "exit=$?"` appended to
+/// recover the status it thinks it lost. The replacement answers the same question and states
+/// the total, so there is nothing to recover.
+fn refusal(command: &str) -> Option<String> {
+    // A plain search is answered in Prepare with the toolkit, so there is nothing to refuse.
+    if redirect::search_from_shell(command).is_some() {
+        return None;
+    }
+    let tool = replacement(command)?;
+    Some(format!(
+        "`{}` is a read the toolkit replaces · call `{tool}`. It answers the same question with the \
+         matches and their true total, so a retry through `shell` gains nothing; appending to the \
+         command does not change what it is judged on.",
+        program(command).unwrap_or("that command"),
+    ))
 }
 
 /// The tool that replaces `command`, when the command is a read.
@@ -132,15 +174,28 @@ mod tests {
 
     #[test]
     fn the_refusal_names_the_program_and_the_tool() {
-        let command = "rg 'render_claim'";
-        let tool = replacement(command).expect("a read");
-        let message = format!(
-            "`{}` is a read the toolkit replaces · use {tool}.",
-            program(command).expect("a program"),
-        );
+        // A command the redirect does not serve, so it still reaches the Gate.
+        let message = refusal("cat src/lib.rs").expect("a read");
         assert_eq!(
             message,
-            "`rg` is a read the toolkit replaces · use at_peek_search."
+            "`cat` is a read the toolkit replaces · call `at_peek_slice`. It answers the same \
+             question with the matches and their true total, so a retry through `shell` gains \
+             nothing; appending to the command does not change what it is judged on."
         );
+    }
+
+    #[test]
+    fn a_redirected_read_is_not_refused() {
+        // The shape is answered in Prepare, so the Gate must leave it alone; a refusal here would
+        // be a second answer to a call that already has one.
+        assert_eq!(refusal("rg -n 'render_claim' ."), None);
+        assert_eq!(refusal("grep -rn foo src"), None);
+    }
+
+    #[test]
+    fn a_command_that_is_not_a_read_has_no_refusal() {
+        assert_eq!(refusal("cargo test"), None);
+        assert_eq!(refusal("git commit -m 'x'"), None);
+        assert_eq!(refusal("node scripts/build.mjs"), None);
     }
 }

@@ -1,0 +1,15 @@
+{
+  "name": "recover-investigation",
+  "why": "A thread was cut off mid-investigation; the answer is a status, not a search.",
+  "prompt": "A previous session left the rig integration mid-stream. From the repository's own notes, what is the plugin building, what is built and verified, and what is still unmeasured? Cite each finding as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "integrations/rig/README.md:14",
+    "integrations/rig/README.md:29",
+    "docs/design/rig.md:136",
+    "docs/design/rig.md:143"
+  ],
+  "extra_paths": [],
+  "must_say": [],
+  "tool_says": []
+}

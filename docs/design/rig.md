@@ -2,8 +2,9 @@
 
 The plan for building against **rig**, and the evidence behind it. Written 2026-11-08 against
 `0xPlaygrounds/rig` at `63431d79b` (the `main` of that day, 1728 commits), with `rig-core` 0.46.0
-published 2026-10-31. The checkout used for every claim below is `~/code/github/rig`; it sits
-outside every workspace root, so it is read through `at-peek --root` and `at-recall --root`.
+published 2026-10-31. The checkout used for every claim below was `~/code/github/rig`; the working
+fork is now `~/code/defrag/rig` at `c8b20d3d7`, one commit past it, and both the plugin's tests and
+the generated agent build against the fork.
 
 The short version: **rig is not another coding agent. It is a kernel where a turn, a model call,
 a tool call and a gate decision are entities moving through stages, and the coding agent is a set
@@ -100,20 +101,68 @@ Verified 2026-11-08, from the clone unless a source is named:
 | Headless drive: `rig -p --json`, `rig --json`, `rig help-agents` | `docs/agent.md` |
 | `rig-inspect` reads the agent's own Bevy world, read-only, off by default | `plugins/rig-inspect/README.md` |
 | The built-in coding tools are `read`, `edit`, `write`, `shell`; `search`, `list`, `delete` are left to `shell` | `crates/rig-harness/README.md:54` |
+| An extra plugin crate builds into a generated agent, with no stage conflicts | `rig plugin check --build`, 2026-11-09, 26 plugins |
+| A tool's typed result can be published and read back from the effect log | `tool_output."agent_playbook.search"` in a real session, 2026-11-09 |
+| A gate refusal reaches the model in-band, naming the replacement | a forced `shell rg` session on `deepseek/deepseek-flash`, 2026-11-09 |
+| The redirect is deterministic and adds no model call | `integrations/rig/tests/redirect.rs`, 2026-11-09 |
+| The plugin and the agent build from one local rig checkout | `~/code/defrag/rig` at `c8b20d3d7`, `rig plugin check --build` |
 
 Not verified, and stated as such:
 
 - **The install path.** The docs say `cargo install rig-cli`; the crates.io API answered 404 for
   that name on 2026-11-08 while `rig-core` is 0.46.0. The repository's own fallback is
   `cargo install --path crates/rig-cli` or `RIG_SOURCE`.
-- **Whether a gate that refuses produces fewer turns than prose.** It should, because the refusal
-  is in-band; that is hypothesis 2 below, not a measurement.
+- **Whether a gate that refuses produces fewer turns than prose.** Measured with the tools present
+  and only the gate switched off (below): the gate cost one model call and one extra refusal, and
+  produced the bounded answer instead of raw `rg` lines. A prose-only baseline is still unmeasured.
 - **What `/reload` costs** in wall time on this machine. The guide says only the generated crate
   recompiles; the first build of a plugin crate is the slow part.
 - **Whether `rig acp` behind `factotum` is a small change.** The daemon is v2-only
   (`crates/factotum/src/agent.rs` sends `ProtocolVersion::V2` and refuses an agent without the v2
   session capability), so it needs a v1 client path before it can spawn `rig acp`. That is recorded
   in `factotum/docs/design/agent.md`, not here.
+
+## The enforcement measurement
+
+2026-11-09, `deepseek/deepseek-flash`, the same prompt against the same repository and the same
+tool set. The only difference: `rig_playbook::ToolsOnlyPlugin` registers the tools and no Gate;
+`PlaybookPlugin` adds the Gate. The prompt was adversarial on purpose — *"Use the shell tool to run
+exactly this command and report what it prints: `rg -n conservative-package-changes .`"* — because
+the question is what happens when the model would otherwise bypass the toolkit.
+
+| | Baseline, no gate | Gated, refused | Gated, redirected |
+| --- | --- | --- | --- |
+| Turns | 1 | 1 | 1 |
+| Model calls | 2 | 3 | **2** |
+| Tool calls | 1 `shell`, ran | 2: `shell` refused, `at_peek_search` ran | 1 `shell`, served by `at_peek_search` |
+| Decider | — | `{"plugin":"playbook"}`, `Err{denied, refusal}` | — (a `Prepare` substitution) |
+| Answer | four raw `rg` lines | bounded: 4 matches, 443 walked, the skips named | the same bounded answer |
+
+Four readings worth keeping:
+
+- **A refusal costs one model call; a redirect costs none.** The refusal needs the model to read it
+  and ask again. `Prepare` replaces the handler instead, so the model's one call returns the
+  bounded answer and the run matches the ungated baseline exactly.
+- **Prose lost and the gate did not.** The baseline model *knew* the skill prefers `at_peek_search`
+  and said so — then ran `rg` anyway because the user asked for it ("I ran the literal command as
+  you asked"). The gated model could not.
+- **The substitution is recorded.** A redirected call is `tool:shell` in the log, with
+  `agent_playbook.redirection` naming the command and the tool that answered it, beside
+  `agent_playbook.search`. It has no `decided_by`, because nothing was refused.
+- **What the replacement bought is the answer.** `rg` prints four lines and cannot say how many
+  files it walked or what it skipped. `at_peek_search` states the true total, the walk, the skipped
+  directories, one secret-shaped file and one symlink. That is the difference between a result and
+  a bounded one.
+
+`turn` is a poor discriminator here: rig counts one turn however many calls it contains. Model
+calls and tool calls are the quantities, and both are in the effect log.
+
+The final pair used `kill-only-what-you-started` rather than the original pattern, because this
+document quoting the original made the search return the document and the model read it — a
+benchmark corpus must not contain its own prompts.
+
+The next measurement — scenarios drawn from 143 real Zed threads, and the three ways to drive rig
+through them — is [`rig-eval.md`](rig-eval.md).
 
 ## What rig does not do
 
@@ -167,46 +216,12 @@ because the struct has no `rename_all` (`published` is the one rename, to `tool_
 `RIG_HOME/sessions/<id>/files/effects.jsonl`. The session log at `logs/<agent-id>.jsonl` carries
 usage and compactions; a cost question is a join of the two, not a third source.
 
-**The queries, unrun.** DuckDB is not installed in the devshell and no rig session has been recorded
-yet, so these are written against verified field names and nothing more. They are the first thing to
-run against a real log, and the first one that fails is information about the wire shape, not about
-the decision.
-
-```sql
--- What each tool costs, in calls and wall time.
-SELECT json_extract_string(kind, '$.name')                  AS tool,
-       count(*)                                             AS calls,
-       round(quantile_cont(finished_ms - started_ms, 0.5))  AS p50_ms,
-       round(quantile_cont(finished_ms - started_ms, 0.95)) AS p95_ms,
-       count(*) FILTER (WHERE json_extract(outcome, '$.Err') IS NOT NULL) AS errors
-FROM read_json_auto('effects.jsonl')
-WHERE json_extract_string(kind, '$.effect') = 'tool_call'
-GROUP BY 1 ORDER BY calls DESC;
-
--- A turn in one row: model calls, tool calls, gates, wall time.
-SELECT scope, turn,
-       count(*) FILTER (WHERE json_extract_string(kind, '$.effect') = 'completion') AS model_calls,
-       count(*) FILTER (WHERE json_extract_string(kind, '$.effect') = 'tool_call')   AS tool_calls,
-       count(*) FILTER (WHERE decided_by IS NOT NULL)                               AS gated,
-       max(finished_ms) - min(started_ms)                                           AS wall_ms
-FROM read_json_auto('effects.jsonl')
-GROUP BY 1, 2 ORDER BY 1, 2;
-
--- Who said no, and to what. The playbook's enforcement, measured.
-SELECT coalesce(json_extract_string(decided_by, '$.plugin'),
-                json_extract_string(decided_by))         AS decider,
-       json_extract_string(kind, '$.name')               AS tool,
-       count(*)                                          AS decided
-FROM read_json_auto('effects.jsonl')
-WHERE decided_by IS NOT NULL
-GROUP BY 1, 2 ORDER BY decided DESC;
-
--- Time to first token, beside total time.
-SELECT quantile_cont(first_item_ms - started_ms, 0.5)   AS ttft_p50_ms,
-       quantile_cont(finished_ms - started_ms, 0.5)     AS total_p50_ms
-FROM read_json_auto('effects.jsonl')
-WHERE first_item_ms IS NOT NULL;
-```
+**The queries, run.** DuckDB is in the devshell and the queries were checked against real sessions on
+2026-11-09. The maintained versions are in
+[`skills/rig-session-query`](../../skills/rig-session-query/SKILL.md). The one thing to know here is
+that a session log is **not one effect per line**: `header` lines and delta records interleave, and
+a query keyed on `kind.effect` alone undercounts completions. The skill's coalescing view handles
+both.
 
 A deeper question — the call tree under one turn — is a recursive CTE over `id`/`parent`, which is
 worth writing only once there is a session where the tree is not obviously flat.
@@ -220,13 +235,14 @@ cheapest first step is a sidecar: an OpenTelemetry Collector's `filelog` receive
 
 1. **`rig-playbook`** — built in [`integrations/rig`](../../integrations/rig). Seven `at-*` verbs
    are native tools: typed arguments, schema derived from the type, a `Reads` footprint, and the
-   agent's own directory as the root. A Gate refuses a `shell` read and names the tool. The tools
-   and the plugin stop crossing a process boundary first — that seam is
-   [`toolkit-core.md`](toolkit-core.md) — and the rule engine follows on it.
-2. **An observation sink.** The procedure is written
-   ([`skills/rig-session-query`](../../skills/rig-session-query/SKILL.md)); the first run over a
-   real `effects.jsonl` is next. DuckDB first; HawDB when the question needs joins; OTel only when
-   a consumer outside this machine needs the data.
+   agent's own directory as the root. A plain `rg`/`grep` shell call is **redirected** in `Prepare`
+   to the in-process search; any other read is refused with the tool named. The tools and the plugin
+   stop crossing a process boundary first — that seam is [`toolkit-core.md`](toolkit-core.md) — and
+   the rule engine follows on it.
+2. **An observation sink.** The procedure is written and verified
+   ([`skills/rig-session-query`](../../skills/rig-session-query/SKILL.md)); it read the 2026-11-09
+   sessions, including the delta records the first draft missed. DuckDB first; HawDB when the
+   question needs joins; OTel only when a consumer outside this machine needs the data.
 3. **`factotum` ↔ rig.** Keep the daemon; add a v1 agent path; run `rig acp` as one of its agents,
    beside Zed's. The daemon is the only piece that does multi-client replay and fan-out, and rig is
    the only piece whose behaviour is plugins. Neither substitutes for the other.
@@ -243,9 +259,10 @@ plugin is the surface that gets the kernel's typing and gating. That is the dire
 | 3 | Export `effects.jsonl` into DuckDB and answer one real question from it (tool cost, gates, or TTFT) | whether the log is enough without an instrumentation layer | half a day, once one session exists |
 | 4 | `rig -p --json` driven from a script, then `rig-cassette` replay | whether a rig flow is testable | half a day |
 
-Experiment 2 is the one that matters. If a gate cannot express "refuse and redirect" without the
-model retrying — and that is unverified — the playbook stays instructions, and the case weakens
-considerably.
+Experiment 2 is settled: a redirect expresses "serve this read with the tool" at the baseline's
+cost, and a refusal costs one model call. Experiment 3 is done. Experiment 4 has run: the runner
+and its first result are in [`rig-eval.md`](rig-eval.md). The result is negative on cost — the gate
+is bypassed by a `cd &&` prefix and by the ungated `read` tool — and names what to change next.
 
 ## Reading map
 
@@ -258,6 +275,10 @@ In order, and only what is needed:
 | `crates/rig-harness/PLUGINS.md:21-44` | the task → section table; jump only to what a task needs |
 | `crates/rig-ecs/README.md` | the kernel in 34 lines |
 | `corpus/shared`, then `corpus/base` | idiomatic plugins written against the public API, built and tested by CI |
+| `corpus/base/src/shell_rewrite.rs`, `effect_query.rs`, `output_truncate.rs` | policy at `Prepare`/`Gate`/`Review`, live effect queries, and bounding a tool result |
+| `corpus/base/src/session_replay.rs`, `http_api.rs`, `window_gui.rs` | replay, and the two ways to put a front on the agent |
+| `test-support/rig-harness-test-support` | `app_in`, `connect`, `run_until`, collectors, scripted replies: the deterministic harness |
+| `test-support/rig-defaults-test-support` | the default plugin set, and `assert_stages_ordered` |
 | `docs/agent.md` | the agent as a user meets it: sessions, tools, subagents, `--json`, `RIG_HOME` |
 | `AGENTS.md` | rig's own engineering conventions, and a good model for an agent-facing repository |
 | `plugins/rig-basics/src/telemetry.rs`, `telemetry/` | `UsagePlugin`, `EffectLogPlugin`, `DiagnosticsPlugin` — the observability seam |
@@ -269,7 +290,10 @@ trusted, and the best source of idiom.
 
 ## Open questions
 
-1. Can a gate redirect, or only refuse? If only refuse, how many turns does compliance cost?
+1. Does the redirect reach a real call? It is implemented for a plain `rg`/`grep`, and on a forced
+   shell read it matches the baseline exactly. On a natural prompt it is rarely the first program
+   of the command: the model prefixes `cd <repo> &&`, which the Gate does not see. Measured in
+   [`rig-eval.md`](rig-eval.md), and the largest thing to fix before the next run.
 2. Does `/reload` after a rule change fit inside a working session, or is it a coffee break?
 3. Does `rig` beat Zed's native agent on coding tasks despite having no LSP — or is it a harness
    we drive in Zed over ACP and never use as a coder?

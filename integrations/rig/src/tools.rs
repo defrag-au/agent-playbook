@@ -6,10 +6,14 @@
 
 use std::path::{Path, PathBuf};
 
+use at_peek::paths::Root;
+use at_peek::verbs::search::{self, Mode, SearchFacts};
+use at_peek::verbs::Opts;
 use rig_harness::prelude::*;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
+use crate::fail;
 use crate::spawn;
 
 /// Register every tool.
@@ -95,6 +99,17 @@ fn push_root(argv: &mut Vec<String>, base: Option<&Path>) {
     }
 }
 
+/// The search answer, under the key the effect log reads it by.
+///
+/// A newtype rather than `impl ContextValue for SearchFacts`: the trait is rig's, and the tool
+/// crate must not depend on rig to be publishable.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PublishedSearch(pub SearchFacts);
+
+impl rig_harness::rig_core::tool::ContextValue for PublishedSearch {
+    const KEY: &'static str = "agent_playbook.search";
+}
+
 #[derive(Clone, Default)]
 pub struct Search {
     base: Option<PathBuf>,
@@ -122,6 +137,38 @@ pub struct SearchArgs {
     pub limit: Option<u16>,
 }
 
+/// The read, in process. `collect` returns facts and `report` renders them, so the text is the
+/// CLI's own bytes rather than a second implementation of them.
+fn search_in_process(
+    base: Option<&Path>,
+    args: SearchArgs,
+) -> Result<(SearchFacts, Opts), ToolExecutionError> {
+    let root = match base {
+        Some(base) => Root::at(base).map_err(fail),
+        None => {
+            let cwd = std::env::current_dir().map_err(|error| {
+                ToolExecutionError::other(format!("cannot read the working directory: {error}"))
+            })?;
+            Root::discover(&cwd).map_err(fail)
+        }
+    }?;
+    let mode = Mode::of(args.count, args.files_only).map_err(fail)?;
+    let opts = Opts::resolve(
+        root,
+        base.is_some(),
+        args.limit.map(usize::from),
+        None,
+        false,
+        args.summary,
+    )
+    .map_err(fail)?;
+
+    let mut targets = vec![args.pattern];
+    targets.extend(args.paths);
+    let facts = search::collect(&targets, &opts, mode).map_err(fail)?;
+    Ok((facts, opts))
+}
+
 impl PerCallTool for Search {
     fn at(&self, at: CallPlace) -> Self {
         Self {
@@ -146,18 +193,18 @@ impl Tool for Search {
 
     async fn call(
         &self,
-        _: &mut ToolContext,
+        context: &mut ToolContext,
         args: SearchArgs,
     ) -> Result<String, ToolExecutionError> {
-        let mut argv = vec!["search".to_owned(), args.pattern];
-        argv.extend(args.paths);
-        push_switch(&mut argv, "--count", args.count);
-        push_switch(&mut argv, "--files-only", args.files_only);
-        push_switch(&mut argv, "--summary", args.summary);
-        push_value(&mut argv, "--limit", args.limit.map(|n| n.to_string()));
-        push_root(&mut argv, self.base.as_deref());
-
-        blocking(move || execute("at-peek", &argv)).await
+        let base = self.base.clone();
+        let (facts, opts) = blocking(move || search_in_process(base.as_deref(), args)).await?;
+        let text = facts.report(&opts).render();
+        context
+            .insert_result(PublishedSearch(facts))
+            .map_err(|error| {
+                ToolExecutionError::other(format!("could not publish the search facts: {error}"))
+            })?;
+        Ok(text)
     }
 }
 
@@ -511,7 +558,7 @@ mod tests {
     }
 
     #[test]
-    fn a_search_argv_carries_the_verb_and_the_root() {
+    fn an_argv_carries_the_verb_and_the_root() {
         let args = SearchArgs {
             pattern: "render_claim".to_owned(),
             paths: vec!["src".to_owned()],
@@ -539,5 +586,30 @@ mod tests {
                 "/tmp/project",
             ]
         );
+    }
+
+    #[test]
+    fn the_search_tool_reads_in_process_and_renders_the_cli_answer() {
+        let dir = std::env::temp_dir().join(format!("rig-playbook-search-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("src")).expect("fixture src");
+        std::fs::write(dir.join("src/a.rs"), "fn alpha() {}\n").expect("fixture file");
+
+        let args = SearchArgs {
+            pattern: "alpha".to_owned(),
+            paths: Vec::new(),
+            count: false,
+            files_only: false,
+            summary: false,
+            limit: None,
+        };
+        let (facts, opts) = search_in_process(Some(&dir), args).expect("a search");
+        let text = facts.report(&opts).render();
+
+        assert_eq!(facts.total, 1);
+        assert!(text.contains("src/a.rs:1:fn alpha() {}"), "{text}");
+        assert!(text.contains("# 1 match in 1 file"), "{text}");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

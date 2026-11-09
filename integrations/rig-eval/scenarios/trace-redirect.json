@@ -1,0 +1,16 @@
+{
+  "name": "trace-redirect",
+  "why": "The symbol trace a thread does before changing a handler.",
+  "prompt": "Find how this plugin stops a plain `rg` or `grep` shell call from running, and what answers it instead. Cite where the command is recognised, where the call's handler is replaced, and where the search runs in process. Cite each definition as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "integrations/rig/src/redirect.rs:41",
+    "integrations/rig/src/redirect.rs:44",
+    "integrations/rig/src/redirect.rs:166",
+    "integrations/rig/src/tools.rs:142",
+    "integrations/rig/src/lib.rs:84"
+  ],
+  "extra_paths": [],
+  "must_say": [],
+  "tool_says": []
+}

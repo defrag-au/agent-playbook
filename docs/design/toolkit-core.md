@@ -7,11 +7,16 @@ the tree at `agent-playbook`.
 The short version: **the verbs already compute structured facts and then render them immediately.
 Keep the facts, render on demand, and both modes share one implementation.**
 
-**Status 2026-11-08.** Step 1 is done: `Opts::resolve`, `search::collect`, `SearchFacts`, and the
-optional `serde` feature. Six goldens were captured from the **pre-refactor** binary and still
-match byte for byte; a second test proves the library renders the CLI's bytes, including the exit a
-limit adds. `cargo test -p at-peek` passes 39 tests, `cargo clippy --all-targets -D warnings` is
-clean, and `cargo check --workspace --all-targets` is clean. The remaining verbs are steps 3 and 4.
+**Status 2026-11-09.** Steps 1 and 2 are done. `Opts::resolve`, `search::collect`, `SearchFacts`,
+and the optional `serde` feature are in `at-peek`. Six goldens were captured from the
+**pre-refactor** binary and still match byte for byte; a second test proves the library renders the
+CLI's bytes, including the exit a limit adds. `cargo test -p at-peek` passes 39 tests and clippy is
+clean. In `integrations/rig`, `at_peek_search` now calls `collect` in process and publishes
+`PublishedSearch` under `agent_playbook.search`; the plugin's seven tests pass and its clippy is
+clean. A generated agent builds with the plugin, and two headless runs on `deepseek/deepseek-flash`
+exercised both halves: the model called `at_peek_search` on its first step, and the published facts
+(`total = 4`, `walked = 443`) were queryable in `effects.jsonl`. The other six verbs still spawn,
+and `spawn.rs` stays until step 5. The remaining toolkit verbs are steps 3 and 4.
 
 ## What this decides
 
