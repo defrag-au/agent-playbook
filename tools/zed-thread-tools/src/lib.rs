@@ -8,12 +8,13 @@
 //! message variant Zed's own `/compact` writes. Existing messages are never
 //! removed or rewritten.
 //!
-//! See `README.md` in this crate for the two commands and the safety
+//! See `README.md` in this crate for the four commands and the safety
 //! properties.
 
 pub mod archive;
 pub mod audit;
 pub mod db;
+pub mod export;
 pub mod metadata;
 pub mod recover;
 pub mod tui;
@@ -27,6 +28,7 @@ pub use audit::{
     ThreadExplanation, ToolOutputDetail,
 };
 pub use db::{default_db_path, ThreadHeader, ThreadRecord};
+pub use export::{export, ExportOptions, ExportOutcome, SnapshotManifest};
 pub use recover::{
     prepare_recovery, write_recovery, PreparedRecovery, RecoverOptions, RecoveryMode, RecoveryPlan,
     WriteOutcome,
@@ -56,6 +58,12 @@ pub enum Error {
     BundleExists(PathBuf),
     ThreadConflict(String),
     UnsupportedBundleVersion(u32),
+    OutputExists(PathBuf),
+    BudgetTooSmall {
+        budget: u64,
+        smallest: u64,
+        title: String,
+    },
 }
 
 impl fmt::Display for Error {
@@ -105,6 +113,19 @@ impl fmt::Display for Error {
                 formatter,
                 "unsupported bundle format version {version}; this tool understands {}",
                 archive::BUNDLE_FORMAT_VERSION
+            ),
+            Self::OutputExists(path) => write!(
+                formatter,
+                "refusing to write into existing path {}",
+                path.display()
+            ),
+            Self::BudgetTooSmall {
+                budget,
+                smallest,
+                title,
+            } => write!(
+                formatter,
+                "no thread tree fits a {budget}-byte budget; the smallest is {title:?} at {smallest} bytes"
             ),
         }
     }

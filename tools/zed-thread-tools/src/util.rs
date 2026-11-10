@@ -1,5 +1,13 @@
 //! Small shared helpers for stable names and BLOB serialization.
 
+/// A thread id that can be used as a file name without escaping.
+pub(crate) fn safe_id(id: &str) -> bool {
+    !id.is_empty()
+        && id
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
+}
+
 /// A lowercase, ASCII, dash-separated name safe for a directory component.
 pub(crate) fn slugify(value: &str) -> String {
     let mut slug = String::new();

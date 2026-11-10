@@ -237,10 +237,12 @@ cheapest first step is a sidecar: an OpenTelemetry Collector's `filelog` receive
 1. **`rig-playbook`** — built in [`integrations/rig`](../../integrations/rig). Seven `at-*` verbs
    are native tools: typed arguments, schema derived from the type, a `Reads` footprint, and the
    agent's own directory as the root. Every tool calls its verb's `collect` in process and publishes
-the typed answer, so there is no `PATH` or subprocess dependency; [`toolkit-core.md`](toolkit-core.md)
-   records that seam. `PlaybookPlugin` is the daily driver: a plain `rg`/`grep` shell call is
-   **redirected** in `Prepare` to the in-process search, and every other shell command runs through
-   the classifier, which permits reads and builds and refuses writes. `GatedPlugin` keeps the
+   the typed answer, so there is no `PATH` or subprocess dependency; [`toolkit-core.md`](toolkit-core.md)
+   records that seam. `PlaybookPlugin` is the daily driver: the plain `rg`/`grep`, `cat`, `sed -n`,
+   `head`, `git status`, `git log` and `git diff` forms are **redirected** in `Prepare` to the verb
+   that answers the same question, and every other shell command runs through the classifier, which
+   permits reads and builds and refuses writes. `SlimPlugin` takes the next step: the lightweight
+   reads are not registered at all, and the redirect is their only surface. `GatedPlugin` keeps the
    earlier read-refusal policy for the measurement above. The rule engine follows on the same seam.
 2. **An observation sink.** The procedure is written and verified
    ([`skills/rig-session-query`](../../skills/rig-session-query/SKILL.md)); it read the 2026-11-09
@@ -252,6 +254,97 @@ the typed answer, so there is no `PATH` or subprocess dependency; [`toolkit-core
 
 `tools/at-mcp` stays useful for the harnesses that are not rig (Zed's agent, Claude), but the
 plugin is the surface that gets the kernel's typing and gating. That is the direction to evaluate.
+
+## Driving it yourself
+
+Two ways, both the same agent and the same plugin.
+
+**The terminal.** From the checkout, with the home whose `settings.toml` names the plugin:
+
+```sh
+RIG_HOME=.tmp/rig-home-slim .tmp/rig-fork/bin/rig
+```
+
+The TUI is the thread: prompts, tool calls and results. The typed facts are in the effect log,
+`RIG_HOME/sessions/<id>/files/effects.jsonl`, not in the TUI, so "what did that call find" is a
+query over the log. Change the home for a different arm: `.tmp/rig-home-advertised`,
+`.tmp/rig-home-permissive`, `.tmp/rig-home-baseline`.
+
+**Zed, over ACP.** `rig_acp::AcpPlugin` is a front, off by default. Turn it on in the home the agent
+uses and build once:
+
+```sh
+RIG_HOME=.tmp/rig-home-slim .tmp/rig-fork/bin/rig plugin enable rig_acp::AcpPlugin
+RIG_HOME=.tmp/rig-home-slim .tmp/rig-fork/bin/rig plugin check --build
+```
+
+Then add the home as a custom agent in `~/.config/zed/settings.json` (merge it with an existing
+`agent_servers` map if there is one):
+
+```json
+{
+  "agent_servers": {
+    "rig-playbook": {
+      "type": "custom",
+      "command": "/Users/damo/code/defrag/agent-playbook/.tmp/rig-fork/bin/rig",
+      "args": ["acp"],
+      "env": {
+        "RIG_HOME": "/Users/damo/code/defrag/agent-playbook/.tmp/rig-home-slim"
+      }
+    }
+  }
+}
+```
+
+Zed starts `rig acp`, and an Agent Panel thread is a rig session, in the thread's working directory.
+The handshake is ACP v1: `initialize` answers `protocolVersion: 1` and `agentInfo: rig 0.46.0`
+(verified 2026-11-10). Each session runs in a process of its own.
+
+The model key is not in the Zed settings. Rig's `/login <provider>` saves it under
+`RIG_HOME/auth/keys/<vendor>.json`, readable by the owner alone; run it once in the terminal or as a
+slash command in the Zed thread. `DEEPSEEK_API_KEY` in the environment works too, when Zed is
+started with it.
+
+A custom frontend is only needed for a view neither front has: the typed facts and the policy's
+decisions as they happen. Both write `effects.jsonl`; the next step there is the DuckDB reader — the
+same log the eval exports — not a second agent loop.
+
+### Local models (measured 2026-11-10, wired 2026-11-11)
+
+Ollama 0.34 on `127.0.0.1:11434`, reached through `plugins/rig-local-models` — promoted out of
+the corpus and on by default. It probes `/api/tags` and `/api/show`, registers `local/<name>` in
+the catalog, carries the server's tool and vision capabilities into the entry, and serves each
+through Ollama's OpenAI-compatible `/v1`.
+
+| Model | Params | Read a fixture | Image |
+| --- | --- | --- | --- |
+| `local/qwen3-vl:4b` | 4.0B | three identical `read` calls, correct answer | "red" |
+| `local/qwen3-vl:8b` | 8.2B | one `read` call, correct answer | not run |
+| `local/qwen2.5-coder:7b` | 7.6B | a tool call written as text, not executed; one clean call under `[text_tools]` | not run |
+| `local/qwen3:0.6b` | 0.75B | a `read` call with a wrong absolute path, tool failed | not run |
+
+The plugin spawns a `Starting` entity while it probes (holding a headless run's first prompt) and
+sets `ModelsArriving`; `--model` waits up to 3 s for the catalog, and `[model] default` is not
+applied while models are still arriving. Both now work headlessly:
+
+```sh
+rig -p --model local/qwen3-vl:4b "Reply with exactly: READY"   # READY
+```
+
+An ACP client still sees `session/new` answer before the probe finishes, so it waits for the
+`config_option_update` and then sets `configId: "model"`.
+
+The vision gap is closed: `LocalModel::spec` sets `input.image` from Ollama's `capabilities`, and
+`a_model_that_reads_images_says_so_in_the_catalog` pins it. Before the fix `qwen3-vl:4b` answered
+"unknown" to a solid-red PNG; after it, "red". Four tests pass in the plugin's suite.
+
+### The slim arm with a local model (one run, 2026-11-11)
+
+`local/qwen3-vl:8b` and `local/qwen3-vl:4b` in `.tmp/rig-home-slim`, asked to find `VioletOrchid` in
+a scratch project, both called `at_peek_search` directly — not `shell rg`. Each effect log records
+`tool:at_peek_search` with typed `agent_playbook.search` facts: two matches in `src/lib.rs`, three
+files considered. That is the adoption signal the slim arm was built to test; two runs is still not
+a rate.
 
 ## The experiments, in order
 
@@ -266,6 +359,15 @@ Experiment 2 is settled: a redirect expresses "serve this read with the tool" at
 cost, and a refusal costs one model call. Experiment 3 is done. Experiment 4 has run: the runner
 and its first result are in [`rig-eval.md`](rig-eval.md). The result is negative on cost — the gate
 is bypassed by a `cd &&` prefix and by the ungated `read` tool — and names what to change next.
+
+The next treatment is the description, not the policy. `AdvertisedPlugin` is `PlaybookPlugin` with
+one change: each tool's description is the catalogue question, the typed call, and what the shell
+does not give, and a short map of all seven is in the system prompt. `SlimPlugin` is the other
+treatment: `at_peek_slice`, `at_peek_stat`, `at_recall_state` and `at_recall_log` are not registered,
+and the plain `cat`, `sed -n`, `head`, `git status`, `git log` and `git diff` forms are served by
+the same verbs in `Prepare`, so the model keeps its shell habit. `rig:advertised` and `rig:slim`
+each pair with `rig:permissive`, holding the policy and the redirect constant. Five scenarios is not
+enough to decide either; the long-thread corpus comes first.
 
 ## Reading map
 

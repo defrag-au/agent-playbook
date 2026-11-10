@@ -1,24 +1,37 @@
 # rig-playbook
 
-The agent-playbook, as a rig plugin. Two halves, both on the kernel's public API:
+The agent-playbook, as a rig plugin. Three parts, all on the kernel's public API:
 
 - **Seven `at-*` verbs as native tools.** Typed arguments, a schema derived from the argument type,
-  a `Reads` footprint, and the agent's own directory as the root. Descriptions come from the verbs'
-  catalogue, so the text the model reads and the grammar the parser enforces cannot drift. Every
-  tool calls its verb's `collect` in process and publishes the typed answer, so there is no `PATH`
-  or subprocess dependency.
-- **A shell policy, and a redirect.** A plain `rg`/`grep` call is answered in `Prepare` by
-  `at-peek search`; every other shell command runs through the classifier, which permits reads and
-  builds and refuses writes. `GatedPlugin` keeps the earlier read-refusal policy, because the
-  measurement that retired it is worth reproducing.
+  a `Reads` footprint, and the agent's own directory as the root. The catalogue supplies each
+  question and its notes, so the text the model reads and the grammar the parser enforces cannot
+  drift; the advertised arm adds the typed call and the advantage. Every tool calls its verb's
+  `collect` in process and publishes the typed answer, so there is no `PATH` or subprocess
+  dependency.
+- **A shell policy, and a redirect.** The redirect serves plain `rg`/`grep`, `cat`, `sed -n`,
+  `head`, `git status`, `git log` and `git diff` in process, and a `;`-separated compound of those
+  forms as one result. The model keeps its habit and gets the bounded answer. Every other shell
+  command runs through the classifier, which permits reads and builds and refuses writes.
+  `GatedPlugin` keeps the earlier read-refusal policy, because the measurement that retired it is
+  worth reproducing.
+- **A slim arm.** `SlimPlugin` leaves `at_peek_slice`, `at_peek_stat`, `at_recall_state` and
+  `at_recall_log` to the redirect and registers only `at_peek_search`, `at_recall_diff` and
+  `at_recall_pr`. It tests the proposition that a shell habit served by the toolkit beats a tool
+  the model has to be told about.
+- **An advertised arm.** `AdvertisedPlugin` is the same tools, policy and redirect as
+  `PlaybookPlugin`, with each tool's description shaped as question → typed call → what the shell
+  does not give, and a short map of all seven in the system prompt. The pair is the experiment:
+  same behaviour, different advertising.
 
-**Status 2026-11-10.** Compiles against `rig-harness` 0.46.0 and Bevy 0.20; `cargo test` passes 23
-tests, including two deterministic harness tests: one scripts a `shell rg` and asserts the redirect,
-the other scripts all seven read tools and asserts each published fact. A generated agent builds
-with it (`rig plugin check --build`, 26 plugins, no conflicting systems in a stage), from the local
-fork at `~/code/defrag/rig`. It has run headless on `deepseek/deepseek-flash` over this repository,
-and a live `pre-edit-state` run recorded `agent_playbook.state` (branch, HEAD, pending, changed
-paths) in `effects.jsonl` alongside the text the model saw.
+**Status 2026-11-10.** Compiles against `rig-harness` 0.46.0 and Bevy 0.20; `cargo test` passes 41
+tests, including four deterministic harness tests: one scripts a `shell rg` and asserts the
+redirect, one scripts the six plain shell reads and a `;`-compound and asserts each published fact,
+one scripts all seven read tools and asserts each published fact, and one reads the request an
+advertised agent builds and asserts the tool map and every advertised description. A generated
+agent builds with it (`rig plugin check --build`, 26 plugins, no conflicting systems in a stage),
+from the local fork at `~/code/defrag/rig`. It has run headless on `deepseek/deepseek-flash` over
+this repository, and a live `pre-edit-state` run recorded `agent_playbook.state` (branch, HEAD,
+pending, changed paths) in `effects.jsonl` alongside the text the model saw.
 
 - a search task: **one turn**, one `at_peek_search` call, the answer correct, and the facts
   (`total = 4`, `walked = 443`) present in `effects.jsonl`;
@@ -30,6 +43,25 @@ paths) in `effects.jsonl` alongside the text the model saw.
 
 What is still unmeasured is a prose-only baseline (no tools at all) on a task that needs the rules.
 Do not cite this as a turn-count win until that run exists.
+
+## The arms
+
+`PlaybookPlugin` is the daily driver. `SlimPlugin` leaves the lightweight reads to the redirect;
+`AdvertisedPlugin` adds the advertised descriptions and the tool map; `GatedPlugin` is the earlier
+read-refusal policy; `ToolsOnlyPlugin` is the no-policy baseline. All but the slim arm register the
+same seven tools.
+
+| Plugin | What it adds |
+| --- | --- |
+| `rig_playbook::PlaybookPlugin` | the tools, the shell policy, the redirect |
+| `rig_playbook::SlimPlugin` | `search`, `diff` and `pr`; the lightweight reads are redirected |
+| `rig_playbook::AdvertisedPlugin` | the same as `PlaybookPlugin`, plus the advertised descriptions and the tool map |
+| `rig_playbook::GatedPlugin` | the tools, the redirect, and the earlier read-refusal policy |
+| `rig_playbook::ToolsOnlyPlugin` | the tools, and no policy |
+
+`rig:slim`, `rig:advertised` and `rig:permissive` in [`integrations/rig-eval`](../rig-eval) name
+the first three homes. `rig:permissive` against `rig:advertised` isolates the advertising;
+`rig:permissive` against `rig:slim` isolates the redirect and the smaller tool set.
 
 ## Load it
 
@@ -113,13 +145,19 @@ answered it. The same code serves both modes, so a fact and a rendered line cann
 
 ## What happens to a shell read
 
-A plain `rg`/`grep` is **redirected, not refused**, in both `PlaybookPlugin` and `GatedPlugin`:
-`Prepare` replaces the call's handler with `at-peek search`, so the model gets the bounded answer as
-the shell's result and spends no call on a refusal. The redirect is deliberately conservative —
-`rg [--line-number] PATTERN [PATH…]` and `grep -r[n] PATTERN [PATH…]`, with no pipeline,
-redirection or answer-changing flag.
+A plain **`rg`/`grep`** is a search. A plain **`cat`**, **`sed -n 'A,Bp'`** or **`head`** is a
+slice. A plain **`git status`**, **`git log`** or **`git diff`** is the matching history verb. Each
+is **redirected, not refused**: `Prepare` replaces the call's handler, so the model gets the bounded
+answer as the shell's result and spends no call on a refusal. A **`;`-separated compound** of those
+forms is served as one result, and its facts are published together under
+`agent_playbook.redirects`.
 
-Under `GatedPlugin`, everything else that is really a read is refused, naming the tool:
+The redirect is deliberately conservative. Anything with a pipeline, redirection, conditional
+(`&&`/`||`), substitution, unknown flag or a segment it cannot serve is left as written, so the
+policy or the Gate sees it. That is why an exploratory `git status; echo ---; ls` still runs as a
+shell command: the `echo` and `ls` segments have no verb.
+
+Under `GatedPlugin`, a read the redirect does not serve is refused, naming the tool:
 
 | Shell read | Replaced with |
 | --- | --- |
@@ -137,11 +175,9 @@ working tree. `sed -i` is a write and is left alone too. Anything not in the tab
 
 ## The baseline
 
-`rig_playbook::ToolsOnlyPlugin` registers the same seven tools and adds no policy. `GatedPlugin`
-is the earlier read-refusal policy. Load one instead of `PlaybookPlugin` in a second `RIG_HOME`, run
-the same prompt, and the effect logs give the cost of enforcement directly. They exist for that
-comparison, not for daily use; the one-prompt result is in [`docs/design/rig.md`](../../docs/design/rig.md),
-and the scenario runner and its first result in [`integrations/rig-eval`](../rig-eval) and
+`ToolsOnlyPlugin` and `GatedPlugin` exist for the comparison, not for daily use: the one-prompt
+result is in [`docs/design/rig.md`](../../docs/design/rig.md), and the scenario runner and its first
+result in [`integrations/rig-eval`](../rig-eval) and
 [`docs/design/rig-eval.md`](../../docs/design/rig-eval.md).
 
 ## Build and test
@@ -157,6 +193,8 @@ direnv exec . cargo test
 direnv exec . cargo clippy --all-targets -- -D warnings
 ```
 
-The classifier and the argv mapping are pure and tested without a Bevy app. `tests/redirect.rs`
-builds the app with one scripted model turn and asserts what the harness did with it: the
-conversation keeps the model's call, the result is the search, and the log names the substitution.
+The classifier and the argv mapping are pure and tested without a Bevy app. Four harness tests
+build the app with a scripted model and assert what it saw: `tests/redirect.rs` checks the search
+substitution, `tests/redirect_reads.rs` checks the six plain shell reads, `tests/tools.rs` checks
+every published fact, and `tests/advertised.rs` checks the tool map and the advertised
+descriptions.

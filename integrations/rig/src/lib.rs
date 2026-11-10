@@ -13,17 +13,21 @@
 //!   in process. The model sees the bounded answer as the shell's result, with no refusal to
 //!   read and no second call.
 //!
-//! [`PlaybookPlugin`] is the daily driver. [`GatedPlugin`] keeps the earlier policy — a read refused
-//! unless it is a redirection or a tool — and exists for the measurement that showed the gate cost
-//! more than it bought.
+//! [`PlaybookPlugin`] is the daily driver. [`AdvertisedPlugin`] adds the advertised descriptions and
+//! a prompt-level tool map, for measuring whether advertising changes which tool the model reaches
+//! for. [`SlimPlugin`] leaves the lightweight reads to the redirect, to measure whether a shell habit
+//! served by the toolkit beats a tool the model has to be told about. [`GatedPlugin`] keeps the
+//! earlier policy — a read refused unless it is a redirection or a tool — and exists for the
+//! measurement that showed the gate cost more than it bought.
 //!
 //! The playbook's rule stays in `AGENTS.md` as the human-readable copy. This is the same rule the
 //! harness applies.
 
+mod advertise;
 mod redirect;
 mod tools;
 
-pub use redirect::Redirection;
+pub use redirect::{PublishedBatch, Redirection, ServedFact};
 pub use tools::{
     PublishedDiff, PublishedLog, PublishedPr, PublishedSearch, PublishedSlice, PublishedStat,
     PublishedState,
@@ -50,6 +54,44 @@ pub struct PlaybookPlugin;
 impl Plugin for PlaybookPlugin {
     fn build(&self, app: &mut App) {
         tools::add(app);
+        redirect::add(app);
+        app.add_systems(AgentPass, apply_shell_policy.in_set(Stage::Gate));
+    }
+}
+
+/// [`PlaybookPlugin`] with the toolkit advertised: each tool's description names its typed call and
+/// what the shell does not give, and a short map of all seven is added to the system prompt.
+///
+/// The tools, the policy and the redirect are identical to [`PlaybookPlugin`], so a comparison
+/// between the two measures the advertising and nothing else.
+#[derive(Default)]
+pub struct AdvertisedPlugin;
+
+impl Plugin for AdvertisedPlugin {
+    fn build(&self, app: &mut App) {
+        tools::add_advertised(app);
+        redirect::add(app);
+        app.add_systems(AgentPass, apply_shell_policy.in_set(Stage::Gate));
+    }
+
+    fn finish(&self, app: &mut App) {
+        advertise::add_prompt(app);
+    }
+}
+
+/// [`PlaybookPlugin`] with the lightweight reads left to the redirect.
+///
+/// `at_peek_slice`, `at_peek_stat`, `at_recall_state` and `at_recall_log` are not registered. The
+/// plain `cat`, `sed -n`, `head`, `git status`, `git log` and `git diff` forms are served in process
+/// by the same verbs, so the model keeps its shell habit and still gets the bounded answer. Only
+/// `at_peek_search`, `at_recall_diff` and `at_recall_pr` remain as explicit tools, because their
+/// answers are not a rename of a shell command.
+#[derive(Default)]
+pub struct SlimPlugin;
+
+impl Plugin for SlimPlugin {
+    fn build(&self, app: &mut App) {
+        tools::add_with(app, tools::Toolset::slim());
         redirect::add(app);
         app.add_systems(AgentPass, apply_shell_policy.in_set(Stage::Gate));
     }
@@ -92,13 +134,7 @@ pub struct TerseStatPlugin;
 
 impl Plugin for TerseStatPlugin {
     fn build(&self, app: &mut App) {
-        tools::add_with(
-            app,
-            tools::Toolset {
-                stat: Some(tools::StatStyle::Content),
-                ..tools::Toolset::default()
-            },
-        );
+        tools::add_with(app, tools::Toolset::terse());
         app.add_systems(AgentPass, apply_shell_policy.in_set(Stage::Gate));
     }
 }
@@ -133,6 +169,13 @@ fn apply_shell_policy(mut calls: Query<(&ToolRequest, &mut Decision), (ReadyToSt
         let command = request.call.function.arguments["command"]
             .as_str()
             .unwrap_or_default();
+
+        // A call the redirect serves is answered in Prepare by a read-only verb; the policy has
+        // nothing to decide about it.
+        if redirect::is_redirect(command) {
+            continue;
+        }
+
         let analysis = classify(command);
 
         if permits(&analysis) {
@@ -202,15 +245,15 @@ fn refuse_shell_reads(mut calls: Query<(&ToolRequest, &mut Decision), (ReadyToSt
 /// recover the status it thinks it lost. The replacement answers the same question and states
 /// the total, so there is nothing to recover.
 fn refusal(command: &str) -> Option<String> {
-    // A plain search is answered in Prepare with the toolkit, so there is nothing to refuse.
-    if redirect::search_from_shell(command).is_some() {
+    // A shell read the redirect serves is answered in Prepare, so there is nothing to refuse.
+    if redirect::is_redirect(command) {
         return None;
     }
     let tool = replacement(command)?;
     Some(format!(
-        "`{}` is a read the toolkit replaces · call `{tool}`. It answers the same question with the \
-         matches and their true total, so a retry through `shell` gains nothing; appending to the \
-         command does not change what it is judged on.",
+        "`{}` is a read the toolkit replaces · call `{tool}`. It answers the same question with a \
+         stated bound, so a retry through `shell` gains nothing; appending to the command does not \
+         change what it is judged on.",
         program(command).unwrap_or("that command"),
     ))
 }
@@ -318,7 +361,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reads_are_refused_with_the_tool_that_replaces_them() {
+    fn reads_map_to_the_tool_that_replaces_them() {
         for (command, tool) in [
             ("rg 'render_claim'", "at_peek_search"),
             ("grep -rn TODO src", "at_peek_search"),
@@ -358,13 +401,13 @@ mod tests {
 
     #[test]
     fn the_refusal_names_the_program_and_the_tool() {
-        // A command the redirect does not serve, so it still reaches the Gate.
-        let message = refusal("cat src/lib.rs").expect("a read");
+        // `wc` has no redirect, so it still reaches the Gate.
+        let message = refusal("wc -l src/lib.rs").expect("a read");
         assert_eq!(
             message,
-            "`cat` is a read the toolkit replaces · call `at_peek_slice`. It answers the same \
-             question with the matches and their true total, so a retry through `shell` gains \
-             nothing; appending to the command does not change what it is judged on."
+            "`wc` is a read the toolkit replaces · call `at_peek_stat`. It answers the same \
+             question with a stated bound, so a retry through `shell` gains nothing; appending to \
+             the command does not change what it is judged on."
         );
     }
 
@@ -372,8 +415,19 @@ mod tests {
     fn a_redirected_read_is_not_refused() {
         // The shape is answered in Prepare, so the Gate must leave it alone; a refusal here would
         // be a second answer to a call that already has one.
-        assert_eq!(refusal("rg -n 'render_claim' ."), None);
-        assert_eq!(refusal("grep -rn foo src"), None);
+        for command in [
+            "rg -n 'render_claim' .",
+            "grep -rn foo src",
+            "cat src/lib.rs",
+            "sed -n '40,60p' src/lib.rs",
+            "head -20 Cargo.toml",
+            "git status --short",
+            "git log --oneline -5",
+            "git diff --stat",
+        ] {
+            assert_eq!(refusal(command), None, "`{command}`");
+        }
+        assert!(refusal("git diff --cached").is_some());
     }
 
     #[test]

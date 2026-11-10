@@ -9,6 +9,8 @@ can actually report.
 
 | Arm | What runs | How it is driven |
 | --- | --- | --- |
+| `rig:slim` | `rig` + `SlimPlugin`: `search`, `diff` and `pr`; `cat`, `sed -n`, `head`, `git status`, `git log` and `git diff` are redirected | `rig -p --json` |
+| `rig:advertised` | `rig` + `AdvertisedPlugin`: the tools, the redirect and the shell policy, plus advertised descriptions and the tool map | `rig -p --json` |
 | `rig:permissive` | `rig` + `PlaybookPlugin`: the `at-*` tools, the redirect, the shell policy | `rig -p --json` |
 | `rig:gated` | `rig` + `GatedPlugin`: the same tools, the redirect, the read-refusal Gate | `rig -p --json` |
 | `rig:baseline` | `rig` + `ToolsOnlyPlugin`: the same tools, no shell policy | `rig -p --json` |
@@ -18,7 +20,10 @@ can actually report.
 | `zed` | Zed's built-in agent | interactive; audited from `threads.db` |
 
 `rig:vanilla` is the control that separates "rig" from "our plugin". Without it, a win could be the
-harness or the policy layer, and we could not say which.
+harness or the policy layer, and we could not say which. `rig:permissive` and `rig:advertised` are a
+paired treatment: the same tools, policy and redirect, with only what the model is told about them
+changed. `rig:permissive` and `rig:slim` are the other pair: the same policy and redirect, with the
+lightweight reads removed from the tool surface and served from the shell call instead.
 
 ## Fairness controls
 

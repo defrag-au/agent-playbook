@@ -25,22 +25,44 @@ use rig_harness::prelude::*;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
+use crate::advertise;
 use crate::fail;
+
+/// The tools a plugin may register.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ToolKind {
+    Search,
+    Slice,
+    Stat,
+    State,
+    Log,
+    Diff,
+    Pr,
+}
+
+const ALL: &[ToolKind] = &[
+    ToolKind::Search,
+    ToolKind::Slice,
+    ToolKind::Stat,
+    ToolKind::State,
+    ToolKind::Log,
+    ToolKind::Diff,
+    ToolKind::Pr,
+];
 
 /// Which read tools a plugin registers.
 #[derive(Debug, Clone, Copy)]
 pub struct Toolset {
-    /// How `at_peek_stat` answers, or `None` to leave it out.
-    pub stat: Option<StatStyle>,
-    /// Whether `at_recall_log` is registered.
-    pub log: bool,
+    tools: &'static [ToolKind],
+    /// How `at_peek_stat` answers, when it is registered.
+    stat: StatStyle,
 }
 
 impl Default for Toolset {
     fn default() -> Self {
         Self {
-            stat: Some(StatStyle::Report),
-            log: true,
+            tools: ALL,
+            stat: StatStyle::Report,
         }
     }
 }
@@ -49,15 +71,48 @@ impl Toolset {
     /// The full set with the two least-used read tools left out.
     pub const fn lean() -> Self {
         Self {
-            stat: None,
-            log: false,
+            tools: &[
+                ToolKind::Search,
+                ToolKind::Slice,
+                ToolKind::State,
+                ToolKind::Diff,
+                ToolKind::Pr,
+            ],
+            stat: StatStyle::Report,
         }
+    }
+
+    /// The lightweight reads left out. Their plain shell forms are served by the redirect;
+    /// `at_peek_search`, `at_recall_diff` and `at_recall_pr` remain.
+    pub const fn slim() -> Self {
+        Self {
+            tools: &[ToolKind::Search, ToolKind::Diff, ToolKind::Pr],
+            stat: StatStyle::Report,
+        }
+    }
+
+    /// The full set, with `at_peek_stat` answering as rows only.
+    pub const fn terse() -> Self {
+        Self {
+            tools: ALL,
+            stat: StatStyle::Content,
+        }
+    }
+
+    fn has(&self, tool: ToolKind) -> bool {
+        self.tools.contains(&tool)
     }
 }
 
-/// Register every tool, with `at_peek_stat` answering as the CLI does.
+/// Register every tool, with `at_peek_stat` answering as the CLI does and the catalogue's own
+/// descriptions.
 pub fn add(app: &mut App) {
     add_with(app, Toolset::default());
+}
+
+/// Register every tool with the advertised descriptions and add the prompt-level tool map.
+pub fn add_advertised(app: &mut App) {
+    add_with_description(app, Toolset::default(), Description::Advertised);
 }
 
 /// Register the read tools a [`Toolset`] names.
@@ -65,23 +120,74 @@ pub fn add(app: &mut App) {
 /// The arms that vary the set register a different [`Toolset`]; every tool either arm registers is
 /// identical.
 pub fn add_with(app: &mut App, tools: Toolset) {
-    app.add_tool_per_call(Search::default(), options());
-    app.add_tool_per_call(Slice::default(), options());
-    if let Some(style) = tools.stat {
+    add_with_description(app, tools, Description::Catalogue);
+}
+
+fn add_with_description(app: &mut App, tools: Toolset, description: Description) {
+    if tools.has(ToolKind::Search) {
+        app.add_tool_per_call(
+            Search {
+                description,
+                ..Search::default()
+            },
+            options(),
+        );
+    }
+    if tools.has(ToolKind::Slice) {
+        app.add_tool_per_call(
+            Slice {
+                description,
+                ..Slice::default()
+            },
+            options(),
+        );
+    }
+    if tools.has(ToolKind::Stat) {
         app.add_tool_per_call(
             Stat {
-                style,
+                style: tools.stat,
+                description,
                 ..Stat::default()
             },
             options(),
         );
     }
-    app.add_tool_per_call(State::default(), options());
-    if tools.log {
-        app.add_tool_per_call(Log::default(), options());
+    if tools.has(ToolKind::State) {
+        app.add_tool_per_call(
+            State {
+                description,
+                ..State::default()
+            },
+            options(),
+        );
     }
-    app.add_tool_per_call(Diff::default(), options());
-    app.add_tool_per_call(Pr::default(), options());
+    if tools.has(ToolKind::Log) {
+        app.add_tool_per_call(
+            Log {
+                description,
+                ..Log::default()
+            },
+            options(),
+        );
+    }
+    if tools.has(ToolKind::Diff) {
+        app.add_tool_per_call(
+            Diff {
+                description,
+                ..Diff::default()
+            },
+            options(),
+        );
+    }
+    if tools.has(ToolKind::Pr) {
+        app.add_tool_per_call(
+            Pr {
+                description,
+                ..Pr::default()
+            },
+            options(),
+        );
+    }
 }
 
 /// A tool that only reads, whatever it is aimed at. Two reads of different paths can run side by
@@ -102,8 +208,27 @@ fn describe(verb: Option<&'static at_peek::catalogue::Verb>) -> String {
     }
 }
 
+/// How a tool describes itself to the model.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Description {
+    /// The verb's catalogue entry, plus the CLI spelling.
+    #[default]
+    Catalogue,
+    /// The question, the typed call, and what the shell does not give.
+    Advertised,
+}
+
+impl Description {
+    fn render(self, tool: &str, verb: Option<&'static at_peek::catalogue::Verb>) -> String {
+        match self {
+            Self::Catalogue => describe(verb),
+            Self::Advertised => advertise::describe(tool, verb).unwrap_or_else(|| describe(verb)),
+        }
+    }
+}
+
 /// Publish a typed answer with the call's result, under the key its `ContextValue` names.
-fn publish<T: rig_harness::rig_core::tool::ContextValue>(
+pub(crate) fn publish<T: rig_harness::rig_core::tool::ContextValue>(
     context: &mut ToolContext,
     value: T,
 ) -> Result<(), ToolExecutionError> {
@@ -221,6 +346,7 @@ impl rig_harness::rig_core::tool::ContextValue for PublishedPr {
 #[derive(Clone, Default)]
 pub struct Search {
     base: Option<PathBuf>,
+    description: Description,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -264,6 +390,7 @@ impl PerCallTool for Search {
     fn at(&self, at: CallPlace) -> Self {
         Self {
             base: Some(at.base),
+            description: self.description,
         }
     }
 }
@@ -275,7 +402,8 @@ impl Tool for Search {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        describe(at_peek::catalogue::find("search"))
+        self.description
+            .render(Self::NAME, at_peek::catalogue::find("search"))
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -298,6 +426,7 @@ impl Tool for Search {
 #[derive(Clone, Default)]
 pub struct Slice {
     base: Option<PathBuf>,
+    description: Description,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -324,6 +453,7 @@ impl PerCallTool for Slice {
     fn at(&self, at: CallPlace) -> Self {
         Self {
             base: Some(at.base),
+            description: self.description,
         }
     }
 }
@@ -335,7 +465,8 @@ impl Tool for Slice {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        describe(at_peek::catalogue::find("slice"))
+        self.description
+            .render(Self::NAME, at_peek::catalogue::find("slice"))
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -369,6 +500,7 @@ pub enum StatStyle {
 pub struct Stat {
     base: Option<PathBuf>,
     style: StatStyle,
+    description: Description,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -395,6 +527,7 @@ impl PerCallTool for Stat {
         Self {
             base: Some(at.base),
             style: self.style,
+            description: self.description,
         }
     }
 }
@@ -406,7 +539,8 @@ impl Tool for Stat {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        describe(at_peek::catalogue::find("stat"))
+        self.description
+            .render(Self::NAME, at_peek::catalogue::find("stat"))
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -434,6 +568,7 @@ impl Tool for Stat {
 #[derive(Clone, Default)]
 pub struct State {
     base: Option<PathBuf>,
+    description: Description,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -467,6 +602,7 @@ impl PerCallTool for State {
     fn at(&self, at: CallPlace) -> Self {
         Self {
             base: Some(at.base),
+            description: self.description,
         }
     }
 }
@@ -478,7 +614,8 @@ impl Tool for State {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        describe(at_recall::catalogue::find("state"))
+        self.description
+            .render(Self::NAME, at_recall::catalogue::find("state"))
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -501,6 +638,7 @@ impl Tool for State {
 #[derive(Clone, Default)]
 pub struct Log {
     base: Option<PathBuf>,
+    description: Description,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -536,6 +674,7 @@ impl PerCallTool for Log {
     fn at(&self, at: CallPlace) -> Self {
         Self {
             base: Some(at.base),
+            description: self.description,
         }
     }
 }
@@ -547,7 +686,8 @@ impl Tool for Log {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        describe(at_recall::catalogue::find("log"))
+        self.description
+            .render(Self::NAME, at_recall::catalogue::find("log"))
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -570,6 +710,7 @@ impl Tool for Log {
 #[derive(Clone, Default)]
 pub struct Diff {
     base: Option<PathBuf>,
+    description: Description,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -617,6 +758,7 @@ impl PerCallTool for Diff {
     fn at(&self, at: CallPlace) -> Self {
         Self {
             base: Some(at.base),
+            description: self.description,
         }
     }
 }
@@ -628,7 +770,8 @@ impl Tool for Diff {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        describe(at_recall::catalogue::find("diff"))
+        self.description
+            .render(Self::NAME, at_recall::catalogue::find("diff"))
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -651,6 +794,7 @@ impl Tool for Diff {
 #[derive(Clone, Default)]
 pub struct Pr {
     base: Option<PathBuf>,
+    description: Description,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -689,6 +833,7 @@ impl PerCallTool for Pr {
     fn at(&self, at: CallPlace) -> Self {
         Self {
             base: Some(at.base),
+            description: self.description,
         }
     }
 }
@@ -700,7 +845,8 @@ impl Tool for Pr {
     type Error = ToolExecutionError;
 
     fn description(&self) -> String {
-        describe(at_recall::catalogue::find("pr"))
+        self.description
+            .render(Self::NAME, at_recall::catalogue::find("pr"))
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -723,6 +869,22 @@ impl Tool for Pr {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_slim_set_leaves_the_lightweight_reads_out() {
+        let slim = Toolset::slim();
+        for tool in [ToolKind::Search, ToolKind::Diff, ToolKind::Pr] {
+            assert!(slim.has(tool), "{tool:?} should be registered");
+        }
+        for tool in [
+            ToolKind::Slice,
+            ToolKind::Stat,
+            ToolKind::State,
+            ToolKind::Log,
+        ] {
+            assert!(!slim.has(tool), "{tool:?} should be left to the redirect");
+        }
+    }
 
     #[test]
     fn every_tool_names_a_catalogued_verb() {

@@ -32,7 +32,7 @@ struct Cli {
     #[arg(long = "scenario", value_name = "NAME")]
     only: Vec<String>,
 
-    /// A target: rig:gated, rig:permissive, rig:terse, rig:lean, rig:baseline, rig:vanilla, opencode, pi; repeatable
+    /// A target: rig:advertised, rig:slim, rig:gated, rig:permissive, rig:terse, rig:lean, rig:baseline, rig:vanilla, opencode, pi; repeatable
     #[arg(long = "target", value_name = "NAME")]
     targets: Vec<String>,
 
@@ -276,6 +276,8 @@ fn rig_target(root: &Path, label: &str, path: &str) -> Target {
 
 fn parse_target(root: &Path, spec: &str) -> Result<Target> {
     match spec {
+        "rig:advertised" => Ok(rig_target(root, "advertised", ".tmp/rig-home-advertised")),
+        "rig:slim" => Ok(rig_target(root, "slim", ".tmp/rig-home-slim")),
         "rig:gated" => Ok(rig_target(root, "gated", ".tmp/rig-home")),
         "rig:permissive" => Ok(rig_target(root, "permissive", ".tmp/rig-home-permissive")),
         "rig:terse" => Ok(rig_target(root, "terse", ".tmp/rig-home-terse")),
@@ -285,7 +287,7 @@ fn parse_target(root: &Path, spec: &str) -> Result<Target> {
         "opencode" => Ok(Target::Opencode),
         "pi" => Ok(Target::Pi),
         other => bail!(
-            "unknown target `{other}`; known: rig:gated, rig:permissive, rig:terse, rig:lean, rig:baseline, rig:vanilla, opencode, pi"
+            "unknown target `{other}`; known: rig:advertised, rig:slim, rig:gated, rig:permissive, rig:terse, rig:lean, rig:baseline, rig:vanilla, opencode, pi"
         ),
     }
 }
