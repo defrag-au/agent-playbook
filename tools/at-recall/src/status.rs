@@ -13,6 +13,8 @@ use at_core::contract::Fail;
 use crate::git::{with_paths, Git, Noun, GIT};
 
 /// One changed path.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Entry {
     /// The two-letter code git reported.
     pub code: String,
@@ -178,6 +180,11 @@ impl Status {
             )));
         }
         Ok(status)
+    }
+
+    /// The entries in git's order, for a verb that keeps them as facts.
+    pub fn entries(&self) -> &[Entry] {
+        &self.entries
     }
 
     pub fn oid(&self) -> Option<&String> {

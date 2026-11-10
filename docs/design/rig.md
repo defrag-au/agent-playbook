@@ -126,9 +126,10 @@ Not verified, and stated as such:
 
 2026-11-09, `deepseek/deepseek-flash`, the same prompt against the same repository and the same
 tool set. The only difference: `rig_playbook::ToolsOnlyPlugin` registers the tools and no Gate;
-`PlaybookPlugin` adds the Gate. The prompt was adversarial on purpose — *"Use the shell tool to run
-exactly this command and report what it prints: `rg -n conservative-package-changes .`"* — because
-the question is what happens when the model would otherwise bypass the toolkit.
+`rig_playbook::GatedPlugin` adds the Gate. The prompt was adversarial on purpose — *"Use the shell
+tool to run exactly this command and report what it prints: `rg -n conservative-package-changes .`"*
+— because the question is what happens when the model would otherwise bypass the toolkit. (The gate
+is now `GatedPlugin`; `PlaybookPlugin` is the daily driver, with the shell policy below.)
 
 | | Baseline, no gate | Gated, refused | Gated, redirected |
 | --- | --- | --- | --- |
@@ -235,10 +236,12 @@ cheapest first step is a sidecar: an OpenTelemetry Collector's `filelog` receive
 
 1. **`rig-playbook`** — built in [`integrations/rig`](../../integrations/rig). Seven `at-*` verbs
    are native tools: typed arguments, schema derived from the type, a `Reads` footprint, and the
-   agent's own directory as the root. A plain `rg`/`grep` shell call is **redirected** in `Prepare`
-   to the in-process search; any other read is refused with the tool named. The tools and the plugin
-   stop crossing a process boundary first — that seam is [`toolkit-core.md`](toolkit-core.md) — and
-   the rule engine follows on it.
+   agent's own directory as the root. Every tool calls its verb's `collect` in process and publishes
+the typed answer, so there is no `PATH` or subprocess dependency; [`toolkit-core.md`](toolkit-core.md)
+   records that seam. `PlaybookPlugin` is the daily driver: a plain `rg`/`grep` shell call is
+   **redirected** in `Prepare` to the in-process search, and every other shell command runs through
+   the classifier, which permits reads and builds and refuses writes. `GatedPlugin` keeps the
+   earlier read-refusal policy for the measurement above. The rule engine follows on the same seam.
 2. **An observation sink.** The procedure is written and verified
    ([`skills/rig-session-query`](../../skills/rig-session-query/SKILL.md)); it read the 2026-11-09
    sessions, including the delta records the first draft missed. DuckDB first; HawDB when the

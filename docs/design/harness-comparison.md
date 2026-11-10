@@ -9,8 +9,9 @@ can actually report.
 
 | Arm | What runs | How it is driven |
 | --- | --- | --- |
-| `rig:gated` | `rig` + `PlaybookPlugin`: the `at-*` tools, the redirect, the Gate | `rig -p --json` |
-| `rig:baseline` | `rig` + `ToolsOnlyPlugin`: the same tools, no Gate | `rig -p --json` |
+| `rig:permissive` | `rig` + `PlaybookPlugin`: the `at-*` tools, the redirect, the shell policy | `rig -p --json` |
+| `rig:gated` | `rig` + `GatedPlugin`: the same tools, the redirect, the read-refusal Gate | `rig -p --json` |
+| `rig:baseline` | `rig` + `ToolsOnlyPlugin`: the same tools, no shell policy | `rig -p --json` |
 | `rig:vanilla` | `rig` with no extra plugin | `rig -p --json` |
 | `opencode` | opencode 1.19.5 | `opencode run --format json --auto` |
 | `pi` | Pi coding agent 1.5.0 | `pi --mode json` |
@@ -33,9 +34,10 @@ harness or the policy layer, and we could not say which.
 - **Approval policy is recorded, not equalised.** opencode runs `--auto`; Pi has no permission
   system; Zed is approved interactively; rig's Gate is part of the arm. Those are the harnesses.
 - **One corpus.** The five scenarios in `integrations/rig-eval/scenarios`.
-- **One worktree state.** The arms run sequentially in the same checkout. `at-recall state` is
-  recorded before and after each arm; a harness that writes changes the next arm and its run is
-  flagged rather than compared.
+- **One snapshot state per run.** Each run executes in a fresh snapshot of the worktree: a fresh
+  git history without the corpus, one deterministic uncommitted file, and symlinked warm build
+  directories. Arms cannot affect one another, and `--jobs` runs snapshots in parallel. Wall time
+  is contended and is not compared across arms.
 - **Same instructions.** Every arm reads `AGENTS.md` — opencode and Pi do it by default, and Pi is
   not given `-nc`. The comparison is therefore harness plus enforcement, not knowledge of the
   rules. If the goal later becomes "no rules at all", that is a second run with the context file
@@ -60,10 +62,11 @@ runner does not ask one to.
 
 Sandboxing is therefore a deployment concern that sits outside the harness, and outside this
 comparison. The seatbelt profile in `sandbox.rs` is not a safety sandbox: it denies reads of the
-corpus, the output directory and `.tmp/rig-eval`, so an arm cannot read the gold it is scored
-against. It must be identical across arms, and delegating it to each harness is impossible for Pi
-and opencode. Equal ambient authority is the only fair baseline: a sandbox enabled on the rig arm
-alone would measure refused commands, not a better harness.
+real checkout's `.git`, the corpus, the output directory and `.tmp/rig-eval`, and each run
+executes in a snapshot whose reachable history has the corpus rewritten out. That keeps the gold out
+of every arm's reach. It must be identical across arms, and delegating it to each harness is impossible for
+Pi and opencode. Equal ambient authority is the only fair baseline: a sandbox enabled on the rig
+arm alone would measure refused commands, not a better harness.
 
 An unattended harness would sandbox at launch (container, VM or seatbelt), or inside rig with a
 plugin that sets `Processes`. The Gate is policy above either. That work starts after the
@@ -111,6 +114,7 @@ harness's native headless mode and treats Zed as a recorded manual run.
 about rig; the driver is the only harness-specific part.
 
 - `--target rig:gated` (repeatable), `opencode`, `pi`, `zed`
+- `--jobs N` runs N snapshots concurrently
 - each driver produces the same `RunResult`; `score` and `report` do not know which harness
   produced it
 - `--zed-thread <scenario>=<id|title>` binds a manual thread to a scenario
@@ -129,7 +133,8 @@ The drivers:
 ## What the first comparison will and will not say
 
 It will say, per scenario and per arm: checks passed, tool calls, output bytes, model calls and
-wall time. It will not say "harness X is better" from five scenarios on one model. The value is
+wall time. Wall time is reported, but a run with `--jobs > 1` is contended and is not compared
+across arms. It will not say "harness X is better" from five scenarios on one model. The value is
 the shape of the difference: whether the playbook plugin changes the call count or the output
 bytes, whether opencode and Pi reach the same answer with fewer calls, and where Zed's interactive
 agent lands.
@@ -137,6 +142,60 @@ agent lands.
 The result is also allowed to be that the harnesses are within noise of each other. Five scenarios
 is a probe, not a benchmark; a difference that does not survive the long-thread corpus is not a
 result.
+
+## The first result
+
+2026-11-09, `deepseek/deepseek-flash`, five scenarios × five targets × two repeats, four workers,
+50 runs. Every run was clean: no contamination, no inspected-corpus tag, no timeout, no unparsed
+stream line. The snapshot history held no corpus, and `draft-pr` still found `3b39d5c` and
+`c206304`.
+
+| Target | Median score | Median tool calls | Median output | Median model calls |
+| --- | --- | --- | --- | --- |
+| opencode | 1.00 | 8 | 34.5 KB | 4 |
+| pi | 0.80 | 11 | 28.1 KB | 7 |
+| rig:baseline | 1.00 | 10 | 24.5 KB | 8 |
+| rig:gated | 1.00 | 11 | 24.9 KB | 8 |
+| rig:vanilla | 1.00 | 14 | 45.7 KB | 10 |
+
+The overall medians are not a ranking: the two easy scenarios are 1.00 for every arm. The hard
+ones are where the differences are, and they are noisy:
+
+| Scenario | opencode | pi | rig:baseline | rig:gated | rig:vanilla |
+| --- | --- | --- | --- | --- | --- |
+| `devshell-tests` | 0.88 | 0.88 | 1.00 | 0.88 | 1.00 |
+| `pre-edit-state` | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| `draft-pr` | 1.00 | 0.90 | 1.00 | 1.00 | 1.00 |
+| `recover-investigation` | 0.88 | 0.62 | 0.62 | 0.88 | 1.00 |
+| `trace-redirect` | 0.50 | 0.60 | 0.70 | 0.40 | 0.80 |
+
+The important result is the instability. The previous run — before the snapshot linked the
+sibling fork — had `rig:baseline` at 1.00 on `recover-investigation` and 0.80 on `trace-redirect`,
+and `rig:vanilla` at 1.00 and 0.80. This run has baseline 0.62 and 0.70, and vanilla 1.00 and
+0.80. Same five scenarios, same model, two repeats each; the hard-scenario ranking moved. Two
+repeats is not a sample.
+
+What survives:
+
+- **The easy scenarios cannot separate the arms.** They are correctness smoke tests, and their
+  medians carry the overall numbers.
+- **The `at-*` tools are not a stable correctness win.** `rig:baseline` used fewer calls than
+  vanilla on `draft-pr` (5 against 21) and `recover-investigation` (15 against 20), but scored
+  0.62 against 1.00 on recover; the extra calls bought citations. On `trace-redirect` both used 12
+  calls, and baseline scored 0.70 against 0.80.
+- **The Gate is mixed.** It beat baseline on recover (0.88 against 0.62) and lost on trace (0.40
+  against 0.70); it spent 13 calls on `draft-pr` against 5. It is neither a consistent saving nor
+  a consistent correctness win.
+- **opencode is the cheapest; it and the gated arm are weakest on trace** (0.50 and 0.40). Pi
+  matches opencode on devshell and is close on draft-pr (0.90 against 1.00), but 0.62 on recover.
+- **Wall time is contended** under four workers and is not compared.
+
+The fork path was a snapshot bug: `integrations/rig` resolves its dev-dependencies at `../../../rig`,
+and the first run without the sibling link spent 22 tool calls on `devshell-tests` where the fixed
+run spends 9. The fixed run is the data; the earlier run is kept as a lesson.
+
+The clean per-run data is in `.tmp/rig-eval/full-3`: `traces.json`, `tools.json`, `checks.json`,
+and `observable.md`. The next corpus has to come from the long threads; this one shows why.
 
 ## Order
 

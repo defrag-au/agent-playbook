@@ -71,6 +71,7 @@ pub fn run(
     command
         .args(&args)
         .current_dir(&invocation.cwd)
+        .env("PWD", &invocation.cwd)
         .stdin(Stdio::null())
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr));

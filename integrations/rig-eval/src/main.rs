@@ -29,21 +29,29 @@
 
 mod cli;
 mod driver;
+mod export;
 mod process;
 mod report;
 mod sandbox;
 mod scenario;
 mod score;
+mod snapshot;
 mod stream;
 mod tag;
 mod target;
 
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc;
+use std::thread;
 
 use anyhow::{bail, Context, Result};
 
 use crate::cli::Args;
 use crate::driver::RunContext;
+use crate::report::RunResult;
+use crate::scenario::Scenario;
+use crate::target::Target;
 
 fn main() -> ExitCode {
     match run() {
@@ -57,13 +65,25 @@ fn main() -> ExitCode {
 
 fn run() -> Result<()> {
     let args = Args::parse()?;
-    let scenarios = scenario::load(&args)?;
+    if let Some(reuse) = &args.reuse {
+        let results = report::read(reuse)?;
+        export::write(&args.out, &results)?;
+        println!(
+            "wrote {} export(s) to {}",
+            results.len(),
+            args.out.display()
+        );
+        return Ok(());
+    }
+    let template = snapshot::Template::build(&args)?;
+    let scenarios = scenario::load(&args, &template.path)?;
     if scenarios.is_empty() {
         bail!("no scenarios in {}", args.scenario_dir.display());
     }
 
     if args.dry_run {
         report::print_plan(&args, &scenarios);
+        snapshot::discard(&template.path);
         return Ok(());
     }
 
@@ -81,30 +101,153 @@ fn run() -> Result<()> {
         None => println!("# sandbox: not available; the agent can read the corpus and the results"),
     }
 
-    let context = RunContext {
-        args: &args,
-        env: &vars,
-        sandbox,
-    };
+    let jobs = jobs(&scenarios, &args.targets, args.repeat);
+    let results = run_jobs(&args, &scenarios, &jobs, &template, &vars, &sandbox);
+    snapshot::discard(&template.path);
+    let results = results?;
+    report::write(&args, &results)?;
+    Ok(())
+}
 
-    let mut results = Vec::new();
-    for scenario in &scenarios {
-        let workdir = args.root.join(&scenario.workdir);
-        for target in &args.targets {
-            for repeat in 1..=args.repeat {
-                println!(
-                    "· {} · {} · run {repeat}/{}",
-                    scenario.name,
-                    target.label(),
-                    args.repeat
-                );
-                let result = target::run_one(target, scenario, &workdir, repeat, &context)?;
-                report::print_run(&result);
-                results.push(result);
+fn jobs(scenarios: &[Scenario], targets: &[Target], repeat: u32) -> Vec<(usize, usize, u32)> {
+    let mut jobs = Vec::new();
+    for scenario in 0..scenarios.len() {
+        for target in 0..targets.len() {
+            for run in 1..=repeat {
+                jobs.push((scenario, target, run));
             }
         }
     }
+    jobs
+}
 
-    report::write(&args, &results)?;
-    Ok(())
+enum Message {
+    Done {
+        index: usize,
+        result: Box<RunResult>,
+    },
+    Job {
+        index: usize,
+        error: String,
+    },
+    Worker {
+        error: String,
+    },
+}
+
+fn run_jobs(
+    args: &Args,
+    scenarios: &[Scenario],
+    jobs: &[(usize, usize, u32)],
+    template: &snapshot::Template,
+    env: &[(String, String)],
+    sandbox: &Option<String>,
+) -> Result<Vec<RunResult>> {
+    let workers = args.jobs.min(jobs.len()).max(1);
+    let mut run_env = env.to_vec();
+    let path = std::env::join_paths(std::iter::once(template.bin.clone()).chain(
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
+    ))
+    .context("building the snapshot PATH")?;
+    run_env.push(("PATH".to_owned(), path.to_string_lossy().into_owned()));
+    let run_env = &run_env;
+    let next = AtomicUsize::new(0);
+    let (sender, receiver) = mpsc::channel();
+    let mut results: Vec<Option<RunResult>> = jobs.iter().map(|_| None).collect();
+    let mut errors = Vec::new();
+
+    thread::scope(|scope| {
+        for worker_index in 0..workers {
+            let sender = sender.clone();
+            let next = &next;
+            scope.spawn(move || {
+                let worker = match snapshot::worker(template, worker_index) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let _ = sender.send(Message::Worker {
+                            error: format!("worker {worker_index}: {error:#}"),
+                        });
+                        return;
+                    }
+                };
+                loop {
+                    let index = next.fetch_add(1, Ordering::Relaxed);
+                    if index >= jobs.len() {
+                        break;
+                    }
+                    let (scenario_index, target_index, repeat) = jobs[index];
+                    let scenario = &scenarios[scenario_index];
+                    let target = &args.targets[target_index];
+                    if let Err(error) = snapshot::reset(&worker, &template.commit) {
+                        let _ = sender.send(Message::Job {
+                            index,
+                            error: format!("{error:#}"),
+                        });
+                        break;
+                    }
+                    let workdir = worker.join(&scenario.workdir);
+                    let context = RunContext {
+                        args,
+                        env: run_env,
+                        sandbox: sandbox.clone(),
+                    };
+                    match target::run_one(target, scenario, &workdir, repeat, &context) {
+                        Ok(result) => {
+                            let _ = sender.send(Message::Done {
+                                index,
+                                result: Box::new(result),
+                            });
+                        }
+                        Err(error) => {
+                            let _ = sender.send(Message::Job {
+                                index,
+                                error: format!("{error:#}"),
+                            });
+                            break;
+                        }
+                    }
+                }
+                snapshot::discard(&worker);
+            });
+        }
+        drop(sender);
+
+        for message in receiver {
+            match message {
+                Message::Done { index, result } => {
+                    let result = *result;
+                    println!(
+                        "· {} · {} · run {}/{}",
+                        result.scenario, result.target, result.repeat, args.repeat
+                    );
+                    report::print_run(&result);
+                    results[index] = Some(result);
+                }
+                Message::Job { index, error } => {
+                    let (scenario, target, repeat) = jobs[index];
+                    eprintln!(
+                        "· {} · {} · run {}/{}: {error}",
+                        scenarios[scenario].name,
+                        args.targets[target].label(),
+                        repeat,
+                        args.repeat
+                    );
+                    errors.push(error);
+                }
+                Message::Worker { error } => {
+                    eprintln!("worker: {error}");
+                    errors.push(error);
+                }
+            }
+        }
+    });
+
+    if !errors.is_empty() {
+        bail!(
+            "{} job(s) failed; the first was: {}",
+            errors.len(),
+            errors[0]
+        );
+    }
+    Ok(results.into_iter().flatten().collect())
 }

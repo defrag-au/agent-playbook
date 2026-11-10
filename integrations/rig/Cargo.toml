@@ -16,9 +16,12 @@ license = "MIT"
 # workspace, and by the launcher's own `[patch.crates-io]` when the plugin is built into an agent.
 rig-harness = "=0.46.0"
 # The verb catalogues and the reads themselves. `serde` is on so the typed answer can be published
-# with the call's facts; the CLI does not enable it.
+# with the call's facts; the CLIs do not enable it.
 at-peek = { path = "../../tools/at-peek", features = ["serde"] }
-at-recall = { path = "../../tools/at-recall" }
+at-recall = { path = "../../tools/at-recall", features = ["serde"] }
+# What a shell line can do, before it runs. Its grammar is brush-parser's; the program table is
+# ours.
+command-classify = { path = "../../tools/command-classify" }
 # The tool schemas derive from the argument types.
 schemars = "1"
 serde = { version = "1", features = ["derive"] }

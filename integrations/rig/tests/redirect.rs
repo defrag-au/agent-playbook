@@ -16,7 +16,7 @@ use rig_harness_test_support::{
     app_in, calls, collect, connect, first_agent, log_ended, log_tool_outputs, reply, run_until,
     scratch_home, Collected, Ended, ToolOutputs,
 };
-use rig_playbook::{PlaybookPlugin, PublishedSearch, Redirection};
+use rig_playbook::{GatedPlugin, PublishedSearch, Redirection};
 use serde::Serialize;
 
 /// The shell tool's arguments, typed for the scripted call.
@@ -43,7 +43,7 @@ fn a_shell_search_is_answered_by_the_tool_without_a_second_model_call() {
             AgentPlugin,
             SessionLogPlugin,
             rig_basics::coding_tools::ShellTool,
-            PlaybookPlugin,
+            GatedPlugin,
         ));
     collect::<EffectRecorded>(&mut app);
     app.finish();

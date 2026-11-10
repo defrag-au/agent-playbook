@@ -3,9 +3,10 @@
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::fs;
+use std::path::Path;
 
 use anyhow::{Context, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::cli::Args;
 use crate::scenario::Scenario;
@@ -13,7 +14,7 @@ use crate::score::Check;
 use crate::tag::RunTag;
 use crate::target::Target;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct RunResult {
     pub scenario: String,
     pub target: String,
@@ -101,8 +102,16 @@ pub fn write(args: &Args, results: &[RunResult]) -> Result<()> {
     fs::write(&path, summary(args, results))
         .with_context(|| format!("writing {}", path.display()))?;
 
+    crate::export::write(&args.out, results)?;
     println!("\nwrote {}", args.out.display());
     Ok(())
+}
+
+/// Read a run's `results.json` back, for `--reuse`.
+pub fn read(directory: &Path) -> Result<Vec<RunResult>> {
+    let path = directory.join("results.json");
+    let text = fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))
 }
 
 pub fn print_plan(args: &Args, scenarios: &[Scenario]) {
@@ -128,6 +137,7 @@ pub fn print_plan(args: &Args, scenarios: &[Scenario]) {
         Err(why) => println!("env      {why}"),
     }
     println!("out      {}", args.out.display());
+    println!("jobs     {}", args.jobs);
     for target in &args.targets {
         match target {
             Target::Rig(home) => {
@@ -185,10 +195,19 @@ fn summary(args: &Args, results: &[RunResult]) -> String {
     );
     let _ = writeln!(
         text,
-        "Model `{}` · launcher `{}`.",
+        "Model `{}` · launcher `{}` · {} worker(s).",
         args.model,
-        args.rig.display()
+        args.rig.display(),
+        args.jobs
     );
+    if args.jobs > 1 {
+        let _ = writeln!(
+            text,
+            "Runs ran with {} workers; wall time includes contention and is not comparable \
+             across arms.\n",
+            args.jobs
+        );
+    }
     let _ = writeln!(
         text,
         "Score is checks passed: `path:line` citations in the answer, paths in the answer, \
@@ -417,6 +436,24 @@ mod tests {
         assert!(text.contains("## Contaminated"));
     }
 
+    #[test]
+    fn a_saved_result_reads_back() {
+        let directory =
+            std::env::temp_dir().join(format!("rig-eval-read-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).expect("a directory");
+        let result = result("pi", BTreeSet::new());
+        std::fs::write(
+            directory.join("results.json"),
+            serde_json::to_string(&[result]).expect("json"),
+        )
+        .expect("write");
+        let read = read(&directory).expect("read");
+        assert_eq!(read.len(), 1);
+        assert_eq!(read[0].target, "pi");
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     fn args() -> Args {
         let root = PathBuf::from("/repo");
         Args {
@@ -430,7 +467,9 @@ mod tests {
             pi: root.join("pi"),
             env_file: root.join("env"),
             out: root.join("out"),
+            reuse: None,
             repeat: 1,
+            jobs: 1,
             timeout: None,
             dry_run: false,
         }

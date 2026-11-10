@@ -71,7 +71,7 @@ pub fn run(
         target: format!("rig:{}", home.label),
         repeat,
         model: context.args.model.clone(),
-        workdir: workdir.display().to_string(),
+        workdir: scenario.workdir.clone(),
         wall_ms: completed.wall.as_millis().try_into().unwrap_or(u64::MAX),
         exit_code: facts.exit_code.or(completed.status.code()),
         exit_error: facts.exit_error,

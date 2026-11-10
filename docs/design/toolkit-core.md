@@ -7,16 +7,15 @@ the tree at `agent-playbook`.
 The short version: **the verbs already compute structured facts and then render them immediately.
 Keep the facts, render on demand, and both modes share one implementation.**
 
-**Status 2026-11-09.** Steps 1 and 2 are done. `Opts::resolve`, `search::collect`, `SearchFacts`,
-and the optional `serde` feature are in `at-peek`. Six goldens were captured from the
-**pre-refactor** binary and still match byte for byte; a second test proves the library renders the
-CLI's bytes, including the exit a limit adds. `cargo test -p at-peek` passes 39 tests and clippy is
-clean. In `integrations/rig`, `at_peek_search` now calls `collect` in process and publishes
-`PublishedSearch` under `agent_playbook.search`; the plugin's seven tests pass and its clippy is
-clean. A generated agent builds with the plugin, and two headless runs on `deepseek/deepseek-flash`
-exercised both halves: the model called `at_peek_search` on its first step, and the published facts
-(`total = 4`, `walked = 443`) were queryable in `effects.jsonl`. The other six verbs still spawn,
-and `spawn.rs` stays until step 5. The remaining toolkit verbs are steps 3 and 4.
+**Status 2026-11-10.** Steps 1–5 are done. `Opts::resolve` and the facts/`report` split are in both
+verb crates; every verb returns an `XxxFacts` value and the CLI renders it. Six goldens were
+captured from the **pre-refactor** binary and still match byte for byte, and the full contract
+suites pass unchanged (`at-peek` 39 tests, `at-recall` 74). In `integrations/rig`, all seven tools
+call `collect` in process and publish their facts under `agent_playbook.*`; `spawn.rs` is deleted,
+so the plugin has no `PATH` or subprocess dependency. The plugin's 23 tests pass, clippy is clean,
+a generated agent builds with it, and a deterministic harness test asserts the published facts for
+all seven tools. A live `pre-edit-state` run recorded `agent_playbook.state` (branch, HEAD,
+pending, changed paths) in `effects.jsonl`. Step 6, the rule engine, is next.
 
 ## What this decides
 
@@ -32,7 +31,7 @@ This supersedes the "seven tools and a gate" framing in [`rig.md`](rig.md): the 
 replacement vocabulary, and the rule engine is the product. The rule engine is planned next; this
 document is the seam it stands on.
 
-## What exists today
+## What existed before the split
 
 The CLI is not a thin wrapper over a library — the library is the CLI's implementation, and the
 render happens inside it.
@@ -205,12 +204,12 @@ No existing assertion is changed, and the contract tests still call the binary.
 
 | Step | Change | Proves |
 | --- | --- | --- |
-| 1 | `Opts::resolve`, `search::collect`, `SearchFacts`, serde feature | the pattern, end to end |
-| 2 | plugin uses `search::collect` and publishes facts | no subprocess, identical text |
-| 3 | `slice`, `stat` | the simple verbs follow without new decisions |
-| 4 | `state` (expose `Status`), `log`, `diff`, `pr` | the git verbs, where the facts mostly exist |
-| 5 | delete `spawn.rs`; `playbook` via lib | the plugin has no process dependency |
-| 6 | the rule engine (`rules.rs`, footprint gates) | the product, on a typed seam |
+| 1 | `Opts::resolve`, `search::collect`, `SearchFacts`, serde feature | the pattern, end to end — done |
+| 2 | plugin uses `search::collect` and publishes facts | no subprocess, identical text — done |
+| 3 | `slice`, `stat` | the simple verbs follow without new decisions — done |
+| 4 | `state` (expose `Status`), `log`, `diff`, `pr` | the git verbs, where the facts mostly exist — done |
+| 5 | delete `spawn.rs` | the plugin has no process dependency — done |
+| 6 | the rule engine (`rules.rs`, footprint gates) | the product, on a typed seam — next |
 
 Step 2 is the checkpoint: if the plugin's text differs from the CLI's on the same fixture, stop
 and fix the render, not the test.

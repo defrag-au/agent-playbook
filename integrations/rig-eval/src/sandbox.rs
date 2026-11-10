@@ -23,8 +23,13 @@ pub fn profile(args: &Args) -> Option<String> {
 
     // Deny the corpus itself, not its parent: a harness may walk the eval crate at startup, and
     // an unreadable directory in that walk can kill it. The corpus directory is the only thing
-    // that holds the gold.
-    let mut denied = vec![args.scenario_dir.clone(), args.out.clone()];
+    // that holds the gold; the checkout's `.git` also holds it, because the corpus is committed
+    // and a snapshot's history does not have it.
+    let mut denied = vec![
+        args.scenario_dir.clone(),
+        args.out.clone(),
+        args.root.join(".git"),
+    ];
     // A copy of an earlier run kept under the repository's scratch directory is still a leak.
     let scratch = args.root.join(".tmp/rig-eval");
     if scratch.exists() {
@@ -70,7 +75,9 @@ mod tests {
             pi: root.join(".tmp/pi/bin/pi"),
             env_file: root.join(".env"),
             out: root.join(".tmp/rig-eval/run"),
+            reuse: None,
             repeat: 1,
+            jobs: 1,
             timeout: None,
             dry_run: false,
         };

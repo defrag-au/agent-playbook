@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::sync::LazyLock;
 
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::scenario::Scenario;
 
@@ -84,10 +84,17 @@ fn same_path(cited: &str, gold: &str) -> bool {
     cited == gold || cited.ends_with(&format!("/{gold}")) || gold.ends_with(&format!("/{cited}"))
 }
 
-/// A path is named by itself, or by a directory that contains it. `git status` collapses an
-/// untracked tree to its top directory, and that is as correct an answer as listing every file.
+/// A path is named by itself, by a citation with a shorter path, or by a directory that contains
+/// it. `git status` collapses an untracked tree to its top directory, and that is as correct an
+/// answer as listing every file under it.
 fn names_path(answer: &str, path: &str) -> bool {
     if answer.contains(path) {
+        return true;
+    }
+    if citations(answer)
+        .iter()
+        .any(|citation| same_path(&citation.path, path))
+    {
         return true;
     }
     answer
@@ -102,7 +109,7 @@ fn names_path(answer: &str, path: &str) -> bool {
         .any(|directory| path.starts_with(directory))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Source {
     Gold,
@@ -111,7 +118,7 @@ pub enum Source {
     Tool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Check {
     pub required: String,
     pub source: Source,
@@ -243,5 +250,21 @@ mod tests {
         assert!(names_path("?? src/driver/", "src/driver/mod.rs"));
         assert!(names_path("src/driver/", "src/driver/nested/file.rs"));
         assert!(!names_path("src/other/", "src/driver/mod.rs"));
+    }
+
+    #[test]
+    fn a_shorter_citation_names_the_path() {
+        assert!(names_path(
+            "`src/tools.rs`",
+            "integrations/rig/src/tools.rs"
+        ));
+        assert!(names_path(
+            "`integrations/rig/src/tools.rs`",
+            "integrations/rig/src/tools.rs"
+        ));
+        assert!(!names_path(
+            "`src/other.rs`",
+            "integrations/rig/src/tools.rs"
+        ));
     }
 }

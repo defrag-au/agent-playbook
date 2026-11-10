@@ -1,8 +1,8 @@
 //! Labels a run carries beyond its measurements: why it is excluded, or what it inspected.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum RunTag {
     /// A tool output carried the expected answer; the run is excluded from the comparison.

@@ -134,13 +134,33 @@ cargo run --manifest-path integrations/rig-eval/Cargo.toml -- --out /tmp/rig-eva
 ```
 
 The corpus ships at `integrations/rig-eval/scenarios`; `--scenarios` points elsewhere for a private
-copy, and `--out` is required. A corpus inside the checkout is only run where the macOS sandbox is
-available: `sandbox-exec` denies the agent every read of the corpus directory, the output
-directory and `.tmp/rig-eval`. It denies the corpus itself, not the eval crate around it: a
-harness may walk the crate at startup, and an unreadable directory in that walk can kill it.
-Without the seal a repo-wide search would find the content, and a model that reads its own gold
-scores itself, so the runner refuses an in-checkout corpus rather than pretend the run is
-evidence. This is measurement integrity, not a safety sandbox; see
+copy, and `--out` is required. The corpus is committed, so a filesystem deny on `scenarios/` alone
+does not hide it: `git show` and `git diff` read the committed content from `.git`. Each run
+therefore executes in a snapshot of the worktree under `$TMPDIR`:
+
+- the snapshot copies the real `.git` and rewrites the corpus out of the commits that hold it, then
+  prunes the old objects; the reachable history has no corpus, while the branch commits remain for
+  `draft-pr`;
+- the working tree is a clean checkout of that history; the corpus directory is absent;
+- `integrations/rig` resolves its dev-dependencies at `../../../rig`; the sibling fork is symlinked
+  beside the snapshot, so the plugin's tests run as they do in the checkout;
+- the seatbelt profile denies the real checkout's `.git`, the corpus directory, the output
+  directory and `.tmp/rig-eval`; the snapshot's own `.git` is outside those paths;
+- the snapshot's `eval` branch carries one uncommitted file (`docs/design/rig-eval.md`), so a
+  `git: status` scenario has a deterministic answer;
+- build directories in the snapshot are symlinks to the real warm `target/` directories, because a
+  cold build per snapshot would dominate the run; cargo's lock serialises workers that share one.
+  One consequence: a test binary compiled inside a snapshot has that snapshot's path baked into
+  `CARGO_MANIFEST_DIR` and `CARGO_BIN_EXE_*`, so after the snapshot is deleted a later `cargo test`
+  at the checkout can run the stale binary and fail with `NotFound`. `cargo clean --workspace`
+  (which keeps dependencies) forces the checkout's own build; the eval run itself is unaffected.
+- a `direnv` shim at the front of `PATH` delegates `direnv exec` to the real devshell and then runs
+  the command in the snapshot. No per-snapshot allow entry or copied cache is needed.
+
+`--jobs N` runs up to N snapshots concurrently. Each worker resets to the template commit and
+reseeds the dirty file between jobs, so every run starts from the same content. Wall time includes
+contention and is not comparable across arms; model calls, tool calls, output bytes and score are.
+This is measurement integrity, not a safety sandbox; see
 `harness-comparison.md#isolation-is-not-an-arm`.
 
 A scenario is JSON:
@@ -160,10 +180,9 @@ A scenario is JSON:
 
 Every check is validated before a run: a gold line past the end of its file is an error rather
 than a model failure. A scenario whose expectation is the working tree itself uses
-`"git": "status"` instead of the static lists: the runner reads the branch and every changed
-path from `git status --branch -uall`, removes the sealed corpus and output directory from the
-result, and refuses to run on a clean tree because there is nothing to list. `pre-edit-state`
-is that scenario.
+`"git": "status"` instead of the static lists: the runner reads the branch and every changed path
+from the snapshot's `git status --branch -uall`. The snapshot always has one uncommitted file, so
+the expectation is deterministic. `pre-edit-state` is that scenario.
 
 The score is checks passed. Precision is `path:line` hits over every
 citation the answer makes; recall is hits over gold. Precision is a weak signal when gold is a
@@ -218,6 +237,9 @@ are citations one line off rather than wrong conclusions. That confirms the warn
 this design: a task that needs one search cannot show the difference. The next corpus has to come
 from the long threads — median 74 tool calls and 793 KB — where the shape of the read and the size
 of the result compound.
+
+The five-target comparison in `harness-comparison.md#the-first-result` supersedes this two-home
+result; the snapshot runner above produced it.
 
 ## What the next run changes
 

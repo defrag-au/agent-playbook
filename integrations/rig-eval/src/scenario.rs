@@ -43,7 +43,7 @@ pub struct Scenario {
     /// The branch `git: status` found, resolved from the workdir.
     #[serde(skip)]
     pub git_branch: Option<String>,
-    /// The changed paths `git: status` found, with the sealed corpus removed.
+    /// The changed paths `git: status` found, resolved from the snapshot.
     #[serde(skip)]
     pub git_paths: Vec<String>,
 }
@@ -58,12 +58,12 @@ impl Scenario {
             + self.tool_says.len()
     }
 
-    /// Fill the fields the corpus cannot know: the state of the working tree it runs against.
-    fn resolve(&mut self, args: &Args) -> Result<()> {
+    /// Fill the fields the corpus cannot know: the state of the snapshot it runs against.
+    fn resolve(&mut self, snapshot: &Path) -> Result<()> {
         let Some(GitExpectation::Status) = self.git else {
             return Ok(());
         };
-        let workdir = args.root.join(&self.workdir);
+        let workdir = snapshot.join(&self.workdir);
         let output = Command::new("git")
             .arg("-C")
             .arg(&workdir)
@@ -80,19 +80,12 @@ impl Scenario {
             .with_context(|| format!("{}: git status output is not UTF-8", self.name))?;
         let (branch, paths) = parse_status(&text);
         self.git_branch = branch;
-
-        // A path the sandbox denies is a path the agent cannot name. The corpus and the results
-        // are sealed during a run, so they are never expected in the answer.
-        let sealed = sealed_prefixes(args, &self.workdir);
-        self.git_paths = paths
-            .into_iter()
-            .filter(|path| !sealed.iter().any(|prefix| path.starts_with(prefix)))
-            .collect();
+        self.git_paths = paths;
         Ok(())
     }
 }
 
-pub fn load(args: &Args) -> Result<Vec<Scenario>> {
+pub fn load(args: &Args, snapshot: &Path) -> Result<Vec<Scenario>> {
     let mut files: Vec<_> = fs::read_dir(&args.scenario_dir)
         .with_context(|| format!("reading {}", args.scenario_dir.display()))?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
@@ -109,8 +102,13 @@ pub fn load(args: &Args) -> Result<Vec<Scenario>> {
             fs::read_to_string(&file).with_context(|| format!("reading {}", file.display()))?;
         let mut scenario: Scenario =
             serde_json::from_str(&text).with_context(|| format!("parsing {}", file.display()))?;
-        scenario.resolve(args)?;
-        validate(&scenario, &args.root)?;
+        // Select before resolving: a scenario that needs a dirty worktree must not stop a run of
+        // the scenarios that do not.
+        if !args.only.is_empty() && !args.only.contains(&scenario.name) {
+            continue;
+        }
+        scenario.resolve(snapshot)?;
+        validate(&scenario, snapshot)?;
         scenarios.push(scenario);
     }
 
@@ -120,7 +118,6 @@ pub fn load(args: &Args) -> Result<Vec<Scenario>> {
                 bail!("no scenario named `{name}`");
             }
         }
-        scenarios.retain(|scenario| args.only.contains(&scenario.name));
     }
 
     Ok(scenarios)
@@ -146,29 +143,8 @@ fn parse_status(text: &str) -> (Option<String>, Vec<String>) {
     (branch, paths)
 }
 
-/// Paths under the workdir that the agent cannot read during a run.
-fn sealed_prefixes(args: &Args, workdir: &str) -> Vec<String> {
-    let base = if workdir == "." || workdir.is_empty() {
-        args.root.clone()
-    } else {
-        args.root.join(workdir)
-    };
-    [
-        args.scenario_dir.clone(),
-        args.out.clone(),
-        args.root.join(".tmp/rig-eval"),
-    ]
-    .into_iter()
-    .filter_map(|path| {
-        path.strip_prefix(&base)
-            .ok()
-            .map(|path| path.to_string_lossy().into_owned())
-    })
-    .collect()
-}
-
 /// A gold citation must still name a line that exists; stale gold is an error, not a model miss.
-fn validate(scenario: &Scenario, root: &Path) -> Result<()> {
+fn validate(scenario: &Scenario, snapshot: &Path) -> Result<()> {
     if scenario.name.trim().is_empty() {
         bail!("a scenario has an empty `name`");
     }
@@ -183,12 +159,12 @@ fn validate(scenario: &Scenario, root: &Path) -> Result<()> {
     }
     if scenario.git == Some(GitExpectation::Status) && scenario.git_paths.is_empty() {
         bail!(
-            "{}: `git: status` finds no readable changed paths; run from a dirty worktree",
+            "{}: `git: status` finds no changed paths; the snapshot has no uncommitted change",
             scenario.name
         );
     }
 
-    let workdir = root.join(&scenario.workdir);
+    let workdir = snapshot.join(&scenario.workdir);
     if !workdir.is_dir() {
         bail!(
             "{}: workdir {} is not a directory",

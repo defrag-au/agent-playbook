@@ -75,7 +75,7 @@ pub fn run(
         target: "opencode".to_owned(),
         repeat,
         model: context.args.model.clone(),
-        workdir: workdir.display().to_string(),
+        workdir: scenario.workdir.clone(),
         wall_ms: completed.wall.as_millis().try_into().unwrap_or(u64::MAX),
         exit_code: completed.status.code(),
         exit_error,

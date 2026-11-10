@@ -32,7 +32,7 @@ struct Cli {
     #[arg(long = "scenario", value_name = "NAME")]
     only: Vec<String>,
 
-    /// A target: rig:gated, rig:baseline, rig:vanilla, opencode, pi; repeatable
+    /// A target: rig:gated, rig:permissive, rig:terse, rig:lean, rig:baseline, rig:vanilla, opencode, pi; repeatable
     #[arg(long = "target", value_name = "NAME")]
     targets: Vec<String>,
 
@@ -68,9 +68,17 @@ struct Cli {
     #[arg(long, required = true, value_name = "DIR")]
     out: PathBuf,
 
+    /// Re-export an existing results.json as Observable files, without running anything
+    #[arg(long, value_name = "DIR")]
+    reuse: Option<PathBuf>,
+
     /// Runs per scenario and target
     #[arg(long, value_name = "N", default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
     repeat: u32,
+
+    /// Runs to execute in parallel, each in its own snapshot checkout
+    #[arg(long, value_name = "N", default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
+    jobs: u32,
 
     /// Kill a run that takes longer than this
     #[arg(long, value_name = "SECONDS")]
@@ -93,7 +101,9 @@ pub struct Args {
     pub pi: PathBuf,
     pub env_file: PathBuf,
     pub out: PathBuf,
+    pub reuse: Option<PathBuf>,
     pub repeat: u32,
+    pub jobs: usize,
     pub timeout: Option<Duration>,
     pub dry_run: bool,
 }
@@ -148,7 +158,9 @@ impl Args {
                 .map(|path| absolute(&path))
                 .unwrap_or_else(|| root.join(DEFAULT_ENV)),
             out: absolute(&cli.out),
+            reuse: cli.reuse.map(|path| absolute(&path)),
             repeat: cli.repeat,
+            jobs: cli.jobs as usize,
             timeout: cli.timeout.map(Duration::from_secs),
             dry_run: cli.dry_run,
         };
@@ -158,6 +170,9 @@ impl Args {
 
     /// A dry run may be planned before a launcher or a home exists; a real run may not.
     fn validate(&self) -> Result<()> {
+        if self.reuse.is_some() {
+            return Ok(());
+        }
         if self.dry_run {
             return Ok(());
         }
@@ -262,12 +277,15 @@ fn rig_target(root: &Path, label: &str, path: &str) -> Target {
 fn parse_target(root: &Path, spec: &str) -> Result<Target> {
     match spec {
         "rig:gated" => Ok(rig_target(root, "gated", ".tmp/rig-home")),
+        "rig:permissive" => Ok(rig_target(root, "permissive", ".tmp/rig-home-permissive")),
+        "rig:terse" => Ok(rig_target(root, "terse", ".tmp/rig-home-terse")),
+        "rig:lean" => Ok(rig_target(root, "lean", ".tmp/rig-home-lean")),
         "rig:baseline" => Ok(rig_target(root, "baseline", ".tmp/rig-home-baseline")),
         "rig:vanilla" => Ok(rig_target(root, "vanilla", ".tmp/rig-home-vanilla")),
         "opencode" => Ok(Target::Opencode),
         "pi" => Ok(Target::Pi),
         other => bail!(
-            "unknown target `{other}`; known: rig:gated, rig:baseline, rig:vanilla, opencode, pi"
+            "unknown target `{other}`; known: rig:gated, rig:permissive, rig:terse, rig:lean, rig:baseline, rig:vanilla, opencode, pi"
         ),
     }
 }

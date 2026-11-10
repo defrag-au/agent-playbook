@@ -8,6 +8,9 @@
 //! The in-progress check is a read of the files git itself uses to remember a merge, rebase,
 //! cherry-pick, revert or bisect. They are named in [`PENDING`] *and* in the help, so "none" is a
 //! claim about a known list rather than a shrug.
+//!
+//! The answer is a [`StateFacts`] value. [`collect`] reads it; [`StateFacts::report`] renders the
+//! CLI's bytes. A harness calls `collect` and keeps the facts rather than parsing the listing.
 
 use at_core::contract::{plural_of, Fail, Report, MAX_LIMIT};
 
@@ -27,98 +30,191 @@ pub const PENDING: &[(&str, &str)] = &[
     ("BISECT_LOG", "bisect"),
 ];
 
-pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
-    let mut report = Report::new();
-    if let Some(asked) = opts.limit_clamped_from {
-        report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
-    }
+/// HEAD, as a value a harness can keep.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HeadFacts {
+    pub short: String,
+    pub date: String,
+    pub author: String,
+    pub subject: String,
+}
 
+/// One changed path.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StateChange {
+    /// The two-letter code git reported.
+    pub code: String,
+    pub path: String,
+    /// The other half of a rename, when git detected one.
+    pub original: Option<String>,
+}
+
+impl StateChange {
+    /// Porcelain v2 writes `.` where `git status --short` writes a space — "unmodified on this side
+    /// of the comparison". Rendered as the space, because the two-letter column is the one thing a
+    /// reader is expected to recognise, and `.M` is not a form anyone has seen before.
+    fn line(&self) -> String {
+        let code = self.code.replace('.', " ");
+        match &self.original {
+            Some(original) => format!("{code}  {original} -> {}", self.path),
+            None => format!("{code}  {}", self.path),
+        }
+    }
+}
+
+/// The answer to a state read, before it is a report.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StateFacts {
+    /// The branch as git prints it, `detached HEAD` included.
+    pub branch: String,
+    /// `None` on a branch with no commits yet.
+    pub head: Option<HeadFacts>,
+    /// The tracked upstream, with divergence when git reports it.
+    pub upstream: String,
+    /// The half-finished operations in progress, or `["none"]`.
+    pub pending: Vec<String>,
+    /// The changed paths, in git's order.
+    pub changes: Vec<StateChange>,
+    /// Untracked names ending in `/` are directories git did not expand.
+    pub collapsed_directories: usize,
+    /// Records that did not parse.
+    pub unparsed: usize,
+    /// Whether any tracked path has changed.
+    pub tracks_changes: bool,
+}
+
+pub fn collect(opts: &Opts) -> Result<StateFacts, Fail> {
     let status = Status::read(&opts.git)?;
     let head = match status.oid() {
         Some(_) => Some(Head::read(opts)?),
         None => None,
     };
 
-    report.header(
-        TOOL,
-        "state",
-        opts.root.name(),
-        &match &head {
-            Some(head) => format!("{} · {}", status.branch(), head.short),
-            None => format!("{} · no commits yet", status.branch()),
-        },
-    );
+    Ok(StateFacts {
+        branch: status.branch(),
+        head: head.map(|head| HeadFacts {
+            short: head.short,
+            date: head.date,
+            author: head.author,
+            subject: head.subject,
+        }),
+        upstream: status.upstream().to_string(),
+        pending: pending(opts)?,
+        changes: status
+            .entries()
+            .iter()
+            .map(|entry| StateChange {
+                code: entry.code.clone(),
+                path: entry.path.clone(),
+                original: entry.original.clone(),
+            })
+            .collect(),
+        collapsed_directories: status.collapsed_directories(),
+        unparsed: status.unparsed(),
+        tracks_changes: status.tracks_changes(),
+    })
+}
 
-    if let Some(head) = &head {
-        report.content(format!(
-            "{:<9}  {}  {}  {}",
-            "head", head.date, head.author, head.subject
-        ));
-    }
-    report.content(format!("{:<9}  {}", "upstream", status.upstream()));
-    report.content(format!("{:<9}  {}", "pending", pending(opts)?.join(", ")));
-
-    let mut budget = Budget::new(opts.limit);
-    if !opts.summary {
-        for line in status.lines() {
-            budget.push(&mut report, line);
+impl StateFacts {
+    /// Render the CLI's answer.
+    pub fn report(&self, opts: &Opts) -> Outcome {
+        let mut report = Report::new();
+        if let Some(asked) = opts.limit_clamped_from {
+            report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
         }
-    }
 
-    let total = status.len();
-    let shown = total - budget.dropped();
-    report.bound(if opts.summary && total > 0 {
-        // The rows are the body, and the body was not asked for — so the count is the whole truth
-        // about it rather than a statement about what was printed.
-        format!("{}, not shown", plural(total, "path"))
-    } else if shown == total {
-        plural(total, "path")
-    } else {
-        format!(
-            "{shown} of {} · --limit {}",
-            plural(total, "path"),
-            opts.limit
-        )
-    });
-    if status.collapsed_directories() > 0 {
-        let collapsed = status.collapsed_directories();
-        report.bound(format!(
-            "caveat: {} shown collapsed, ending in `/`",
-            plural_of(collapsed, "untracked directory", "untracked directories")
-        ));
-    }
-    if status.unparsed() > 0 {
-        report.bound(format!(
-            "caveat: {} status record(s) did not parse and are not listed",
-            status.unparsed()
-        ));
-    }
-    budget.width_caveat(&mut report);
-
-    // The exits, in the contract's order: the body this answer withheld, then the one question it
-    // implies. At most two, and a clean tree offers neither — that silence is the useful reading.
-    let withheld_body = if opts.summary {
-        total
-    } else {
-        budget.dropped()
-    };
-    if withheld_body > 0 {
-        report.next(
-            again(
-                opts,
-                "state",
-                None,
-                &[],
-                &[format!("--limit {}", total.min(MAX_LIMIT))],
-            ),
-            format!("all {}", plural(total, "path")),
+        report.header(
+            TOOL,
+            "state",
+            opts.root.name(),
+            &match &self.head {
+                Some(head) => format!("{} · {}", self.branch, head.short),
+                None => format!("{} · no commits yet", self.branch),
+            },
         );
-    }
-    if status.tracks_changes() {
-        report.next(again(opts, "diff", None, &[], &[]), "what changed in them");
-    }
 
-    Ok(Outcome::from_report(report))
+        if let Some(head) = &self.head {
+            report.content(format!(
+                "{:<9}  {}  {}  {}",
+                "head", head.date, head.author, head.subject
+            ));
+        }
+        report.content(format!("{:<9}  {}", "upstream", self.upstream));
+        report.content(format!("{:<9}  {}", "pending", self.pending.join(", ")));
+
+        let mut budget = Budget::new(opts.limit);
+        if !opts.summary {
+            for change in &self.changes {
+                budget.push(&mut report, change.line());
+            }
+        }
+
+        let total = self.changes.len();
+        let shown = total - budget.dropped();
+        report.bound(if opts.summary && total > 0 {
+            // The rows are the body, and the body was not asked for — so the count is the whole
+            // truth about it rather than a statement about what was printed.
+            format!("{}, not shown", plural(total, "path"))
+        } else if shown == total {
+            plural(total, "path")
+        } else {
+            format!(
+                "{shown} of {} · --limit {}",
+                plural(total, "path"),
+                opts.limit
+            )
+        });
+        if self.collapsed_directories > 0 {
+            report.bound(format!(
+                "caveat: {} shown collapsed, ending in `/`",
+                plural_of(
+                    self.collapsed_directories,
+                    "untracked directory",
+                    "untracked directories"
+                )
+            ));
+        }
+        if self.unparsed > 0 {
+            report.bound(format!(
+                "caveat: {} status record(s) did not parse and are not listed",
+                self.unparsed
+            ));
+        }
+        budget.width_caveat(&mut report);
+
+        // The exits, in the contract's order: the body this answer withheld, then the one question
+        // it implies. At most two, and a clean tree offers neither — that silence is the useful
+        // reading.
+        let withheld_body = if opts.summary {
+            total
+        } else {
+            budget.dropped()
+        };
+        if withheld_body > 0 {
+            report.next(
+                again(
+                    opts,
+                    "state",
+                    None,
+                    &[],
+                    &[format!("--limit {}", total.min(MAX_LIMIT))],
+                ),
+                format!("all {}", plural(total, "path")),
+            );
+        }
+        if self.tracks_changes {
+            report.next(again(opts, "diff", None, &[], &[]), "what changed in them");
+        }
+
+        Outcome::from_report(report)
+    }
+}
+
+pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
+    collect(opts).map(|facts| facts.report(opts))
 }
 
 /// HEAD, as git describes it in one `log -1`.

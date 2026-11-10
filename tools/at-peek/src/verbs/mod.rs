@@ -1,10 +1,15 @@
 //! The verbs.
 //!
-//! Each returns an [`Outcome`] — a report and the exit code it implies — so that "nothing
-//! found" is a fact the caller can branch on rather than an empty success, and so a verb cannot
-//! print content and then exit as though it had found none. Both live in the contract in
-//! `at-core`, because `at-recall` answers in the same shape and the two must not drift. Any
-//! target that fails fails the whole invocation: a partial result that looks complete is the
+//! Each has a `collect` that reads and returns typed facts, and a `run` that renders those facts
+//! into an [`Outcome`] — a report and the exit code it implies — from the shared contract in
+//! `at-core`, so `at-peek` answers in exactly the shape `at-recall` does and one set of reading
+//! habits covers both. The output contract is the same document in both tools, and it has to be:
+//! a bound stated one way here and another way there is not a contract.
+//!
+//! A harness calls `collect` and keeps the facts; the CLI calls `run`, which is `collect` plus
+//! `report`. The rendered text is the CLI's own bytes either way.
+//!
+//! Any target that fails fails the whole invocation: a partial result that looks complete is the
 //! failure this toolkit exists to remove, and it is cheaper to re-run without the bad target
 //! than to notice that one line of a batch was missing.
 
