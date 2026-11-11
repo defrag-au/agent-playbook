@@ -29,7 +29,7 @@ of the installed agent toolkit.
 
 ```
 review/cases/<slug>/
-  case.toml      model-facing: story, intent, image, optional crop
+  case.toml      metadata: story, arch, os, intent, image, optional crop
   expected.toml  scorer-facing: defect or clean, boxes, severity
   full.png
   crop.png       optional magnification, generated with image-shot
@@ -41,6 +41,10 @@ The runner reads `case.toml` and the images, sends `RUBRIC.md` + `intent` +
 images, parses the answer, then reads `expected.toml` to score it. The expected
 file must never be in the prompt. The rubric is versioned; edit it only with the
 intention of invalidating comparisons.
+
+A corpus is one architecture and one OS unless a comparison says otherwise.
+The storybook keeps `tests/goldens-<arch>/<slug>/<os>.png`, and a case records
+both, so an aarch64 macOS image is never scored against an x86_64 Linux one.
 
 ## Constraints
 
@@ -81,10 +85,10 @@ images a provider cannot read.
 
 ### 4. Local memory and time
 
-The machine is a 48 GB M5 Pro. One local model resident at a time; `keep_alive`
-is bounded and a model is unloaded before the next one is loaded. The registry
-carries a `max_resident_gb` and the runner refuses a model whose resident size
-plus context exceeds it.
+The machine is a 48 GB M5 Pro, aarch64 macOS. One local model resident at a
+time; `keep_alive` is bounded and a model is unloaded before the next one is
+loaded. The registry carries a `max_resident_gb` and the runner refuses a model
+whose resident size plus context exceeds it.
 
 The measured local calibration:
 
@@ -190,6 +194,14 @@ The Python reference runner that produced the first results was a stopgap and is
 removed. Model I/O, image handling, parsing and scoring are Rust through
 `rig-core`. Introspection (digest, quantisation, resident size) goes through the
 Ollama HTTP API, not by parsing CLI output.
+
+### 12. Architecture and platform are provenance
+
+The renderer differs by architecture and OS, and the storybook keeps
+`tests/goldens-<arch>/<slug>/<os>.png`. A case records `arch` and `os`; a corpus
+is one architecture and one OS unless a comparison says otherwise. Do not mix
+aarch64 and x86_64 images, or macOS and Linux ones, in one run and call the
+difference a model result.
 
 ## The runner shape
 

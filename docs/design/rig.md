@@ -311,10 +311,10 @@ same log the eval exports — not a second agent loop.
 
 ### Local models (measured 2026-11-10, wired 2026-11-11)
 
-Ollama 0.34 on `127.0.0.1:11434`, reached through `plugins/rig-local-models` — promoted out of
-the corpus and on by default. It probes `/api/tags` and `/api/show`, registers `local/<name>` in
-the catalog, carries the server's tool and vision capabilities into the entry, and serves each
-through Ollama's OpenAI-compatible `/v1`.
+Ollama 0.34 on `127.0.0.1:11434`, reached through `plugins/rig-local-models` — a built-in
+plugin, off by default. It probes `/api/tags` and `/api/show`, registers `local/<name>` in the
+catalog, carries the server's tool and vision capabilities into the entry, and serves each through
+Ollama's OpenAI-compatible `/v1`.
 
 | Model | Params | Read a fixture | Image |
 | --- | --- | --- | --- |
@@ -325,9 +325,12 @@ through Ollama's OpenAI-compatible `/v1`.
 
 The plugin spawns a `Starting` entity while it probes (holding a headless run's first prompt) and
 sets `ModelsArriving`; `--model` waits up to 3 s for the catalog, and `[model] default` is not
-applied while models are still arriving. Both now work headlessly:
+applied while models are still arriving. It is opt-in because that hold is real: a home whose
+frontier model drives must start without waiting for a local server. An offline home enables it
+once, and pays the probe there:
 
 ```sh
+rig plugin enable rig_local_models::LocalModelsPlugin
 rig -p --model local/qwen3-vl:4b "Reply with exactly: READY"   # READY
 ```
 
@@ -338,7 +341,7 @@ The vision gap is closed: `LocalModel::spec` sets `input.image` from Ollama's `c
 `a_model_that_reads_images_says_so_in_the_catalog` pins it. Before the fix `qwen3-vl:4b` answered
 "unknown" to a solid-red PNG; after it, "red". Four tests pass in the plugin's suite.
 
-### The slim arm with a local model (one run, 2026-11-11)
+### The slim arm with a local model (two runs, 2026-11-11)
 
 `local/qwen3-vl:8b` and `local/qwen3-vl:4b` in `.tmp/rig-home-slim`, asked to find `VioletOrchid` in
 a scratch project, both called `at_peek_search` directly — not `shell rg`. Each effect log records
