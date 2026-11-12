@@ -7,9 +7,11 @@
 //!
 //! Only the shapes that map without guessing are redirected. `rg`/`grep` become a search; plain
 //! `cat`, `sed -n` and `head` become a slice; plain `git status`, `git log` and `git diff` become
-//! the history verbs. A pipeline, a redirection, an unknown flag, or a command with a second
-//! positional is left alone, and the policy or the Gate sees it as it was written. A wrong
-//! substitution is worse than no substitution.
+//! the history verbs. A leading `cd <path> &&` changes the base for the reads that follow — the
+//! form a model writes when the shell tool does not keep its working directory — and may only move
+//! deeper into the tree the redirect started in. A pipeline, a redirection, any other conditional,
+//! an unknown flag, or a command with a second positional is left alone, and the policy or the
+//! Gate sees it as it was written. A wrong substitution is worse than no substitution.
 
 use std::path::{Path, PathBuf};
 
@@ -52,6 +54,8 @@ enum Redirect {
     Search {
         pattern: String,
         paths: Vec<String>,
+        /// `grep` without `-r` reads only the files it names; a directory is an error, not a walk.
+        recursive: bool,
     },
     Slice {
         targets: Vec<String>,
@@ -161,14 +165,22 @@ impl Tool for RedirectedRead {
         context: &mut ToolContext,
         args: ShellCall,
     ) -> Result<String, ToolExecutionError> {
-        let redirect = redirect_from_shell(&args.command).ok_or_else(|| {
+        let (cd, redirect) = redirect_from_shell(&args.command).ok_or_else(|| {
             ToolExecutionError::invalid_args(format!(
                 "`{}` is not a read this redirect serves",
                 args.command
             ))
         })?;
         let tool = redirect.tool();
-        let base = resolve_base(&self.base, args.cwd.as_deref());
+        let start = resolve_base(&self.base, args.cwd.as_deref());
+        // A `cd` may narrow the base; it may not climb out of the tree this redirect started in.
+        let base = match cd {
+            Some(dir) => Root::at(&start)
+                .map_err(fail)?
+                .resolve(&dir)
+                .map_err(fail)?,
+            None => start,
+        };
         let (served, text) = blocking(move || serve(base, redirect)).await?;
 
         match served.as_slice() {
@@ -254,8 +266,25 @@ fn serve(base: PathBuf, redirect: Redirect) -> Result<(Vec<Served>, String), Too
             }
             Ok((served, text))
         }
-        Redirect::Search { pattern, paths } => {
+        Redirect::Search {
+            pattern,
+            paths,
+            recursive,
+        } => {
             let opts = peek_opts(&base)?;
+            if !recursive {
+                // `grep` without `-r` reads only the files it names; a directory is an error.
+                let root = Root::at(&base).map_err(fail)?;
+                for path in &paths {
+                    let resolved = root.resolve(path).map_err(fail)?;
+                    if resolved.is_dir() {
+                        return Err(ToolExecutionError::invalid_args(format!(
+                            "`{path}` is a directory · `grep` without `-r` reads only the files \
+                             it names"
+                        )));
+                    }
+                }
+            }
             let mut targets = vec![pattern];
             targets.extend(paths);
             let facts = search::collect(&targets, &opts, Mode::Matches).map_err(fail)?;
@@ -328,25 +357,60 @@ pub(crate) fn is_redirect(command: &str) -> bool {
     redirect_from_shell(command).is_some()
 }
 
-/// The redirect behind a shell command, when the command is one this module can serve without
-/// guessing. `None` means the call is left as the model wrote it.
-fn redirect_from_shell(command: &str) -> Option<Redirect> {
-    let segments = shell_segments(command)?;
+/// The redirect behind a shell command, and the directory a leading `cd` moved to.
+fn redirect_from_shell(command: &str) -> Option<(Option<String>, Redirect)> {
+    let (cd, rest) = leading_cd(command)?;
+    let segments = shell_segments(rest)?;
     let mut redirects = Vec::new();
     for words in segments {
         redirects.push(redirect_segment(&words)?);
     }
-    match redirects.len() {
-        0 => None,
-        1 => redirects.pop(),
-        _ => Some(Redirect::Compound(redirects)),
+    let redirect = match redirects.len() {
+        0 => return None,
+        1 => redirects.pop()?,
+        _ => Redirect::Compound(redirects),
+    };
+    Some((cd, redirect))
+}
+
+/// Split a leading `cd <path> &&` from the read it qualifies.
+///
+/// Only one bare path is a base change this can make without guessing. `cd -`, `cd ~/x`, a quoted
+/// or expanded path, a second argument, or a `cd` with no `&&` leaves the command as written, so
+/// the policy and the Gate see it.
+fn leading_cd(command: &str) -> Option<(Option<String>, &str)> {
+    let trimmed = command.trim();
+    let Some(after) = trimmed.strip_prefix("cd") else {
+        return Some((None, trimmed));
+    };
+    if !after.starts_with(char::is_whitespace) {
+        return Some((None, trimmed));
     }
+    let rest = after.trim_start();
+    let (dir, tail) = rest.split_once("&&")?;
+    let dir = dir.trim();
+    let tail = tail.trim();
+    if dir.is_empty()
+        || dir.starts_with('-')
+        || dir.starts_with('~')
+        || dir.chars().any(|c| {
+            c.is_whitespace() || matches!(c, '$' | '`' | '\'' | '"' | '\\' | '*' | '?' | '[' | '{')
+        })
+        || tail.is_empty()
+    {
+        return None;
+    }
+    Some((Some(dir.to_owned()), tail))
 }
 
 fn redirect_segment(words: &[String]) -> Option<Redirect> {
     match words.first()?.as_str() {
         "rg" | "grep" => {
-            search_from_words(words).map(|(pattern, paths)| Redirect::Search { pattern, paths })
+            search_from_words(words).map(|(pattern, paths, recursive)| Redirect::Search {
+                pattern,
+                paths,
+                recursive,
+            })
         }
         "cat" => cat_from_words(words),
         "sed" => sed_from_words(words),
@@ -359,26 +423,33 @@ fn redirect_segment(words: &[String]) -> Option<Redirect> {
 /// Split on unquoted `;`, the shape an exploratory `git status; git log; git diff` uses. A
 /// pipeline, a redirection, a conditional (`&&`/`||`), a substitution or a background job is not
 /// decomposed: the whole call is left as written. Empty segments are skipped, so a trailing `;`
-/// is not a second command.
+/// is not a second command; an empty *quoted* word is kept, because `grep ''` matches every line
+/// and dropping the word would turn it into a search for the next argument.
 fn shell_segments(command: &str) -> Option<Vec<Vec<String>>> {
     let mut segments = Vec::new();
     let mut words = Vec::new();
     let mut current = String::new();
     let mut quote: Option<char> = None;
+    let mut quoted = false;
 
     for ch in command.chars() {
         match quote {
             Some(q) if ch == q => quote = None,
             Some(_) => current.push(ch),
-            None if ch == '\'' || ch == '"' => quote = Some(ch),
+            None if ch == '\'' || ch == '"' => {
+                quote = Some(ch);
+                quoted = true;
+            }
             None if ch.is_whitespace() => {
-                if !current.is_empty() {
+                if !current.is_empty() || quoted {
                     words.push(std::mem::take(&mut current));
+                    quoted = false;
                 }
             }
             None if ch == ';' => {
-                if !current.is_empty() {
+                if !current.is_empty() || quoted {
                     words.push(std::mem::take(&mut current));
+                    quoted = false;
                 }
                 if !words.is_empty() {
                     segments.push(std::mem::take(&mut words));
@@ -391,7 +462,7 @@ fn shell_segments(command: &str) -> Option<Vec<Vec<String>>> {
     if quote.is_some() {
         return None;
     }
-    if !current.is_empty() {
+    if !current.is_empty() || quoted {
         words.push(current);
     }
     if !words.is_empty() {
@@ -577,36 +648,58 @@ fn git_diff(args: &[String]) -> Option<Redirect> {
 /// The search behind a shell segment, when the segment is one this module can serve without
 /// guessing.
 ///
-/// Accepted: `rg [--line-number] PATTERN [PATH…]` and `grep -r[n] PATTERN [PATH…]`. Rejected: any
+/// Accepted: `rg [-n] PATTERN [PATH…]`, `grep -r[nE] PATTERN [PATH…]`, and `grep -nE PATTERN FILE…`.
+/// `-E` is what the search engine already implements. A non-recursive `grep` is served only in its
+/// numbered form with named paths, because otherwise it reads stdin or walks nothing. Rejected: any
 /// flag that changes the answer (`-i`, `-c`, `-l`, `-e`, `-f`, `--glob`, `--hidden`) and every
 /// other program. The segment has already been split from its compound and has no operator left.
-fn search_from_words(words: &[String]) -> Option<(String, Vec<String>)> {
+fn search_from_words(words: &[String]) -> Option<(String, Vec<String>, bool)> {
     let program = words.first()?.as_str();
     if !matches!(program, "rg" | "grep") {
         return None;
     }
 
-    let recursive = words
-        .iter()
-        .any(|word| matches!(word.as_str(), "-r" | "-rn" | "-nr" | "--recursive"));
-    if program == "grep" && !recursive {
-        return None;
-    }
-
+    // `rg` is recursive by default; `grep` is not, and is served recursively only with `-r` or when
+    // every path it names is a file.
+    let mut recursive = program == "rg";
+    let mut numbered = false;
     let mut pattern = None;
     let mut paths = Vec::new();
+
     for word in &words[1..] {
-        if word.starts_with('-') {
-            let allowed = match program {
-                "rg" => matches!(word.as_str(), "-n" | "--line-number"),
-                "grep" => matches!(
-                    word.as_str(),
-                    "-n" | "-r" | "-rn" | "-nr" | "--line-number" | "--recursive"
-                ),
+        if let Some(long) = word.strip_prefix("--") {
+            let allowed = match (program, long) {
+                ("rg", "line-number") => true,
+                ("grep", "line-number") => {
+                    numbered = true;
+                    true
+                }
+                ("grep", "recursive") => {
+                    recursive = true;
+                    true
+                }
+                // Extended regex is what the search engine already implements, so the pattern
+                // means what it says rather than approximately.
+                ("grep", "extended-regexp") => true,
                 _ => false,
             };
             if !allowed {
                 return None;
+            }
+            continue;
+        }
+        if let Some(shorts) = word.strip_prefix('-') {
+            if shorts.is_empty() {
+                return None;
+            }
+            for flag in shorts.chars() {
+                match (program, flag) {
+                    ("rg", 'n') => {}
+                    ("grep", 'n') => numbered = true,
+                    ("grep", 'r') => recursive = true,
+                    ("grep", 'E') => {}
+                    _ => return None,
+                }
             }
             continue;
         }
@@ -616,7 +709,13 @@ fn search_from_words(words: &[String]) -> Option<(String, Vec<String>)> {
         }
     }
 
-    Some((pattern?, paths))
+    let pattern = pattern?;
+    // A non-recursive `grep` reads only the files it names, and the numbered form is the one whose
+    // shape matches a search. Without paths it reads stdin, which is not a file read at all.
+    if program == "grep" && !recursive && (!numbered || paths.is_empty()) {
+        return None;
+    }
+    Some((pattern, paths, recursive))
 }
 
 #[cfg(test)]
@@ -624,13 +723,26 @@ mod tests {
     use super::*;
 
     fn redirected(command: &str) -> Option<Redirect> {
-        redirect_from_shell(command)
+        redirect_from_shell(command).map(|(_, redirect)| redirect)
+    }
+
+    fn base_of(command: &str) -> Option<String> {
+        redirect_from_shell(command).and_then(|(cd, _)| cd)
     }
 
     fn search(pattern: &str, paths: &[&str]) -> Redirect {
         Redirect::Search {
             pattern: pattern.to_owned(),
             paths: paths.iter().map(|path| (*path).to_owned()).collect(),
+            recursive: true,
+        }
+    }
+
+    fn file_search(pattern: &str, paths: &[&str]) -> Redirect {
+        Redirect::Search {
+            pattern: pattern.to_owned(),
+            paths: paths.iter().map(|path| (*path).to_owned()).collect(),
+            recursive: false,
         }
     }
 
@@ -653,6 +765,75 @@ mod tests {
             Some(search("foo", &["src"]))
         );
         assert_eq!(redirected("grep foo src"), None);
+    }
+
+    #[test]
+    fn a_cd_before_a_read_becomes_the_base() {
+        assert_eq!(
+            base_of("cd docs/design && rg -n status"),
+            Some("docs/design".to_owned())
+        );
+        assert_eq!(
+            redirected("cd docs/design && rg -n status"),
+            Some(search("status", &[]))
+        );
+        assert_eq!(
+            base_of("cd /tmp/worker-0 && cat Cargo.toml"),
+            Some("/tmp/worker-0".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_cd_that_is_not_one_literal_path_is_not_redirected() {
+        for command in [
+            "cd - && rg foo",
+            "cd ~/code && rg foo",
+            "cd \"$HOME\" && rg foo",
+            "cd a b && rg foo",
+            "cd && rg foo",
+            "cd docs && rm -rf .",
+            "cd docs && rg foo | head",
+            "cd docs && rg foo && rm x",
+        ] {
+            assert_eq!(redirected(command), None, "`{command}`");
+        }
+    }
+
+    #[test]
+    fn an_extended_regex_over_named_files_is_a_search() {
+        assert_eq!(
+            redirected("grep -n -E '^## |^### ' docs/design/rig.md"),
+            Some(file_search("^## |^### ", &["docs/design/rig.md"]))
+        );
+        assert_eq!(
+            redirected("grep -nE foo src/lib.rs"),
+            Some(file_search("foo", &["src/lib.rs"]))
+        );
+        assert_eq!(
+            redirected("grep -rn -E foo src"),
+            Some(search("foo", &["src"]))
+        );
+    }
+
+    #[test]
+    fn a_grep_that_reads_stdin_or_changes_the_answer_is_not_redirected() {
+        for command in [
+            "grep -n foo",
+            "grep -E foo src/lib.rs",
+            "grep -n -i foo src/lib.rs",
+            "grep -n -c foo src/lib.rs",
+            "grep -n -l foo src/lib.rs",
+        ] {
+            assert_eq!(redirected(command), None, "`{command}`");
+        }
+    }
+
+    #[test]
+    fn an_empty_quoted_word_is_a_word() {
+        assert_eq!(
+            redirected("grep -n '' src/lib.rs"),
+            Some(file_search("", &["src/lib.rs"]))
+        );
     }
 
     #[test]

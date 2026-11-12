@@ -1,0 +1,22 @@
+{
+  "name": "facts-without-subprocess",
+  "why": "Zed thread 7768745e, 2026-11-09: whether CLI routing was right when the agent runs in Rust.",
+  "prompt": "A thread asked whether routing tools through CLI processes was right when the agent runs in Rust. Trace how `at-peek search` reaches the rig agent without a subprocess: the verb's facts type, its `collect`, and where the plugin publishes the answer. Cite each step as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "tools/at-peek/src/verbs/search.rs:98",
+    "tools/at-peek/src/verbs/search.rs:299",
+    "integrations/rig/src/tools.rs:292",
+    "integrations/rig/src/tools.rs:385",
+    "integrations/rig/src/tools.rs:421"
+  ],
+  "extra_paths": [],
+  "must_say": [
+    "SearchFacts",
+    "collect",
+    "agent_playbook.search"
+  ],
+  "tool_says": [
+    "agent_playbook.search"
+  ]
+}

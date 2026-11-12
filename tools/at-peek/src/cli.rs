@@ -75,6 +75,7 @@ fn dispatch(args: &[String]) -> Result<Exit, Fail> {
             let mode = verbs::search::Mode::of(parsed.has("--count"), parsed.has("--files-only"))?;
             verbs::search::run(&parsed.positionals, &opts, mode)?
         }
+        "outline" => verbs::outline::run(&parsed.positionals, &opts)?,
         other => {
             return Err(Fail::usage(format!(
                 "`{other}` is catalogued but not implemented"

@@ -1,14 +1,14 @@
 # Read-only inspection tools for agents
 
 **Status:** proposal, 2026-09-22; part built. Built and tested: `tools/at-core` (the shared output
-contract, path containment and text reading), `tools/at-peek` (`stat`, `slice`, `search`),
+contract, path containment and text reading), `tools/at-peek` (`stat`, `slice`, `search`, `outline`),
 `tools/at-crate` (`where`, `installed`, `files`, `slice`, `search`, `out`), `tools/at-recall`
 (`state`, `log`, `diff`, and the `pr` recipe), `tools/at-reach` (fleet inspection),
 `tools/at-cost` (`repos`, `tree`, `pid` — the process table, attributed to repositories),
 `tools/at-cardano` (read-only Cardano chain enquiry through Koios), and `tools/at-describe` (the
 catalogue). The toolkit is packaged by this repository's `flake.nix` and wired into the org's
 shells by `defrag-nix`. Everything else here is still the plan: the remaining verbs (`tree`, `find`,
-`outline`, `scope` in `peek`; `show`, `blame`, `why`, `churn` in `recall`), the other two recipes
+`scope` in `peek`; `show`, `blame`, `why`, `churn` in `recall`), the other two recipes
 (`review`, `release`), and the rule and skill drafts at the end — which stay drafts until the verbs
 they name exist.
 
@@ -182,7 +182,7 @@ needed — which matters, because the sandbox refuses one.
 | `at-peek tree [dir] [--depth N]` | What is in here | Gitignore-aware; reports counts for excluded paths |
 | `at-peek find <glob>` | Where is that file | Sorted; same ignore rules as `tree` |
 | `at-peek stat <path…>` | How big is it, when did it change | Lines, bytes, language — the file you just wrote |
-| `at-peek outline <path…>` | What does this file declare | Symbols with line ranges, grouped by kind |
+| `at-peek outline <path…>` | The sections of a file | ATX headings with line numbers, outside fenced code; the file's true line count |
 | `at-peek scope <path>:<line>` | What declaration is this line inside | The whole body, plus `--context N` outside it |
 | `at-peek slice <path>:<range>…` | These exact lines | Always line-numbered; `@symbol` for a whole declaration |
 | `at-peek search <pattern> [path…]` | Every mention | Regex; `--context N`; `--count`; `--files-only`; bottom line carries the true total |

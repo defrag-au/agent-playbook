@@ -1,14 +1,13 @@
 {
   "name": "trace-redirect",
-  "why": "The symbol trace a thread does before changing a handler.",
+  "why": "The symbol trace a thread does before changing a handler. Gold re-derived 2026-11-12: the stored lines pointed into the pre-refactor layout and every arm scored 0.00, including opencode.",
   "prompt": "Find how this plugin stops a plain `rg` or `grep` shell call from running, and what answers it instead. Cite where the command is recognised, where the call's handler is replaced, and where the search runs in process. Cite each definition as `path:line`.",
   "workdir": ".",
   "gold": [
-    "integrations/rig/src/redirect.rs:41",
-    "integrations/rig/src/redirect.rs:44",
-    "integrations/rig/src/redirect.rs:166",
-    "integrations/rig/src/tools.rs:142",
-    "integrations/rig/src/lib.rs:84"
+    "integrations/rig/src/redirect.rs:95",
+    "integrations/rig/src/redirect.rs:119",
+    "integrations/rig/src/redirect.rs:261",
+    "integrations/rig/src/redirect.rs:348"
   ],
   "extra_paths": [],
   "must_say": [],

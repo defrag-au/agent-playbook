@@ -1,0 +1,24 @@
+{
+  "name": "advertising-over-gating",
+  "why": "Zed thread 7768745e, 2026-11-09: the shift from gating shell reads to advertising and redirecting.",
+  "prompt": "A thread asked whether refusing shell reads at Gate was the right shape, and what to do instead. From the enforcement measurement, state the cost of a refusal versus a redirect, what a redirected call records, and why the replacement is worth it. Cite each finding as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "docs/design/rig.md:138",
+    "docs/design/rig.md:144",
+    "docs/design/rig.md:145",
+    "docs/design/rig.md:150",
+    "docs/design/rig.md:153"
+  ],
+  "extra_paths": [],
+  "must_say": [
+    "refusal",
+    "redirect",
+    "model call",
+    "agent_playbook.redirection",
+    "bounded"
+  ],
+  "tool_says": [
+    "agent_playbook.redirection"
+  ]
+}

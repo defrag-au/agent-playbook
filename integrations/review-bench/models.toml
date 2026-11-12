@@ -1,0 +1,39 @@
+# The review-bench model registry. A model is a configuration entry, not code.
+# `--dry-run` resolves it; `--allow-heavy` is required for `heavy = true`.
+#
+# Resident sizes are the measured download sizes, not guesses:
+#   ollama show qwen3-vl:30b-a3b-instruct    -> 20 GB (Q4_K_M)
+#   ollama show qwen3-vl:32b-instruct-q4_K_M -> 21 GB (Q4_K_M, dense)
+
+[models.local-30b]
+provider = "ollama"
+model = "qwen3-vl:30b-a3b-instruct"
+context = 65536
+temperature = 0.1
+seed = 42
+think = false
+resident_gb = 20
+max_resident_gb = 24
+
+[models.local-32b]
+provider = "ollama"
+model = "qwen3-vl:32b-instruct-q4_K_M"
+context = 65536
+temperature = 0.1
+seed = 42
+think = false
+resident_gb = 21
+max_resident_gb = 24
+# The dense model takes 16–52 s a case on the 48 GB M5 Pro, and memory pressure
+# is visible. It is an occasional run, never a baseline.
+heavy = true
+
+[models.frontier]
+provider = "deepseek"
+model = "deepseek-flash"
+context = 65536
+temperature = 0.1
+seed = 42
+think = false
+max_output_tokens = 512
+max_cost_usd = 1.00

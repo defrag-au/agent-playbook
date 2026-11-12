@@ -1,0 +1,25 @@
+{
+  "name": "eval-contamination",
+  "why": "Zed thread 7768745e, 2026-11-09: the contamination rule for the harness comparison.",
+  "prompt": "Explain the eval's contamination rule and how it is enforced. Say what makes a run contaminated, what a blocked corpus probe is tagged instead, and the two places the gold is sealed: the snapshot's history and the sandbox profile. Cite each finding as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "docs/design/rig-eval.md:197",
+    "docs/design/rig-eval.md:198",
+    "docs/design/rig-eval.md:199",
+    "integrations/rig-eval/src/snapshot.rs:3",
+    "integrations/rig-eval/src/snapshot.rs:5",
+    "integrations/rig-eval/src/sandbox.rs:4",
+    "integrations/rig-eval/src/sandbox.rs:7"
+  ],
+  "extra_paths": [],
+  "must_say": [
+    "contaminated",
+    "inspected-corpus",
+    "sandbox",
+    "history"
+  ],
+  "tool_says": [
+    "inspected-corpus"
+  ]
+}

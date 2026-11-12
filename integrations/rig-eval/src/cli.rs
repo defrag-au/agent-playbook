@@ -1,5 +1,6 @@
 //! The command line, and the paths it resolves.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -134,6 +135,7 @@ impl Args {
         if targets.is_empty() {
             targets = default_targets(&root);
         }
+        dedupe(&mut targets);
 
         let args = Self {
             root: root.clone(),
@@ -267,6 +269,12 @@ fn default_targets(root: &Path) -> Vec<Target> {
     ]
 }
 
+/// One run per label: `--home slim=…` and `--target rig:slim` name the same arm.
+fn dedupe(targets: &mut Vec<Target>) {
+    let mut labels = BTreeSet::new();
+    targets.retain(|target| labels.insert(target.label()));
+}
+
 fn rig_target(root: &Path, label: &str, path: &str) -> Target {
     Target::Rig(Home {
         label: label.to_owned(),
@@ -370,5 +378,20 @@ mod tests {
             parse_target(root, "opencode").expect("a target"),
             Target::Opencode
         ));
+    }
+
+    #[test]
+    fn a_home_named_twice_runs_once() {
+        let mut targets = vec![
+            parse_target(Path::new("/repo"), "rig:slim").expect("a target"),
+            Target::Rig(Home {
+                label: "slim".to_owned(),
+                path: PathBuf::from("/tmp/rig-home-slim"),
+            }),
+            parse_target(Path::new("/repo"), "rig:baseline").expect("a target"),
+        ];
+        dedupe(&mut targets);
+        let labels: Vec<String> = targets.iter().map(Target::label).collect();
+        assert_eq!(labels, ["rig:slim", "rig:baseline"]);
     }
 }

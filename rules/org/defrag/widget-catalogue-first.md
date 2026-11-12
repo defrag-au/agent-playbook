@@ -13,7 +13,8 @@ targets:
 **Before writing any widget, read the catalogue.**
 
 - `ui/egui-widgets/CATALOG.md` in `shared-crates` — ~100 widgets, one line each.
-- `ui/macroquad-widgets/CATALOG.md` — the macroquad set.
+- `ui/macroquad-widgets/CATALOG.md` and `gaming/macroquad-gamekit/CATALOG.md` in
+  `macroquad-kit` — the macroquad sets.
 
 Read the whole file. Do not grep instead.
 

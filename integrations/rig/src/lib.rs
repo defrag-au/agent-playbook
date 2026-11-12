@@ -29,8 +29,8 @@ mod tools;
 
 pub use redirect::{PublishedBatch, Redirection, ServedFact};
 pub use tools::{
-    PublishedDiff, PublishedLog, PublishedPr, PublishedSearch, PublishedSlice, PublishedStat,
-    PublishedState,
+    PublishedDiff, PublishedLog, PublishedOutline, PublishedPr, PublishedSearch, PublishedSlice,
+    PublishedStat, PublishedState,
 };
 
 use command_classify::{classify, Analysis, Effect as ShellEffect, Writes as ShellWrites};
@@ -84,8 +84,8 @@ impl Plugin for AdvertisedPlugin {
 /// `at_peek_slice`, `at_peek_stat`, `at_recall_state` and `at_recall_log` are not registered. The
 /// plain `cat`, `sed -n`, `head`, `git status`, `git log` and `git diff` forms are served in process
 /// by the same verbs, so the model keeps its shell habit and still gets the bounded answer. Only
-/// `at_peek_search`, `at_recall_diff` and `at_recall_pr` remain as explicit tools, because their
-/// answers are not a rename of a shell command.
+/// `at_peek_search`, `at_peek_outline`, `at_recall_diff` and `at_recall_pr` remain as explicit
+/// tools, because their answers are not a rename of a shell command.
 #[derive(Default)]
 pub struct SlimPlugin;
 

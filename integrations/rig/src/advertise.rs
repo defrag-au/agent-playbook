@@ -40,6 +40,12 @@ const ADVERTS: &[Advert] = &[
                     modification time for each path.",
     },
     Advert {
+        tool: "at_peek_outline",
+        call: "Call with one or more `paths`; `limit` bounds the headings across the call.",
+        advantage: "Unlike `grep -n '^#'`, it ignores fenced code blocks, numbers every heading, \
+                    and states the file's true line count.",
+    },
+    Advert {
         tool: "at_recall_state",
         call: "Call with no arguments; `summary` gives the frame without the rows.",
         advantage:
@@ -85,6 +91,7 @@ pub const TOOL_MAP: &str = concat!(
     "- at_peek_search — every mention, with the true total (instead of `rg | head`).\n",
     "- at_peek_slice — exact lines, the file's real size, and the range that continues (instead of `sed -n`).\n",
     "- at_peek_stat — lines, bytes, kind and modification time (instead of `wc -l` and `ls -l`).\n",
+    "- at_peek_outline — every heading with its line number and the file's true line count (instead of `grep -n '^#'`).\n",
     "- at_recall_state — branch, HEAD, upstream, any operation in progress and changed paths (instead of `git status`).\n",
     "- at_recall_log — commits with the true total (instead of `git log --oneline | head`).\n",
     "- at_recall_diff — a bounded per-file table, `patch` for the hunks (instead of `git diff`).\n",
@@ -110,6 +117,7 @@ mod tests {
             ("at_peek_search", at_peek::catalogue::find("search")),
             ("at_peek_slice", at_peek::catalogue::find("slice")),
             ("at_peek_stat", at_peek::catalogue::find("stat")),
+            ("at_peek_outline", at_peek::catalogue::find("outline")),
             ("at_recall_state", at_recall::catalogue::find("state")),
             ("at_recall_log", at_recall::catalogue::find("log")),
             ("at_recall_diff", at_recall::catalogue::find("diff")),
@@ -129,6 +137,7 @@ mod tests {
             "at_peek_search",
             "at_peek_slice",
             "at_peek_stat",
+            "at_peek_outline",
             "at_recall_state",
             "at_recall_log",
             "at_recall_diff",
@@ -145,6 +154,15 @@ mod tests {
         for line in &lines[1..8] {
             assert!(line.starts_with("- at_"), "{line}");
         }
+        let tools = lines
+            .iter()
+            .filter(|line| line.starts_with("- at_"))
+            .count();
+        assert_eq!(
+            tools,
+            ADVERTS.len(),
+            "every advert needs a map line: {TOOL_MAP}"
+        );
     }
 
     #[test]

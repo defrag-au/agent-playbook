@@ -17,8 +17,8 @@ use rig_harness_test_support::{
     scratch_home, Collected, Ended, ToolOutputs,
 };
 use rig_playbook::{
-    PlaybookPlugin, PublishedDiff, PublishedLog, PublishedPr, PublishedSlice, PublishedStat,
-    PublishedState,
+    PlaybookPlugin, PublishedDiff, PublishedLog, PublishedOutline, PublishedPr, PublishedSlice,
+    PublishedStat, PublishedState,
 };
 use serde::Serialize;
 
@@ -29,6 +29,11 @@ struct SliceCall {
 
 #[derive(Serialize)]
 struct StatCall {
+    paths: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct OutlineCall {
     paths: Vec<String>,
 }
 
@@ -71,8 +76,9 @@ fn the_read_tools_answer_in_process_and_publish_their_facts() {
     let dir = home.root().join("project");
     fs::create_dir_all(&dir).expect("fixture dir");
     fs::write(dir.join("a.rs"), "one\ntwo\nthree\n").expect("fixture file");
+    fs::write(dir.join("doc.md"), "# One\n\n## Two\n").expect("fixture outline");
     git(&dir, &["init", "--quiet"]);
-    git(&dir, &["add", "a.rs"]);
+    git(&dir, &["add", "a.rs", "doc.md"]);
     git(&dir, &["commit", "--quiet", "-m", "initial"]);
     fs::write(dir.join("a.rs"), "one\ntwo\nthree\nfour\n").expect("second revision");
     git(&dir, &["add", "a.rs"]);
@@ -108,6 +114,14 @@ fn the_read_tools_answer_in_process_and_publish_their_facts() {
                 paths: vec!["a.rs".to_owned()],
             })
             .expect("stat arguments"),
+        ),
+        MockStreamEvent::tool_call(
+            "o1",
+            "at_peek_outline",
+            serde_json::to_value(OutlineCall {
+                paths: vec!["doc.md".to_owned()],
+            })
+            .expect("outline arguments"),
         ),
         MockStreamEvent::tool_call(
             "r1",
@@ -163,6 +177,11 @@ fn the_read_tools_answer_in_process_and_publish_their_facts() {
         outputs["t1"]
     );
     assert!(
+        outputs["o1"].contains("# at-peek outline"),
+        "{}",
+        outputs["o1"]
+    );
+    assert!(
         outputs["r1"].contains("# at-recall state"),
         "{}",
         outputs["r1"]
@@ -214,6 +233,17 @@ fn the_read_tools_answer_in_process_and_publish_their_facts() {
         .expect("stat facts");
     assert_eq!(stat.0.rows[0].path, "a.rs");
     assert_eq!(stat.0.rows[0].lines, Some(5));
+
+    let outline: PublishedOutline = record("at_peek_outline")
+        .published
+        .as_ref()
+        .expect("published outline facts")
+        .get()
+        .expect("readable outline facts")
+        .expect("outline facts");
+    assert_eq!(outline.0.targets[0].path, "doc.md");
+    assert_eq!(outline.0.targets[0].headings_total, 2);
+    assert_eq!(outline.0.targets[0].headings[1].depth, 2);
 
     let state: PublishedState = record("at_recall_state")
         .published

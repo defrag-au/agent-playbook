@@ -255,7 +255,7 @@ reads it needs without an approval per command and without a bound hidden in a p
 
 | Binary | Reads | Verbs |
 | --- | --- | --- |
-| `at-peek` | working-tree files, and spawns nothing at all | `stat`, `slice`, `search` |
+| `at-peek` | working-tree files, and spawns nothing at all | `stat`, `slice`, `outline`, `search` |
 | `at-crate` | extracted crate source, `Cargo.lock`, and build-script output; spawns nothing | `where`, `installed`, `files`, `slice`, `search`, `out` |
 | `at-recall` | `.git` objects and refs, through one subprocess — `git`, read verbs only | `state`, `log`, `diff`, `pr` |
 | `at-reach` | a private fleet tree, and one read-only probe over `ssh` (or `sh` locally) | `root`, `hosts`, `probe` |

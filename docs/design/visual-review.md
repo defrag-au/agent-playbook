@@ -6,7 +6,7 @@ model half answers a different question: *what does this picture look like to a
 reviewer?* This is the design for running the corpus through models, not the
 corpus itself, and it is deliberately a benchmark harness rather than an agent.
 
-The corpus lives in the sibling `shared-crates` checkout, at
+The corpus lives in the sibling `macroquad-kit` checkout, at
 `ui/macroquad-storybook/review`; it is data. The runner lives here, under
 `integrations/`, because it is an evaluation of models and harnesses, not part
 of the installed agent toolkit.
@@ -90,33 +90,43 @@ time; `keep_alive` is bounded and a model is unloaded before the next one is
 loaded. The registry carries a `max_resident_gb` and the runner refuses a model
 whose resident size plus context exceeds it.
 
-The measured local calibration:
+The measured local calibration, from `integrations/review-bench` over the
+13-case corpus, three runs per case (39 calls):
 
 | Model | Resident | Mean per case | Result |
 | --- | --- | --- | --- |
-| `qwen3-vl:30b-a3b-instruct` (Q4_K_M) | 20 GB | 3.8 s | 1/5 defects, 1/8 clean false-positive cases (2 non-matching reports in all), mean IoU 0.26 on the one detected case |
+| `qwen3-vl:30b-a3b-instruct` (Q4_K_M) | 20 GB | 4.0 s | 6/15 defect rows detected (2 of 5 cases), 24/24 clean rows false-positive, mean IoU 0.13 |
 | `qwen3-vl:32b-instruct-q4_K_M` (dense) | 21 GB | 16–52 s | interrupted at 11/13; memory pressure; not scored |
 
-The 30B run predates the stick crop fix, so its `stick-clean` false positive
-was the crop's edge and a re-run should differ on that case. The rest of the
-numbers are from the prompt and rubric as they stand.
+The 30B's answers were identical across all three runs, so no case is flagged
+unstable — the failure is systematic, not noisy. Every one of the 39 answers was
+a single report of content clipped at the top or bottom edge of the image,
+including all 24 clean rows. It described the one real right-edge cut
+(`stick-before`, IoU 0.24) and did not name the defect on the other four defect
+cases; its `holder-before` "detection" is a bottom-edge box at IoU 0.01, which
+the intersection-only match rule counts. It is not usable as a routine reviewer.
 
-The 30B-A3B is the only routine local model. It caught the obvious right-edge
-cut and missed missing content, subtle spacing and the left-edge fragments. The
-dense 32B is an occasional, flagged run (`--allow-heavy`), not a baseline; on
-this machine it is slower than reviewing the thirteen cases by hand.
+The pre-fix run's `stick-clean` false positive was attributed to the crop edge.
+After the crop fix the same case is still reported, now as "the bottom of the
+screen is clipped, cutting off the lower part of the instruction text" — the
+image shows that text complete, with empty space below it. The crop was not the
+cause: the model asserts an edge cut on every screen, clean or not.
 
-The conclusion is not "buy a bigger local model". It is: local for the routine
-pass, frontier for the cases the local model misses, and the corpus decides
-which is which.
+The conclusion is not "buy a bigger local model". The 30B's failure is not
+resolution or capacity; it does not check the screen against the intent. Until a
+local model scores, the deterministic report carries the routine pass and the
+corpus selects between frontier arms. The dense 32B is an occasional, flagged
+run (`--allow-heavy`), not a baseline; on this machine it is slower than
+reviewing the thirteen cases by hand.
 
 ### 5. Reproducibility
 
 Temperature 0.1, top-p 0.9, fixed seed, thinking off unless the case is being
-deliberately compared with it on. Record the model digest and the hashes of the
-corpus, rubric and image files. Three runs per model; report the median and flag
-a case whose answer changes between runs as unstable. A model that is right once
-in three is not reliable.
+deliberately compared with it on. Record the model tag and the hashes of the
+corpus, rubric and image files. Three runs per model, every run reported beside
+the aggregate, and a case whose answer changes between runs flagged unstable —
+kind or box, not the note's wording. A model that is right once in three is not
+reliable.
 
 ### 6. Images and coordinates
 
@@ -166,16 +176,20 @@ limitation, not a prompt quirk.
 ### 9. Artifacts
 
 ```
-.tmp/review-runs/<model>-<digest>/<run>/<slug>.json
-.tmp/review-runs/<model>-<digest>/summary.json
-.tmp/review-runs/<model>-<digest>/summary.txt
+.tmp/review-runs/<model>/<run>/<slug>.json
+.tmp/review-runs/<model>/summary.json
+.tmp/review-runs/<model>/summary.txt
 ```
 
-Each case artifact holds the slug, model, digest, run, elapsed time, prompt and
-image hashes, the typed answer, the score and any error. The summary is a table:
-per case detection, IoU, false positives, latency, parse error; then the
+Each case artifact holds the slug, provider, model, run, elapsed time, prompt
+and image hashes, the typed answer, the score and any error. The summary is a
+table: per case detection, IoU, false positives, latency, parse error; then the
 aggregate. The corpus stays tracked and model-agnostic; the answers stay in
 `.tmp`.
+
+The model is named by its registry tag, not its digest: a tag can be repointed
+(`qwen3-vl:30b` was retagged `-instruct`), so a run's weights are only as pinned
+as the tag. Capturing the provider's digest is a follow-up.
 
 ### 10. Crate boundary
 
@@ -208,7 +222,7 @@ difference a model result.
 ```sh
 # from the agent-playbook repo root
 cargo run --manifest-path integrations/review-bench/Cargo.toml -- \
-  --corpus ../shared-crates/ui/macroquad-storybook/review \
+  --corpus ../macroquad-kit/ui/macroquad-storybook/review \
   --model local-30b --runs 3 --out .tmp/review-runs
 ```
 
@@ -237,9 +251,10 @@ cargo run --manifest-path integrations/review-bench/Cargo.toml -- \
 
 ## What would make this not worth it
 
-- The local 30B stays at one detection in five and the frontier arm costs more
-  than a human review for the same stories. Then the answer is the deterministic
-  report plus a human pass, and the corpus remains a model-selection tool.
+- The local 30B stays at two detections in five, with every clean screen
+  reported, and the frontier arm costs more than a human review for the same
+  stories. Then the answer is the deterministic report plus a human pass, and the
+  corpus remains a model-selection tool.
 - The corpus does not predict new stories. A model that wins here and misses the
   next composition is a corpus problem; extend the corpus before trusting the
   number.
@@ -250,6 +265,11 @@ cargo run --manifest-path integrations/review-bench/Cargo.toml -- \
 
 ## Open decisions
 
+- **A minimum overlap for a detection.** The rule as written counts any
+  intersection, so `holder-before` scores as detected at IoU 0.01 and a box over
+  the whole screen would match everything. The candidate rule is IoU ≥ 0.1, or a
+  report whose centre falls inside the expected box when that box is small.
+  Decide before comparing models across runs.
 - **`other` matching.** Accept `other` for any expected kind, or require its note
   to name the expected defect. The first run did not exercise it; decide when a
   model uses it.
@@ -265,9 +285,9 @@ cargo run --manifest-path integrations/review-bench/Cargo.toml -- \
 
 ## Reading map
 
-- `~/code/defrag/shared-crates/ui/macroquad-storybook/review/README.md` — corpus
+- `~/code/defrag/macroquad-kit/ui/macroquad-storybook/review/README.md` — corpus
   layout, provenance and scoring.
-- `~/code/defrag/shared-crates/ui/macroquad-storybook/review/RUBRIC.md` — the
+- `~/code/defrag/macroquad-kit/ui/macroquad-storybook/review/RUBRIC.md` — the
   fixed prompt.
 - `rig-eval.md` — the coding-agent runner whose `RunResult` and report shape this
   should mirror.

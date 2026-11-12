@@ -12,6 +12,7 @@
 use std::path::{Path, PathBuf};
 
 use at_peek::paths::Root;
+use at_peek::verbs::outline::{self as outline_verb, OutlineFacts};
 use at_peek::verbs::search::{self, Mode, SearchFacts};
 use at_peek::verbs::slice::{self as slice_verb, SliceFacts};
 use at_peek::verbs::stat::{self as stat_verb, StatFacts};
@@ -34,6 +35,7 @@ enum ToolKind {
     Search,
     Slice,
     Stat,
+    Outline,
     State,
     Log,
     Diff,
@@ -44,6 +46,7 @@ const ALL: &[ToolKind] = &[
     ToolKind::Search,
     ToolKind::Slice,
     ToolKind::Stat,
+    ToolKind::Outline,
     ToolKind::State,
     ToolKind::Log,
     ToolKind::Diff,
@@ -74,6 +77,7 @@ impl Toolset {
             tools: &[
                 ToolKind::Search,
                 ToolKind::Slice,
+                ToolKind::Outline,
                 ToolKind::State,
                 ToolKind::Diff,
                 ToolKind::Pr,
@@ -83,10 +87,15 @@ impl Toolset {
     }
 
     /// The lightweight reads left out. Their plain shell forms are served by the redirect;
-    /// `at_peek_search`, `at_recall_diff` and `at_recall_pr` remain.
+    /// `at_peek_search`, `at_peek_outline`, `at_recall_diff` and `at_recall_pr` remain.
     pub const fn slim() -> Self {
         Self {
-            tools: &[ToolKind::Search, ToolKind::Diff, ToolKind::Pr],
+            tools: &[
+                ToolKind::Search,
+                ToolKind::Outline,
+                ToolKind::Diff,
+                ToolKind::Pr,
+            ],
             stat: StatStyle::Report,
         }
     }
@@ -148,6 +157,15 @@ fn add_with_description(app: &mut App, tools: Toolset, description: Description)
                 style: tools.stat,
                 description,
                 ..Stat::default()
+            },
+            options(),
+        );
+    }
+    if tools.has(ToolKind::Outline) {
+        app.add_tool_per_call(
+            Outline {
+                description,
+                ..Outline::default()
             },
             options(),
         );
@@ -309,6 +327,14 @@ pub struct PublishedStat(pub StatFacts);
 
 impl rig_harness::rig_core::tool::ContextValue for PublishedStat {
     const KEY: &'static str = "agent_playbook.stat";
+}
+
+/// The outline answer: each file's headings and its true line count.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PublishedOutline(pub OutlineFacts);
+
+impl rig_harness::rig_core::tool::ContextValue for PublishedOutline {
+    const KEY: &'static str = "agent_playbook.outline";
 }
 
 /// The state answer: branch, HEAD, pending operation and changed paths.
@@ -561,6 +587,68 @@ impl Tool for Stat {
             StatStyle::Content => outcome.report.content_text(),
         };
         publish(context, PublishedStat(facts))?;
+        Ok(text)
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct Outline {
+    base: Option<PathBuf>,
+    description: Description,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OutlineArgs {
+    /// The files to outline.
+    pub paths: Vec<String>,
+    /// Cap the headings across the invocation; default 200, ceiling 2000.
+    #[serde(default)]
+    pub limit: Option<u16>,
+}
+
+fn outline_in_process(
+    base: Option<&Path>,
+    args: OutlineArgs,
+) -> Result<(OutlineFacts, PeekOpts), ToolExecutionError> {
+    let opts = peek_opts(base, args.limit, false)?;
+    let facts = outline_verb::collect(&args.paths, &opts).map_err(fail)?;
+    Ok((facts, opts))
+}
+
+impl PerCallTool for Outline {
+    fn at(&self, at: CallPlace) -> Self {
+        Self {
+            base: Some(at.base),
+            description: self.description,
+        }
+    }
+}
+
+impl Tool for Outline {
+    const NAME: &'static str = "at_peek_outline";
+    type Args = OutlineArgs;
+    type Output = String;
+    type Error = ToolExecutionError;
+
+    fn description(&self) -> String {
+        self.description
+            .render(Self::NAME, at_peek::catalogue::find("outline"))
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        args_schema::<OutlineArgs>()
+    }
+
+    async fn call(
+        &self,
+        context: &mut ToolContext,
+        args: OutlineArgs,
+    ) -> Result<String, ToolExecutionError> {
+        let base = self.base.clone();
+        let (facts, opts) = blocking(move || outline_in_process(base.as_deref(), args)).await?;
+        let text = facts.report(&opts).report.render();
+        publish(context, PublishedOutline(facts))?;
         Ok(text)
     }
 }

@@ -10,7 +10,7 @@ tracks what those threads actually cost, and the ways to drive rig through them.
 ## What the real sessions look like
 
 An audit of the Zed thread store (`~/Library/Application Support/Zed/threads/threads.db`, 143
-threads exported 2026-10-20; the live store now holds 302) gives the shape of the work:
+threads exported 2026-10-20; the live store held 303 on 2026-11-11) gives the shape of the work:
 
 | Measure | Value |
 | --- | --- |
@@ -52,12 +52,209 @@ not a prose reference.
 | 3 | **Draft a PR** — "Summarise this branch for a PR body." | Commits, diffstat, changed areas | The commit hashes and representative files | `at_recall_pr`, `at_recall_diff`, `at_recall_log` |
 | 4 | **Run the devshell tests** — `cargo test` for the plugin; report the totals | Run under the devshell, then locate the harness test | The harness test's `path:line` | `shell`, `at_peek_slice` |
 | 5 | **Pre-edit state** — "What is dirty, and what changed since main?" | Status plus a diff summary | The changed paths and the branch | `at_recall_state`, `at_recall_diff` |
+| 6 | **Rig vs factotum** — "Does rig replace factotum?" | The decision, the ownership boundary, the v2 constraint | Four lines in `rig.md` | `at_peek_search`, `at_peek_slice` |
+| 7 | **OTel or DuckDB** — "Is OTel required?" | What is canonical, what a span lacks, what would bring OTel back | Five lines in `rig.md` | `at_peek_search`, `at_peek_slice` |
+| 8 | **Eval contamination** — "How is the gold sealed?" | The rule, the tags, history, the sandbox | Seven lines across three files | `at_peek_search`, `at_peek_slice` |
+| 9 | **Facts without a subprocess** — "How does `at-peek search` reach rig?" | The facts type, `collect`, publication | Six lines across the verb and the plugin | `at_peek_search`, `at_peek_slice` |
+| 10 | **Redirect declines** — "What does the redirect serve?" | Served forms, the compound stop, declined flags | Eight lines in `redirect.rs` | `at_peek_search`, `at_peek_slice` |
+| 11 | **Advertising over gating** — "Why redirect instead of refuse?" | Refusal versus redirect cost, the record, the bounded answer | Five lines in the enforcement measurement | `at_peek_search`, `at_peek_slice` |
+| 12 | **Zed thread tools beside at-** — "Why not in the namespace?" | Private store, writes, never-print contract | Six lines across the doc and README | `at_peek_search`, `at_peek_slice` |
+| 13 | **The skipped rule** — "Audit the secrets rule from `rules/`" | A false zero, the bound that exposes it, two quoted lines | The definition and the report-don't-delete instruction | `at_peek_search`, the CLI's `--include-secret-paths` |
 
 Scenario 4 is the one that tests the devshell rule as well as the read rules: a bare `cargo` in a
 flake repository is the failure the `rust-devshell-first` rule exists to prevent. The plan called
 for a real failing test. No such failure exists in the repository today, and seeding one would
 measure a fixture rather than the repository, so the scenario runs the suite that is there and
 scores the totals. The devshell half — the part the rule governs — is real either way.
+
+Scenarios 6–12 were mined on 2026-11-11 from the exported rig thread (`Rig HawDB OTEL agent
+observability`, 78 user messages) and the analyser recovery thread. Each prompt is a real question
+from one of them, cut to an answer the committed tree can settle. The first runs, all on `rig:gated`
+with `deepseek/deepseek-flash`, one run each:
+
+| Scenario | Score | Wall | Model calls | Tool calls | Output | Missed |
+| --- | --- | --- | --- | --- | --- | --- |
+| `rig-vs-factotum` | 1.00 | 100.3 s | 6 | 8 | 34.2 KB | — |
+| `otel-or-duckdb` | 1.00 | 18.8 s | 6 | 9 | 23.5 KB | — |
+| `advertising-over-gating` | 1.00 | 28.3 s | 11 | 15 | 53.6 KB | — |
+| `eval-contamination` | 0.92 | 29.0 s | 13 | 15 | 58.7 KB | `snapshot.rs:5` |
+| `redirect-declines` | 0.93 | 19.2 s | 7 | 10 | 49.0 KB | `redirect.rs:327` |
+| `facts-without-subprocess` | 0.89 | 37.7 s | 10 | 15 | 55.4 KB | `tools.rs:292` |
+| `zed-thread-tools-not-at` | 0.92 | 26.8 s | 11 | 15 | 81.1 KB | `README.md:44` |
+
+The first `facts-without-subprocess` run scored 0.60 because its gold named commentary lines
+rather than the `SearchFacts`, `collect` and publish definitions; the gold was corrected before the
+run above. The first `zed-thread-tools-not-at` run missed a `must_say` that required the literal
+"never prints" phrased as the README has it; the check now names the concepts (`message text`,
+`result body`). One run each is a smoke test, not a comparison.
+
+**The local arm is not ready for this corpus.** On 2026-11-11 `local/qwen3-vl:8b` ran
+`rig-vs-factotum` on `rig:slim-local` and `rig:advertised-local` (the same scenario, separate local
+homes): both scored 0.12. The slim arm made 0 tool calls in 182 s; the advertised arm made 2
+`at_peek_search` calls, 482 B of output, in 284 s. Both answers cited `AGENTS.md` rather than
+`docs/design/rig.md` — the model used the system-prompt copy and stopped there. Advertising changed
+the model's tool habit, not its answer. Do not run the local matrix until a stronger local model or
+an explicit "read the repository files, not AGENTS.md" instruction is chosen.
+
+### The long-scenario matrix (2026-11-11)
+
+Seven long scenarios × three frontier arms, one run each, `deepseek/deepseek-flash`, two workers:
+
+| Target | Runs | Median score | Median tool calls | Median output | Median model calls |
+| --- | --- | --- | --- | --- | --- |
+| `rig:advertised` | 7 | 1.00 | 10 | 47.3 KB | 8 |
+| `rig:baseline` | 7 | 1.00 | 11 | 41.3 KB | 8 |
+| `rig:slim` | 7 | 1.00 | 13 | 51.0 KB | 9 |
+
+Every run scored at least 0.83 and no run was refused. The slim arm had the only sub-1.00
+(`eval-contamination`, 0.83) and the highest median tool calls; the advertised arm had the lowest.
+Those differences are one run each, and precision was 0.10–0.33 across all arms because the models
+over-cite — read recall and output beside the score. The 21 runs cost $0.12 in total (4.1M input and
+82k output tokens). This is a smoke test, not a ranking; the next step is paired repeats (two or
+three, still under $1) or a harder scenario the baseline fails.
+
+### The skipped rule: a scenario built around a false zero (2026-11-12)
+
+The thirteenth scenario was written to the one failure the earlier corpus could not produce: a
+question whose naive answer is **confidently wrong**. `rules/core/no-committed-secrets.md` is
+the source of truth for the secrets policy, and `at-peek`'s secret-shaped guard matches its
+filename. A default search of `rules/` therefore prints
+
+```
+# walked 40 files
+# skipped: 1 secret-shaped
+# 0 matches in 0 files
+```
+
+The prompt asks for the rule, both quoted instructions, and what each search did not read. If a
+harness believes the zero, or lists `rules/` and never searches, the answer is "no rule governs
+secrets".
+
+| Target | Score | Tool calls | Output | Missed |
+| --- | --- | --- | --- | --- |
+| `rig:slim` | 1.00 | 16 | 12.3 KB | — |
+| `rig:advertised` | 1.00 | 12 | 7.9 KB | — |
+| `rig:baseline` | 1.00 | 14 | 6.7 KB | — |
+| `opencode` | 0.86 | 16 | 25.3 KB | `at_peek_search` |
+| `pi` | 0.86 | 22 | 29.5 KB | `at_peek_search` |
+
+All five found the trap, quoted `# skipped: 1 secret-shaped`, re-ran with
+`--include-secret-paths`, and cited `:13` and `:30`. The honest bound did the work the scenario
+was built to test: no arm answered from the false zero. So this is a ceiling case for every
+harness, and the only separating check is the rig plugin's tool name, which opencode and Pi cannot
+have by construction. The first smoke (before that check was corrected) scored all three rig arms
+0.86 for the same reason.
+
+Three things it found that are worth acting on:
+
+- **A named path still returns a false zero.** `at-peek search secret
+  rules/core/no-committed-secrets.md` skips the file it was pointed at and reports `0 matches`,
+  and `slice` refuses it too. opencode and Pi both called this out as a false fact rather than a
+  refusal. Whether a named path should override the guard, or the guard should refuse loudly, is an
+  open decision.
+- **`tool_says` naming a `ContextValue` key measures the wrong thing.** `agent_playbook.search` is
+  never printed by the search tool; it appears in the stream only because
+  `facts-without-subprocess` reads `tools.rs`, which declares the key, and
+  `agent_playbook.redirection` passes only because `advertising-over-gating` reads the design doc
+  that names it. The check in this scenario now names `at_peek_search`, which the stream records as
+  the tool result's name. A cross-harness comparison still needs per-check applicability, or
+  opencode and Pi are capped below 1.00 on every scenario that requires a rig tool.
+- **Snapshot file counts are 478, not 483.** HEAD tracks five of the corpus files; the snapshot
+  rewrites them out of history and the working tree. Counting gold against `git archive HEAD`
+  includes those five, so a true total measured that way is five files high.
+
+Two gold boundaries were also corrected from the first matrix: `redirect-declines` no longer asks
+for `redirect.rs:327` — no arm cited the boolean wrapper, and `:346` is the dispatch they cite —
+and `zed-thread-tools-not-at` asks for `README.md:43`, the sentence the `:41-43` citation covers,
+rather than `:44`, which is about naming a thread.
+
+Arm variance is large at this sample size: two smokes of this one scenario gave `rig:advertised`
+23 tool calls and 20.4 KB in the first, 12 and 7.9 KB in the second, at the same score. One run
+each is a smoke test, not a rate.
+
+### Where rig loses the call count (2026-11-12)
+
+The two exploratory scenarios are where rig spends several times opencode's calls. One run each at
+HEAD, `deepseek/deepseek-flash`, two workers:
+
+| Scenario | Target | Model calls | Tool calls | Output | Score |
+| --- | --- | --- | --- | --- | --- |
+| `recover-investigation` | opencode | 4 | 6 | 65.7 KB | 0.75 |
+| | `rig:baseline` | 14 | 20 | 84.3 KB | 0.50 |
+| | `rig:advertised` | 19 | 28 | 83.2 KB | 0.75 |
+| | `rig:slim` | 17 | 29 | 106.5 KB | 1.00 |
+| `trace-redirect` | opencode | 3 | 6 | 112.6 KB | 0.75 |
+| | `rig:baseline` | 10 | 14 | 71.5 KB | 1.00 |
+| | `rig:advertised` | 9 | 12 | 67.3 KB | 1.00 |
+| | `rig:slim` | 10 | 14 | 72.3 KB | 0.50 |
+
+The cause is in the shell calls, not the model. Of the 16 shell calls in
+`recover-investigation`/`rig:advertised`, **14 begin `cd <snapshot> &&`** — the model makes the
+snapshot absolute because the shell tool does not keep its `cwd`. The redirect declines any `&&`
+before it looks at the read, so those 14 are never served; the remaining reads use
+`grep -n -E` (an extended-regex flag it declines) or a pipeline (`| sed -n`, `| head`). Only 6
+redirections fired for 16 shell calls. In `trace-redirect` the same shape gives 3 redirections for
+12 shell calls.
+
+Advertising does not close this: it raises the call count (19 against 14 on
+`recover-investigation`) because a model told about seven tools tries more of them. The toolkit is
+not losing on description, it is losing because the forms the model actually writes are declined.
+
+Three levers, in order of the calls they recover:
+
+1. **`cd <literal> && <served read>`** — strip a leading `cd` to one literal path and use it as the
+   base; every remaining segment must still be a served read, so `cd x && rm -rf` declines as it
+   does today. Fourteen of the 16 shell calls here begin that way, but most continue into a pipeline
+   or a second `&&`, so only the pure ones are servable.
+2. **`-E` on `grep`/`rg`** — `grep -n -E '^## '` is an extended regex, which is the engine the
+   search already uses, so accepting it interprets the pattern correctly rather than approximately.
+   `-i`, `-l` and `-c` stay declined: they change the answer, and the existing tests say so.
+3. **Pipelines** — `rg | head` is the habit the toolkit exists to replace, and serving it as a
+   bounded search with the true total is arguably the better answer. But `grep | grep -v` is a
+   different query, and the module's rule is that a wrong substitution is worse than none. This one
+   is a decision, not a fix.
+
+**Levers 1 and 2 are in (2026-11-12).** `cd <literal> &&` is stripped to a base, `grep -E` is
+accepted, and an empty quoted word is kept rather than dropped — which had turned `grep ''` into a
+search for the next argument. 42 unit tests, clippy and fmt clean. The redirect fires on the form:
+`cd docs/design && grep -E '...'` comes back as `# at-peek search · design · /…/`. The call count
+did not move: redirections went 6 → 7 (`recover-investigation`, advertised) and 6 → 9 (slim),
+model calls 19 → 18 and 17 → 18, tool calls 28 → 25 and 29 → 27. Both rig arms' scores moved
+*down* in the same run, and `rig:baseline` — which registers no redirect at all — moved from 0.50
+to 0.00 on the same scenario, so that swing is run variance, not the change.
+
+The transcript says why redirect coverage cannot close a 3–5× gap. opencode's
+`recover-investigation` run is **five** calls: `ls && git log`, one `grep`, then three whole-file
+reads. `rig:baseline`'s is **seventeen**: one `at_recall_state`, eight `at_peek_search` calls with
+heading and keyword patterns, seven `read` calls, one diff. The model is not being refused; it is
+repeatedly asking for a file's shape and then for ranges of it. A served read is still one tool
+call and one model turn, so redirecting more shell forms cannot reduce the count — only asking for
+fewer, larger things can.
+
+The missing affordance was an **outline**: one call returning each file's headings with line
+numbers and its true line count, which is what `grep -n -E '^## '` and the eight searches were
+hand-rolling.
+
+**Built 2026-11-12.** `at-peek outline <path>…` is a catalogued verb, an `at_peek_outline` tool in
+all four tool sets (including slim, because no shell form maps to it), and an advertised entry with
+a map line. It reports ATX headings outside fenced code blocks, removes a closing hash run only
+where CommonMark allows one, and states the file's true line count. In the snapshot it answers
+`docs/design/rig.md` in one call: 18 headings, 420 lines, and the shell snippets inside fences
+ignored.
+
+The first measurement is a wash. One run each, four targets, the same two scenarios: the tool is
+adopted (`rig:baseline` twice, `rig:advertised` once; slim never called it) and the output is
+correct, but the call count did not fall — baseline 24 tool calls against 17 before, advertised 23
+against 25, slim 39 against 27 — while opencode moved 5 → 9 on the same scenario. The between-run
+spread is larger than any arm difference, so one run each cannot attribute anything. The next
+measurement is three repeats of these two scenarios with the verb and without it.
+
+`trace-redirect`'s gold was also stale: the stored lines pointed into the layout before the
+redirect was refactored, so on 2026-11-12 every arm scored 0.00, opencode included. The gold is now
+`:95` (the interception system), `:119` (the handler replaced), `:261` (`search::collect` in
+process) and `:348` (the `rg`/`grep` arm), which is what every arm cites unprompted. The 2026-11-09
+`trace-redirect` row in `harness-comparison.md` was measured against a different source layout and
+is not comparable with these runs.
 
 ## What to measure
 

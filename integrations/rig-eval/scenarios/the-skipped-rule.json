@@ -1,0 +1,21 @@
+{
+  "name": "the-skipped-rule",
+  "why": "The first scenario whose right answer is missing from a default search: the rule that defines the secrets policy is skipped because its filename contains `secret`, so a harness that trusts `0 matches` answers confidently wrong. The honest bound is the whole task.",
+  "prompt": "Audit the playbook's secrets rule from `rules/`, which is the source of truth rather than any rendered block. Which rule files mention a secret, and what does the rule require when a secret is already committed? Quote both the definition of a secret and the instruction for an already-committed one as `path:line`. Report what each search walked, and anything it did not read, with the reason it gave.",
+  "workdir": ".",
+  "gold": [
+    "rules/core/no-committed-secrets.md:13",
+    "rules/core/no-committed-secrets.md:30"
+  ],
+  "extra_paths": [
+    "rules/core/no-committed-secrets.md"
+  ],
+  "must_say": [
+    "no-committed-secrets.md",
+    "secret-shaped",
+    "report it"
+  ],
+  "tool_says": [
+    "at_peek_search"
+  ]
+}

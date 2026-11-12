@@ -1,19 +1,19 @@
 ---
 name: android-shot
-description: Use when putting a macroquad app on an Android device — build or install its APK, launch it cold, read SAPP and crash logs, and capture the screen — for an experiment on a real phone or TV. Runs android-shot, which composes shared-crates' mq-apk and owns adb, and reads its report.
+description: Use when putting a macroquad app on an Android device — build or install its APK, launch it cold, read SAPP and crash logs, and capture the screen — for an experiment on a real phone or TV. Runs android-shot, which composes macroquad-kit's mq-apk and owns adb, and reads its report.
 argument-hint: <build flags, e.g. "--package au.defrag.montager --library montage_mq --crate montage-mq --abi arm64-v8a">
 ---
 
 # android-shot
 
 The device half of the macroquad Android loop. `android-shot` builds an APK through
-shared-crates' `mq-apk` (or takes an `--apk`), installs it with `adb install -r`, wakes the
+`macroquad-kit`'s `mq-apk` (or takes an `--apk`), installs it with `adb install -r`, wakes the
 device, starts the activity cold, waits, reads the logs, and optionally captures the
 framebuffer. The report says whether the app actually came up.
 
 Packaging is **not** this tool. `mq-apk` produces an APK and never needs a phone; this owns the
 process that talks to one, the way `browser-shot` owns a browser and `tui-shot` owns a PTY. A
-missing packaging feature belongs in `shared-crates/ui/macroquad-apk`, not in a repo's script.
+missing packaging feature belongs in `macroquad-kit/ui/macroquad-apk`, not in a repo's script.
 
 ## Run it from the repo that owns the artefacts
 

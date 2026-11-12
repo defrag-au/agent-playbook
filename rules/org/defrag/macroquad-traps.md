@@ -10,7 +10,7 @@ targets:
 
 ## Directive
 
-Before drawing with macroquad directly, check `shared-crates/gaming/macroquad-gamekit/CATALOG.md`.
+Before drawing with macroquad directly, check `macroquad-kit/gaming/macroquad-gamekit/CATALOG.md`.
 Each trap below compiles, runs, and shows a wrong picture with no error.
 
 - **The window is upside down under `Camera2D::from_display_rect`.** Use `harness::window_camera`

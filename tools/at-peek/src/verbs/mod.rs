@@ -13,6 +13,7 @@
 //! failure this toolkit exists to remove, and it is cheaper to re-run without the bad target
 //! than to notice that one line of a batch was missing.
 
+pub mod outline;
 pub mod search;
 pub mod slice;
 pub mod stat;
