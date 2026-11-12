@@ -1,0 +1,44 @@
+# ── agent-playbook — playbook.defrag.au ───────────────────────────────────────
+#
+# A HOST, not a service. There is deliberately no `main`: wrangler 4 serves an
+# assets-only worker, so nothing here runs Rust, holds a binding, or needs a
+# deploy when a run is published. Adding a run is a directory under
+# `artifacts/`; `scripts/sync-runs.mjs` turns it into pages, and the build
+# produces `dist/`.
+#
+# The arrangement is copied from cnft.dev-workers projects/notebooks and
+# projects/treasuries. See docs/design/benchmark-site.md for why.
+name = "agent-playbook-site"
+account_id = "32b222df0246cc40477b703275f6ff3f"
+compatibility_date = "2026-11-13"
+
+[build]
+command = "./build.sh"
+
+[assets]
+directory = "./dist"
+# Framework emits a real 404 page and clean per-page URLs; this keeps
+# `/runs/<id>/` working as a direct link rather than rewriting every miss.
+not_found_handling = "404-page"
+
+[observability]
+enabled = true
+head_sampling_rate = 0.1
+
+# ── Dev ───────────────────────────────────────────────────────────────────────
+[env.dev]
+name = "agent-playbook-site-dev"
+routes = [{ pattern = "playbook-dev.defrag.au", custom_domain = true }]
+
+[env.dev.assets]
+directory = "./dist"
+not_found_handling = "404-page"
+
+# ── Production ────────────────────────────────────────────────────────────────
+[env.production]
+name = "agent-playbook-site"
+routes = [{ pattern = "playbook.defrag.au", custom_domain = true }]
+
+[env.production.assets]
+directory = "./dist"
+not_found_handling = "404-page"

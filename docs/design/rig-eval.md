@@ -242,12 +242,16 @@ where CommonMark allows one, and states the file's true line count. In the snaps
 `docs/design/rig.md` in one call: 18 headings, 420 lines, and the shell snippets inside fences
 ignored.
 
-The first measurement is a wash. One run each, four targets, the same two scenarios: the tool is
-adopted (`rig:baseline` twice, `rig:advertised` once; slim never called it) and the output is
-correct, but the call count did not fall — baseline 24 tool calls against 17 before, advertised 23
-against 25, slim 39 against 27 — while opencode moved 5 → 9 on the same scenario. The between-run
-spread is larger than any arm difference, so one run each cannot attribute anything. The next
-measurement is three repeats of these two scenarios with the verb and without it.
+The first measurement: the mechanism works, the aggregate is noise. `rig:baseline` stopped using
+`at_peek_search` as an outline — three heading-pattern searches before the verb
+(`^## |the first result|…`, `^## |^### |…`, `^## |Status|…`) became two `at_peek_outline` calls
+covering four files, three of them in one call, and no heading search remained. Its total still
+rose, 17 → 24 tool calls, because that run explored differently: seven shell calls and seven
+slices, including a `cargo test` to check a claim. `rig:advertised` moved the other way on model
+calls (18 → 15) and used the outline once, and the unchanged opencode arm moved 5 → 9 on the same
+scenario. The between-run strategy variance is larger than the displacement, so one run each
+cannot attribute the total. The next measurement is a paired A/B — the same arm with and without
+the verb, three repeats, in one batch.
 
 `trace-redirect`'s gold was also stale: the stored lines pointed into the layout before the
 redirect was refactored, so on 2026-11-12 every arm scored 0.00, opencode included. The gold is now
@@ -261,15 +265,25 @@ is not comparable with these runs.
 Per run, from the `--json` stream (the effect log is kept beside it for the questions the stream
 cannot answer — see the `rig-session-query` skill):
 
-- **Correctness** — cited `path:line` set against gold, as precision and recall.
-- **Tool calls by name** — `terminal`/`shell` calls are the bypass; `at_*` calls are compliance.
-- **Total tool output bytes** — the audit's 8 MB threads are the target. A bounded answer is the
-  point of the toolkit, and this is the number that shows it.
-- **Model calls** — the refusal round-trip is visible here; a redirect would remove it.
-- **Wall time** and **compactions** — the latter is a proxy for context bloat.
+- **Correctness** — cited `path:line` set against gold, as precision and recall. It is a gate, not
+  a ranking: the corpus saturates at 1.00 for every frontier arm.
+- **Billed cost per passed check** (`Cost/check`, µ$) — the number the prompt is actually judged
+  on. It prices turns, tokens and caching together, so it cannot be improved by moving work between
+  turns.
+- **Cache share** (`Cache`, %) — the leading indicator behind that cost. A stable prompt prefix is
+  charged at a fraction of the uncached rate, and a description or ordering change that breaks the
+  prefix drops the share before the bill moves.
+- **Model calls, tool calls by name, output bytes** — diagnostics, not the sentinel. On the
+  2026-11-09 corpus opencode wins model calls per check (1.0 against 2.0) while rig wins cost per
+  check ($0.00072 against $0.00104), because 85–96% of rig's input is served from cache against
+  opencode's ~62%. The three proxies disagree, and only cost prices the trade.
+- **Wall time** and **compactions** — wall time is contended under `--jobs > 1`; compactions are a
+  proxy for context bloat.
 
-Turns are not a metric: rig counts one turn however many calls it contains. Model calls, tool calls
-and output bytes are the quantities.
+`Cost/check` and `Cache` are `—` when they cannot be stated: no check passed, no price reported, or
+no input tokens. An unpriced run is not a free one. Each driver normalises `input_tokens` to every
+input token sent — opencode and Pi report cache reads beside the uncached count, rig includes them —
+so the share means the same thing across arms.
 
 ## What the corpus already has
 

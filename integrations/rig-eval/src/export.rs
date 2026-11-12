@@ -24,6 +24,7 @@ pub struct TraceRow {
     pub outcome: Outcome,
     pub work: Work,
     pub usage: Usage,
+    pub toolkit: Toolkit,
     pub status: Status,
     pub tags: Vec<RunTag>,
     pub answer: Option<String>,
@@ -54,8 +55,20 @@ pub struct Work {
 pub struct Usage {
     pub input_tokens: u64,
     pub output_tokens: u64,
+    pub cached_input_tokens: u64,
     pub cost_usd: f64,
     pub output_bytes: usize,
+}
+
+/// Whether this run used the playbook toolkit, and how. `plugin_calls` counts the `at_*` plugin
+/// tools only; a CLI call is a shell call and is reported by `used_cli`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Toolkit {
+    pub plugin_calls: usize,
+    pub used_plugin: bool,
+    pub used_cli: bool,
+    pub cli_calls: Option<usize>,
+    pub loaded_skill: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -113,8 +126,16 @@ pub fn traces(results: &[RunResult]) -> Vec<TraceRow> {
             usage: Usage {
                 input_tokens: result.input_tokens,
                 output_tokens: result.output_tokens,
+                cached_input_tokens: result.cached_input_tokens,
                 cost_usd: result.cost_usd,
                 output_bytes: result.output_bytes,
+            },
+            toolkit: Toolkit {
+                plugin_calls: result.plugin_calls(),
+                used_plugin: result.used_plugin_tools,
+                used_cli: result.used_toolkit_cli,
+                cli_calls: result.cli_calls(),
+                loaded_skill: result.loaded_skill,
             },
             status: Status {
                 exit_code: result.exit_code,
@@ -161,6 +182,12 @@ pub fn checks(results: &[RunResult]) -> Vec<CheckRow> {
     rows
 }
 
+/// The notebook cells. A run directory writes them beside the three arrays; the site's sync step
+/// rewrites the attachment paths into loaders.
+pub fn notebook() -> &'static str {
+    NOTEBOOK
+}
+
 pub fn write(directory: &Path, results: &[RunResult]) -> Result<()> {
     fs::create_dir_all(directory).with_context(|| format!("creating {}", directory.display()))?;
     write_json(directory, "traces.json", &traces(results))?;
@@ -184,7 +211,7 @@ const NOTEBOOK: &str = r#"# rig-eval · Observable
 
 Three arrays sit beside this file:
 
-- `traces.json` — one row per run, grouped as `outcome`, `work`, `usage` and `status`.
+- `traces.json` — one row per run, grouped as `outcome`, `work`, `usage`, `toolkit` and `status`.
 - `tools.json` — one row per `(scenario, target, repeat, tool)` with `count`.
 - `checks.json` — one row per check: `required`, `source`, `found`.
 
@@ -202,18 +229,30 @@ const runs = traces.map(d => ({
   score: d.outcome.value,
   passed: d.outcome.passed,
   checks: d.outcome.total,
+  solved: d.outcome.total > 0 && d.outcome.passed === d.outcome.total,
   tool_calls: d.work.tool_calls,
   model_calls: d.work.model_calls,
   wall_ms: d.work.wall_ms,
   output_bytes: d.usage.output_bytes,
   cost_usd: d.usage.cost_usd,
+  plugin_calls: d.toolkit.plugin_calls,
+  used_plugin: d.toolkit.used_plugin,
+  used_cli: d.toolkit.used_cli,
+  cli_calls: d.toolkit.cli_calls,
+  loaded_skill: d.toolkit.loaded_skill,
+  // Billed dollars per passed check, and the share of input served from cache. Both are null
+  // where they cannot be stated, so a missing price is not plotted as a free run.
+  cost_per_check: d.outcome.passed > 0 && d.usage.cost_usd > 0
+    ? 1e6 * d.usage.cost_usd / d.outcome.passed : null,
+  cache_pct: d.usage.input_tokens > 0
+    ? 100 * d.usage.cached_input_tokens / d.usage.input_tokens : null,
   tags: d.tags
 }));
 ```
 
 ```js
 Inputs.table(runs, {
-  columns: ["scenario", "target", "repeat", "score", "tool_calls", "output_bytes", "model_calls", "tags"],
+  columns: ["scenario", "target", "repeat", "score", "solved", "tool_calls", "output_bytes", "model_calls", "cost_per_check", "cache_pct", "plugin_calls", "tags"],
   sort: "score"
 })
 ```
@@ -239,6 +278,20 @@ Plot.plot({
   marks: [
     Plot.dot(runs, {x: "tool_calls", y: "score", fill: "target", tip: true}),
     Plot.ruleY([1])
+  ]
+})
+```
+
+```js
+Plot.plot({
+  height: 320,
+  marginLeft: 80,
+  x: {label: null},
+  y: {grid: true, label: "cost per passed check (µ$)"},
+  color: {legend: true},
+  marks: [
+    Plot.barY(runs, Plot.groupX({y: "median"}, {x: "scenario", y: "cost_per_check", fill: "target"})),
+    Plot.ruleY([0])
   ]
 })
 ```
@@ -273,8 +326,12 @@ mod tests {
             target: "t".to_owned(),
             repeat: 1,
             model: "m".to_owned(),
-            tool_calls: BTreeMap::from([("read".to_owned(), 2), ("bash".to_owned(), 1)]),
-            tool_call_total: 3,
+            tool_calls: BTreeMap::from([
+                ("read".to_owned(), 2),
+                ("bash".to_owned(), 1),
+                ("at_peek_search".to_owned(), 2),
+            ]),
+            tool_call_total: 5,
             checks: vec![Check {
                 required: "a.rs".to_owned(),
                 source: Source::Path,
@@ -295,15 +352,19 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].scenario, "s");
         assert_eq!(rows[0].outcome.value, 1.0);
-        assert_eq!(rows[0].work.tool_calls, 3);
+        assert_eq!(rows[0].work.tool_calls, 5);
+        assert_eq!(rows[0].toolkit.plugin_calls, 2);
         assert_eq!(rows[0].tags, vec![RunTag::InspectedCorpus]);
     }
 
     #[test]
     fn tools_are_one_row_per_name() {
         let rows = tools(&[result()]);
-        assert_eq!(rows.len(), 2);
+        assert_eq!(rows.len(), 3);
         assert!(rows.iter().any(|row| row.tool == "read" && row.count == 2));
+        assert!(rows
+            .iter()
+            .any(|row| row.tool == "at_peek_search" && row.count == 2));
     }
 
     #[test]

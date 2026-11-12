@@ -422,6 +422,9 @@
               # harness comparison in `docs/design/harness-comparison.md`. It is a shell tool,
               # not a repository package: `pi` itself is installed from npm into `.tmp/pi`.
               pkgs.nodejs_22
+              # The benchmark site is an assets-only worker built with Observable Framework —
+              # see `docs/design/benchmark-site.md`. Node builds it; wrangler deploys it.
+              pkgs.wrangler
             ];
           };
         }

@@ -84,6 +84,9 @@ struct Tokens {
     input_tokens: Option<u64>,
     #[serde(default)]
     output_tokens: Option<u64>,
+    /// The part of `input_tokens` the provider read from its prompt cache.
+    #[serde(default)]
+    cached_input_tokens: Option<u64>,
     #[serde(default)]
     cost: Option<Cost>,
 }
@@ -100,6 +103,7 @@ pub struct Facts {
     pub compactions: usize,
     pub input_tokens: u64,
     pub output_tokens: u64,
+    pub cached_input_tokens: u64,
     pub cost: f64,
     pub tool_calls: std::collections::BTreeMap<String, usize>,
     pub tool_call_total: usize,
@@ -108,6 +112,14 @@ pub struct Facts {
     pub failed: usize,
     pub cancelled: usize,
     pub output_bytes: usize,
+    /// The run called a playbook tool rather than the CLI.
+    pub used_plugin_tools: bool,
+    /// A shell call named one of the `at-*` binaries.
+    pub used_toolkit_cli: bool,
+    /// How many shell calls named one.
+    pub toolkit_cli_calls: usize,
+    /// The harness loaded a skill — on these harnesses, how the toolkit is discovered.
+    pub loaded_skill: bool,
     /// Every tool result's text, for the `tool_says` checks.
     pub tool_output: String,
     pub unparsed: usize,
@@ -128,11 +140,23 @@ impl Facts {
                 }
             }
             Event::ToolCall { name, args } => {
-                *self.tool_calls.entry(name).or_default() += 1;
+                *self.tool_calls.entry(name.clone()).or_default() += 1;
                 self.tool_call_total += 1;
+                if name == "skill" {
+                    self.loaded_skill = true;
+                }
+                if is_plugin_tool(&name) {
+                    self.used_plugin_tools = true;
+                }
                 if let Some(args) = args {
-                    if serde_json::to_string(&args).is_ok_and(|text| names_eval_data(&text)) {
-                        self.tags.insert(RunTag::InspectedCorpus);
+                    if let Ok(text) = serde_json::to_string(&args) {
+                        if names_eval_data(&text) {
+                            self.tags.insert(RunTag::InspectedCorpus);
+                        }
+                        if matches!(name.as_str(), "shell" | "bash") && names_toolkit(&text) {
+                            self.used_toolkit_cli = true;
+                            self.toolkit_cli_calls += 1;
+                        }
                     }
                 }
             }
@@ -176,6 +200,7 @@ impl Facts {
                 if let Some(usage) = usage {
                     self.input_tokens += usage.input_tokens.unwrap_or_default();
                     self.output_tokens += usage.output_tokens.unwrap_or_default();
+                    self.cached_input_tokens += usage.cached_input_tokens.unwrap_or_default();
                     self.cost += usage.cost.map(|cost| cost.total).unwrap_or_default();
                 }
             }
@@ -237,6 +262,28 @@ pub fn names_eval_data(text: &str) -> bool {
         .any(|needle| text.contains(needle))
 }
 
+/// The binaries the toolkit installs. Used to tell a run that reached for the CLI from one that
+/// only used its harness's own tools.
+const TOOLKIT: &[&str] = &[
+    "at-peek",
+    "at-crate",
+    "at-recall",
+    "at-reach",
+    "at-cost",
+    "at-cardano",
+    "at-describe",
+];
+
+pub fn names_toolkit(text: &str) -> bool {
+    TOOLKIT.iter().any(|name| text.contains(name))
+}
+
+/// A tool the playbook plugin registers. The names are the plugin's own, so a shell call and a
+/// plugin call are never confused.
+pub fn is_plugin_tool(name: &str) -> bool {
+    name.starts_with("at_peek_") || name.starts_with("at_recall_")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,5 +311,26 @@ mod tests {
             facts(&[r#"{"type":"tool_result","name":"bash","output":"{\n  \"gold\": [\n"}"#]);
         assert!(facts.tags.contains(&RunTag::Contaminated));
         assert!(!facts.tags.contains(&RunTag::InspectedCorpus));
+    }
+
+    #[test]
+    fn a_cli_call_is_counted_once() {
+        let facts = facts(&[
+            r#"{"type":"tool_call","name":"bash","args":{"command":"at-peek search foo"}}"#,
+            r#"{"type":"tool_call","name":"bash","args":{"command":"at-recall state"}}"#,
+            r#"{"type":"tool_call","name":"bash","args":{"command":"ls"}}"#,
+        ]);
+        assert!(facts.used_toolkit_cli);
+        assert_eq!(facts.toolkit_cli_calls, 2);
+    }
+
+    #[test]
+    fn the_usage_carries_the_cached_part_of_the_input() {
+        let facts = facts(&[
+            r#"{"type":"usage","purpose":"turn","usage":{"input_tokens":100,"output_tokens":5,"cached_input_tokens":80,"cost":{"total":0.01}}}"#,
+        ]);
+        assert_eq!(facts.input_tokens, 100);
+        assert_eq!(facts.cached_input_tokens, 80);
+        assert_eq!(facts.cost, 0.01);
     }
 }

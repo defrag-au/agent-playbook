@@ -85,6 +85,7 @@ pub fn run(
         compactions: 0,
         input_tokens: facts.input_tokens,
         output_tokens: facts.output_tokens,
+        cached_input_tokens: facts.cached_input_tokens,
         cost_usd: facts.cost,
         tool_calls: facts.tool_calls,
         tool_call_total: facts.tool_call_total,
@@ -93,6 +94,10 @@ pub fn run(
         failed: facts.failed,
         cancelled: 0,
         output_bytes: facts.output_bytes,
+        used_plugin_tools: facts.used_plugin_tools,
+        used_toolkit_cli: facts.used_toolkit_cli,
+        toolkit_cli_calls: facts.toolkit_cli_calls,
+        loaded_skill: facts.loaded_skill,
         unparsed_lines: facts.unparsed,
         tags: facts.tags,
         answer,
@@ -170,6 +175,15 @@ struct Tokens {
     input: u64,
     #[serde(default)]
     output: u64,
+    #[serde(default)]
+    cache: Cache,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct Cache {
+    /// The part of `input` the provider read from its prompt cache.
+    #[serde(default)]
+    read: u64,
 }
 
 #[derive(Default)]
@@ -183,10 +197,15 @@ struct Facts {
     model_calls: usize,
     input_tokens: u64,
     output_tokens: u64,
+    cached_input_tokens: u64,
     cost: f64,
     failed: usize,
     session: Option<String>,
     unparsed: usize,
+    used_plugin_tools: bool,
+    used_toolkit_cli: bool,
+    toolkit_cli_calls: usize,
+    loaded_skill: bool,
     tags: BTreeSet<RunTag>,
 }
 
@@ -211,10 +230,21 @@ impl Facts {
                 *self.tool_calls.entry(part.tool.clone()).or_default() += 1;
                 self.tool_call_total += 1;
                 self.tool_results += 1;
+                if part.tool == "skill" {
+                    self.loaded_skill = true;
+                }
+                if stream::is_plugin_tool(&part.tool) {
+                    self.used_plugin_tools = true;
+                }
                 if let Some(input) = &part.state.input {
-                    if serde_json::to_string(input).is_ok_and(|text| stream::names_eval_data(&text))
-                    {
-                        self.tags.insert(RunTag::InspectedCorpus);
+                    if let Ok(text) = serde_json::to_string(input) {
+                        if stream::names_eval_data(&text) {
+                            self.tags.insert(RunTag::InspectedCorpus);
+                        }
+                        if part.tool == "bash" && stream::names_toolkit(&text) {
+                            self.used_toolkit_cli = true;
+                            self.toolkit_cli_calls += 1;
+                        }
                     }
                 }
                 let output = part
@@ -236,8 +266,11 @@ impl Facts {
             }
             Event::StepFinish { part } => {
                 self.model_calls += 1;
-                self.input_tokens += part.tokens.input;
+                // opencode reports uncached input and cache reads separately; a run's input count
+                // is every input token sent, so the arms stay comparable.
+                self.input_tokens += part.tokens.input + part.tokens.cache.read;
                 self.output_tokens += part.tokens.output;
+                self.cached_input_tokens += part.tokens.cache.read;
                 self.cost += part.cost;
             }
             Event::Other => {}
@@ -271,6 +304,15 @@ mod tests {
             facts.absorb(serde_json::from_str(line).expect("an opencode event"));
         }
         facts
+    }
+
+    #[test]
+    fn a_step_carries_the_cached_part_of_the_input() {
+        let facts = facts(&[
+            r#"{"type":"step_finish","part":{"tokens":{"input":100,"output":5,"cache":{"write":0,"read":80}},"cost":0.01}}"#,
+        ]);
+        assert_eq!(facts.input_tokens, 180, "cache reads are input too");
+        assert_eq!(facts.cached_input_tokens, 80);
     }
 
     #[test]

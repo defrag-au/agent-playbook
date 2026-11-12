@@ -30,7 +30,9 @@
 mod cli;
 mod driver;
 mod export;
+mod manifest;
 mod process;
+mod publish;
 mod report;
 mod sandbox;
 mod scenario;
@@ -40,6 +42,7 @@ mod stream;
 mod tag;
 mod target;
 
+use std::path::Path;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
@@ -49,6 +52,7 @@ use anyhow::{bail, Context, Result};
 
 use crate::cli::Args;
 use crate::driver::RunContext;
+use crate::manifest::Manifest;
 use crate::report::RunResult;
 use crate::scenario::Scenario;
 use crate::target::Target;
@@ -67,7 +71,19 @@ fn run() -> Result<()> {
     let args = Args::parse()?;
     if let Some(reuse) = &args.reuse {
         let results = report::read(reuse)?;
-        export::write(&args.out, &results)?;
+        let identity = manifest::read(reuse).ok();
+        std::fs::create_dir_all(&args.out)
+            .with_context(|| format!("creating {}", args.out.display()))?;
+        report::write(&args, &results, identity.as_ref())?;
+        if let Some(directory) = &args.publish {
+            let identity = identity.as_ref().with_context(|| {
+                format!(
+                    "--publish needs a manifest; {} has none, so the run cannot name its corpus",
+                    reuse.display()
+                )
+            })?;
+            publish(&args, directory, &results, identity)?;
+        }
         println!(
             "wrote {} export(s) to {}",
             results.len(),
@@ -75,6 +91,7 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
+    let started_ms = manifest::now_ms()?;
     let template = snapshot::Template::build(&args)?;
     let scenarios = scenario::load(&args, &template.path)?;
     if scenarios.is_empty() {
@@ -105,7 +122,34 @@ fn run() -> Result<()> {
     let results = run_jobs(&args, &scenarios, &jobs, &template, &vars, &sandbox);
     snapshot::discard(&template.path);
     let results = results?;
-    report::write(&args, &results)?;
+    let env_names: Vec<String> = vars.iter().map(|(name, _)| name.clone()).collect();
+    let manifest = manifest::build(&args, &env_names, &template.commit, started_ms, &results)?;
+    manifest::write(&args, &manifest)?;
+    report::write(&args, &results, Some(&manifest))?;
+    if let Some(directory) = &args.publish {
+        publish(&args, directory, &results, &manifest)?;
+    }
+    Ok(())
+}
+
+/// Write the site's public projection, using the summary the report just wrote.
+fn publish(
+    args: &Args,
+    directory: &Path,
+    results: &[RunResult],
+    manifest: &Manifest,
+) -> Result<()> {
+    let summary_path = args.out.join("summary.md");
+    let summary = std::fs::read_to_string(&summary_path)
+        .with_context(|| format!("reading {}", summary_path.display()))?;
+    let id = crate::publish::write(
+        directory,
+        args.reuse.as_deref().unwrap_or(&args.out),
+        results,
+        manifest,
+        &summary,
+    )?;
+    println!("published {id} to {}", directory.join(&id).display());
     Ok(())
 }
 

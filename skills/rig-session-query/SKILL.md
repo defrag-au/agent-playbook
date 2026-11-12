@@ -1,6 +1,6 @@
 ---
 name: rig-session-query
-description: Use when you need to know what a rig agent session actually did — which tools it called, how long each took, which gate refused what, or how many turns a task took — by recording rig's effect log and querying it with DuckDB. Covers enabling the log, finding the session, checking the wire shape (including header and delta lines), and the queries for the usual questions.
+description: Use when you need to know what a rig agent session actually did — which tools it called, how long each took, which gate refused what, how many turns a task took, or what it cost and how much of the prompt was served from cache — by recording rig's effect log and querying it with DuckDB. Covers enabling the log, finding the session, checking the wire shape (including header and delta lines), and the queries for the usual questions.
 ---
 
 # Querying a rig session with DuckDB
@@ -44,8 +44,9 @@ The newest session is the newest directory:
 ls -t ~/.rig/sessions | head -1
 ```
 
-`logs/<agent-id>.jsonl` in the same session holds messages, usage and compactions. Cost questions
-join the two; nothing else is a third source.
+`logs/<agent-id>.jsonl` in the same session holds messages, usage and compactions, and
+`logs/session.jsonl` holds the session totals — spend questions read the second, joined to the
+effect log when a per-turn split is wanted. Nothing else is a third source.
 
 ## 3. Check the wire shape before trusting a query
 
@@ -146,7 +147,68 @@ WHERE tool_output."agent_playbook.search" IS NOT NULL;
 The call tree under one turn is a recursive CTE over `id`/`parent`; write it only when the tree is
 not obviously flat.
 
-## 5. Reading the answers
+## 5. What the session cost, and how much of the prompt was cache
+
+Spend is not in the effect log. It is a state snapshot in `logs/session.jsonl`, rewritten as the
+session runs, so the **last** one is the session total. The same file carries the breakdown by
+purpose and by model.
+
+```sql
+WITH usage AS (
+  SELECT value
+  FROM read_json_auto('…/logs/session.jsonl', union_by_name = true)
+  WHERE type = 'state'
+    AND key = 'rig_basics::telemetry::usage::SessionUsage'
+  ORDER BY seq DESC
+  LIMIT 1
+)
+SELECT round(CAST(value.total.cost AS DOUBLE) * 1000000, 0)   AS cost_micro_usd,
+       CAST(value.total.tokens.input_tokens AS BIGINT)        AS input_tokens,
+       CAST(value.total.tokens.cached_input_tokens AS BIGINT) AS cached_tokens,
+       round(100.0 * CAST(value.total.tokens.cached_input_tokens AS DOUBLE)
+             / nullif(CAST(value.total.tokens.input_tokens AS DOUBLE), 0), 1) AS cache_pct,
+       CAST(value.total.calls AS BIGINT)                      AS model_calls,
+       CAST(value.total.unpriced AS BIGINT)                   AS unpriced_calls
+FROM usage;
+```
+
+The casts are not decoration: the column is typed `JSON` because the first line of the file is a
+header, and `JSON * 1000000` is a binder error rather than an implicit conversion.
+
+`cost_micro_usd` is what the provider would have charged — the same figure `rig-eval` reports
+beside a run. **`cache_pct` is the leading indicator.** Most of a long session's input is a repeat
+of the same prefix, and a prompt or description change that reorders it — or a tool result that
+invalidates it — drops the share before the bill moves. Read `unpriced_calls`: when it is not 0,
+part of the session had no price and the dollar figure is a floor, not a total.
+
+For a series across sessions, take the last snapshot per session:
+
+```sql
+WITH raw AS (
+  SELECT regexp_extract(filename, 'sessions/([^/]+)/', 1) AS session, seq, value
+  FROM read_json_auto('~/.rig/sessions/*/logs/session.jsonl',
+                      union_by_name = true, filename = true)
+  WHERE type = 'state'
+    AND key = 'rig_basics::telemetry::usage::SessionUsage'
+), ranked AS (
+  SELECT *, row_number() OVER (PARTITION BY session ORDER BY seq DESC) AS last FROM raw
+)
+SELECT session,
+       round(CAST(value.total.cost AS DOUBLE) * 1000000, 0) AS cost_micro_usd,
+       round(100.0 * CAST(value.total.tokens.cached_input_tokens AS DOUBLE)
+             / nullif(CAST(value.total.tokens.input_tokens AS DOUBLE), 0), 1) AS cache_pct,
+       CAST(value.total.calls AS BIGINT) AS model_calls
+FROM ranked
+WHERE last = 1
+ORDER BY session;
+```
+
+**Verified 2026-11-12** against 18 recorded sessions in `.tmp/rig-home-advertised/sessions`:
+cost 1,406–11,491 µ$ per session, cache share 74.6–93.7%, model calls 4–20. The single-session
+query reproduced one of them exactly: 5,203 µ$, 152,408 input tokens of which 130,688 were cache
+reads (85.7%), 10 calls, 0 unpriced.
+
+## 6. Reading the answers
 
 - **`decided_by`** is the gate that answered an effect before it ran: `"person"` or
   `{"plugin":"name"}`. An allow is not a decision and leaves it absent, so this counts refusals and
@@ -189,3 +251,8 @@ offered `at_peek_search` rather than retrying the shell.
   written. A secret-shaped argument may appear as a placeholder.
 - **DuckDB is in this repository's devshell.** Outside it, `nix shell nixpkgs#duckdb` gives the
   same CLI; there is no need to install anything else.
+- **Spend is a state snapshot, not an effect.** Taking the last `SessionUsage` state is the total;
+  summing those records double-counts, because each snapshot restates the running total.
+- **A JSON column needs a cast.** `read_json_auto` types `value` as `JSON` because the first line
+  of the log is a header, so arithmetic on a leaf is a binder error. Cast the leaf
+  (`CAST(value.total.cost AS DOUBLE)`), not the column.

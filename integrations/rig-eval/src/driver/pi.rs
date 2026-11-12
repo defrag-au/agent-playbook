@@ -77,6 +77,7 @@ pub fn run(
         compactions: facts.compactions,
         input_tokens: facts.input_tokens,
         output_tokens: facts.output_tokens,
+        cached_input_tokens: facts.cached_input_tokens,
         cost_usd: facts.cost,
         tool_calls: facts.tool_calls,
         tool_call_total: facts.tool_call_total,
@@ -85,6 +86,10 @@ pub fn run(
         failed: facts.failed,
         cancelled: 0,
         output_bytes: facts.output_bytes,
+        used_plugin_tools: facts.used_plugin_tools,
+        used_toolkit_cli: facts.used_toolkit_cli,
+        toolkit_cli_calls: facts.toolkit_cli_calls,
+        loaded_skill: facts.loaded_skill,
         unparsed_lines: facts.unparsed,
         tags: facts.tags,
         answer,
@@ -186,6 +191,9 @@ struct Usage {
     input: u64,
     #[serde(default)]
     output: u64,
+    /// The part of `input` the provider read from its prompt cache.
+    #[serde(default, rename = "cacheRead")]
+    cache_read: u64,
     #[serde(default)]
     cost: Option<Cost>,
 }
@@ -207,13 +215,18 @@ struct Facts {
     model_calls: usize,
     input_tokens: u64,
     output_tokens: u64,
+    cached_input_tokens: u64,
     cost: f64,
-    failed: usize,
     compactions: usize,
+    failed: usize,
     session: Option<String>,
-    unparsed: usize,
-    tags: BTreeSet<RunTag>,
     aborted: bool,
+    unparsed: usize,
+    used_plugin_tools: bool,
+    used_toolkit_cli: bool,
+    toolkit_cli_calls: usize,
+    loaded_skill: bool,
+    tags: BTreeSet<RunTag>,
 }
 
 impl Facts {
@@ -231,18 +244,32 @@ impl Facts {
                     .map(Content::text)
                     .unwrap_or_default();
                 if let Some(usage) = message.usage {
-                    self.input_tokens += usage.input;
+                    // Pi reports uncached input and cache reads separately; a run's input count is
+                    // every input token sent, so the arms stay comparable.
+                    self.input_tokens += usage.input + usage.cache_read;
                     self.output_tokens += usage.output;
+                    self.cached_input_tokens += usage.cache_read;
                     self.cost += usage.cost.map(|cost| cost.total).unwrap_or_default();
                 }
             }
             Event::ToolStart { tool, args } => {
-                *self.tool_calls.entry(tool).or_default() += 1;
+                *self.tool_calls.entry(tool.clone()).or_default() += 1;
                 self.tool_call_total += 1;
+                if tool == "skill" {
+                    self.loaded_skill = true;
+                }
+                if stream::is_plugin_tool(&tool) {
+                    self.used_plugin_tools = true;
+                }
                 if let Some(args) = args {
-                    if serde_json::to_string(&args).is_ok_and(|text| stream::names_eval_data(&text))
-                    {
-                        self.tags.insert(RunTag::InspectedCorpus);
+                    if let Ok(text) = serde_json::to_string(&args) {
+                        if stream::names_eval_data(&text) {
+                            self.tags.insert(RunTag::InspectedCorpus);
+                        }
+                        if tool == "bash" && stream::names_toolkit(&text) {
+                            self.used_toolkit_cli = true;
+                            self.toolkit_cli_calls += 1;
+                        }
                     }
                 }
             }
@@ -302,6 +329,15 @@ mod tests {
             facts.absorb(serde_json::from_str(line).expect("a Pi event"));
         }
         facts
+    }
+
+    #[test]
+    fn the_last_assistant_message_carries_the_cached_part_of_the_input() {
+        let facts = facts(&[
+            r#"{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input":100,"output":5,"cacheRead":80,"cost":{"total":0.01}}}}"#,
+        ]);
+        assert_eq!(facts.input_tokens, 180, "cache reads are input too");
+        assert_eq!(facts.cached_input_tokens, 80);
     }
 
     #[test]

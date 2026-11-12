@@ -420,6 +420,7 @@ mod tests {
             env_file: root.join("env"),
             out: root.join("out"),
             reuse: None,
+            publish: None,
             repeat: 1,
             jobs: 1,
             timeout: None,

@@ -73,6 +73,10 @@ struct Cli {
     #[arg(long, value_name = "DIR")]
     reuse: Option<PathBuf>,
 
+    /// Write a public site artefact into this directory (the site's `artifacts/`)
+    #[arg(long, value_name = "DIR")]
+    publish: Option<PathBuf>,
+
     /// Runs per scenario and target
     #[arg(long, value_name = "N", default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
     repeat: u32,
@@ -103,6 +107,7 @@ pub struct Args {
     pub env_file: PathBuf,
     pub out: PathBuf,
     pub reuse: Option<PathBuf>,
+    pub publish: Option<PathBuf>,
     pub repeat: u32,
     pub jobs: usize,
     pub timeout: Option<Duration>,
@@ -161,6 +166,7 @@ impl Args {
                 .unwrap_or_else(|| root.join(DEFAULT_ENV)),
             out: absolute(&cli.out),
             reuse: cli.reuse.map(|path| absolute(&path)),
+            publish: cli.publish.map(|path| absolute(&path)),
             repeat: cli.repeat,
             jobs: cli.jobs as usize,
             timeout: cli.timeout.map(Duration::from_secs),
