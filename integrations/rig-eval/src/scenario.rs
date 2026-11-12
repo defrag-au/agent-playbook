@@ -49,13 +49,17 @@ pub struct Scenario {
 }
 
 impl Scenario {
-    pub fn checks(&self) -> usize {
+    pub fn scored_checks(&self) -> usize {
         self.gold.len()
             + self.extra_paths.len()
             + self.git_paths.len()
             + usize::from(self.git_branch.is_some())
             + self.must_say.len()
-            + self.tool_says.len()
+    }
+
+    /// Tool output checks are evidence the work happened; they are reported, not scored.
+    pub fn evidence_checks(&self) -> usize {
+        self.tool_says.len()
     }
 
     /// Fill the fields the corpus cannot know: the state of the snapshot it runs against.
@@ -151,9 +155,9 @@ fn validate(scenario: &Scenario, snapshot: &Path) -> Result<()> {
     if scenario.prompt.trim().is_empty() {
         bail!("{}: `prompt` is empty", scenario.name);
     }
-    if scenario.checks() == 0 {
+    if scenario.scored_checks() == 0 {
         bail!(
-            "{}: no gold, paths, `must_say` or `tool_says` — nothing to score",
+            "{}: no gold, paths or `must_say` — nothing to score (tool evidence is reported, not scored)",
             scenario.name
         );
     }

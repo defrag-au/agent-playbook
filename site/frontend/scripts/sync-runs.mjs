@@ -6,8 +6,8 @@
 // schema.
 //
 // Generated:
-//   src/runs/<id>/index.md
-//   src/runs/<id>/notebook.md
+//   src/runs/<id>/index.md      — the claim, then the notebook
+//   src/runs/<id>/tables.md     — the generated tables
 //   src/data/<id>-traces.json.js
 //   src/data/<id>-tools.json.js
 //   src/data/<id>-checks.json.js
@@ -77,13 +77,17 @@ function label(manifest) {
 
 // The run page supplies its own H1, and the streams are not published beside the
 // summary on the site, so drop the two lines that are only true in a run directory.
-function summaryForSite(summary) {
-  const lines = summary.split("\n");
-  if (lines[0]?.startsWith("# rig-eval")) {
+function withoutTitle(text) {
+  const lines = text.split("\n");
+  if (lines[0]?.startsWith("# ")) {
     lines.shift();
     while (lines[0] === "") lines.shift();
   }
-  const kept = lines.filter(
+  return lines;
+}
+
+function summaryForSite(summary) {
+  const kept = withoutTitle(summary).filter(
     (line) => !line.startsWith("Streams, stderr and effect logs are beside this file"),
   );
   while (kept.at(-1) === "") kept.pop();
@@ -91,7 +95,8 @@ function summaryForSite(summary) {
 }
 
 function notebookForSite(notebook, id) {
-  return notebook
+  return withoutTitle(notebook)
+    .join("\n")
     .replaceAll('FileAttachment("traces.json")', `FileAttachment("../../data/${id}-traces.json")`)
     .replaceAll('FileAttachment("tools.json")', `FileAttachment("../../data/${id}-tools.json")`)
     .replaceAll('FileAttachment("checks.json")', `FileAttachment("../../data/${id}-checks.json")`);
@@ -147,9 +152,9 @@ function writeRun({ id, dir, manifest }) {
 
   writeFileSync(
     join(page, "index.md"),
-    `# ${label(manifest)}\n\n${claim}\n\n---\n\n${summary}\n\n[Open the notebook](./notebook)\n`,
+    `# ${label(manifest)}\n\n${claim}\n\n---\n\n${notebook}\n`,
   );
-  writeFileSync(join(page, "notebook.md"), notebook);
+  writeFileSync(join(page, "tables.md"), `# Tables — ${label(manifest)}\n\n${summary}\n`);
 
   for (const kind of ["traces", "tools", "checks"]) {
     writeFileSync(join(DATA, `${id}-${kind}.json.js`), loader(id, kind));

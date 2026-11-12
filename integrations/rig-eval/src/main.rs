@@ -123,7 +123,14 @@ fn run() -> Result<()> {
     snapshot::discard(&template.path);
     let results = results?;
     let env_names: Vec<String> = vars.iter().map(|(name, _)| name.clone()).collect();
-    let manifest = manifest::build(&args, &env_names, &template.commit, started_ms, &results)?;
+    let manifest = manifest::build(
+        &args,
+        &env_names,
+        &template.advertised,
+        Some(&template.unadvertised),
+        started_ms,
+        &results,
+    )?;
     manifest::write(&args, &manifest)?;
     report::write(&args, &results, Some(&manifest))?;
     if let Some(directory) = &args.publish {
@@ -188,13 +195,28 @@ fn run_jobs(
     sandbox: &Option<String>,
 ) -> Result<Vec<RunResult>> {
     let workers = args.jobs.min(jobs.len()).max(1);
-    let mut run_env = env.to_vec();
-    let path = std::env::join_paths(std::iter::once(template.bin.clone()).chain(
-        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
-    ))
+    let base_env = env.to_vec();
+    let parent = std::env::var_os("PATH").unwrap_or_default();
+    let present = std::env::join_paths(
+        std::iter::once(template.bin.clone()).chain(std::env::split_paths(&parent)),
+    )
     .context("building the snapshot PATH")?;
-    run_env.push(("PATH".to_owned(), path.to_string_lossy().into_owned()));
-    let run_env = &run_env;
+    let absent = std::env::join_paths(
+        [
+            template.bin_absent.clone(),
+            template.stubs.clone(),
+            template.bin.clone(),
+        ]
+        .into_iter()
+        .chain(std::env::split_paths(&parent)),
+    )
+    .context("building the absent PATH")?;
+    let mut env_present = base_env.clone();
+    env_present.push(("PATH".to_owned(), present.to_string_lossy().into_owned()));
+    let mut env_absent = base_env;
+    env_absent.push(("PATH".to_owned(), absent.to_string_lossy().into_owned()));
+    let env_present = &env_present;
+    let env_absent = &env_absent;
     let next = AtomicUsize::new(0);
     let (sender, receiver) = mpsc::channel();
     let mut results: Vec<Option<RunResult>> = jobs.iter().map(|_| None).collect();
@@ -222,7 +244,13 @@ fn run_jobs(
                     let (scenario_index, target_index, repeat) = jobs[index];
                     let scenario = &scenarios[scenario_index];
                     let target = &args.targets[target_index];
-                    if let Err(error) = snapshot::reset(&worker, &template.commit) {
+                    let toolkit = target.toolkit();
+                    let env = if toolkit.on_path() {
+                        env_present
+                    } else {
+                        env_absent
+                    };
+                    if let Err(error) = snapshot::reset(&worker, template.commit_for(toolkit)) {
                         let _ = sender.send(Message::Job {
                             index,
                             error: format!("{error:#}"),
@@ -232,8 +260,9 @@ fn run_jobs(
                     let workdir = worker.join(&scenario.workdir);
                     let context = RunContext {
                         args,
-                        env: run_env,
+                        env,
                         sandbox: sandbox.clone(),
+                        arm: target.label().replace(':', "-"),
                     };
                     match target::run_one(target, scenario, &workdir, repeat, &context) {
                         Ok(result) => {

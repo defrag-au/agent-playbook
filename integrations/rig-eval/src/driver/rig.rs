@@ -21,7 +21,7 @@ pub fn run(
     repeat: u32,
     context: &RunContext<'_>,
 ) -> Result<RunResult> {
-    let stem = format!("{}-rig-{}-r{repeat}", scenario.name, home.label);
+    let stem = format!("{}-{}-r{repeat}", scenario.name, context.arm);
     let mut env = vec![("RIG_HOME".to_owned(), home.path.display().to_string())];
     env.extend(context.env.iter().cloned());
     let invocation = Invocation {
@@ -95,6 +95,7 @@ pub fn run(
         toolkit_cli_calls: facts.toolkit_cli_calls,
         loaded_skill: facts.loaded_skill,
         unparsed_lines: facts.unparsed,
+        toolkit: None,
         tags: facts.tags,
         answer,
         citations: scored.cited.iter().map(Citation::render).collect(),

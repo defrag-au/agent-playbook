@@ -1,7 +1,7 @@
 # Runs
 
-Every published measurement, newest first. A run page carries the generated tables; the notebook
-beside it is the same data as an interactive page.
+Every published measurement, newest first. A run page leads with its charts; the generated
+tables are a second page beside it.
 
 ```js
 const runs = FileAttachment("../data/runs.json").json();
@@ -14,29 +14,33 @@ if (runs.length === 0) {
   display(
     Inputs.table(
       runs.map((run) => ({
-        run: html`<a href="./${run.id}/">${run.label}</a>`,
-        model: run.model,
-        arms: run.arms.join(", "),
+        id: run.id,
+        date: run.label.split(" · ")[0],
+        model: run.label.split(" · ")[1],
+        arms: run.arms.length,
         runs: run.runs,
-        "pass rate": run.checks
-          ? `${Math.round((100 * run.passed) / run.checks)}%`
-          : "—",
+        "pass rate": run.checks ? `${Math.round((100 * run.passed) / run.checks)}%` : "—",
         cost: run.cost_usd ? `$${run.cost_usd.toFixed(3)}` : "—",
-        corpus: run.corpus,
-        notebook: html`<a href="./${run.id}/notebook">notebook</a>`,
       })),
       {
+        columns: ["date", "model", "arms", "runs", "pass rate", "cost"],
+        width: {date: 100, model: 210, arms: 55, runs: 55, "pass rate": 80, cost: 75},
         header: {
-          run: "Run",
+          date: "Date",
           model: "Model",
           arms: "Arms",
           runs: "Runs",
           "pass rate": "Pass rate",
           cost: "Cost",
-          corpus: "Corpus",
-          notebook: "",
         },
-        sort: "run",
+        // A cell that holds a DOM node is appended as-is only through a formatter; the
+        // default formatter stringifies it, which renders a link as its href.
+        format: {
+          model: (label, i, data) =>
+            html`<a href="./${data[i].id}/">${label}</a>
+              <a class="small" href="./${data[i].id}/tables">tables</a>`,
+        },
+        sort: "date",
         reverse: true,
       },
     ),

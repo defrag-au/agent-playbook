@@ -10,9 +10,10 @@ A directory of JSON scenarios. Each names a prompt, a working directory, and the
 must satisfy:
 
 - **`gold`** — `path:line` citations the answer must contain.
-- **`extra_paths`** — paths the answer may mention; they count for precision, not for passing.
+- **`extra_paths`** — paths the answer must name; they also enter the precision denominator.
 - **`must_say`** — literal strings the answer must contain.
-- **`tool_says`** — literal strings a tool's output must contain.
+- **`tool_says`** — literal strings a tool's output must contain. This is **evidence the work
+  happened**, reported separately; it is not scored.
 
 Every check is validated against the snapshot **before** a run starts. A stale `path:line` is a
 runner error, not a model failure. The corpus is versioned by a fingerprint of its file contents;
@@ -20,12 +21,17 @@ each run page names the fingerprint it measured.
 
 ## Scoring
 
-- **Score** is checks passed divided by checks attempted.
+- **Score** is scored checks passed divided by scored checks attempted. The scored checks are
+  `gold`, `extra_paths`, `must_say` and the working-tree expectations; `tool_says` is evidence and
+  is not in either sum.
 - **Pass rate** is the same sum across an arm's runs.
-- **Solved** is a run that passed every check. It is stricter than score, and it is the unit
-  `Cost/solved` divides by.
+- **Solved** is a run that passed every **scored** check. It is stricter than score, and it is the
+  unit `Cost/solved` divides by.
 - **Precision** is the share of cited `path:line` references that match the gold set. It is
   reported as a diagnostic, never as a score.
+
+Tool evidence is reported in its own table. It can show that the mechanism ran, but it cannot make
+an arm that answered correctly look worse, or one that answered incorrectly look better.
 
 ## Isolation
 
@@ -45,14 +51,14 @@ from every table and median. It stays in the results file so the exclusion is au
 
 **Billed cost per passed check** and **billed cost per solved task** are both reported. The first
 is the unit the invoice is made of; the second is what completing a task costs. They diverge when
-an arm passes fewer checks for less money, which is why the pass rate sits beside them.
+an arm passes fewer scored checks for less money, which is why the pass rate sits beside them.
 
 All three drivers normalise `input_tokens` to **every input token sent**, including the part the
 provider served from its prompt cache. The `Cache` column is the share served from cache. It
 explains the token counts; it is not a discount the runner applies.
 
-`Cost/solved` is the arm's total bill divided by the runs that passed every check. A dash means
-it cannot be stated: no solved run, or no price.
+`Cost/solved` is the arm's total bill divided by the runs that passed every **scored** check. A
+dash means it cannot be stated: no solved run, or no price.
 
 ## The ladder
 
@@ -70,7 +76,7 @@ skill store are part of the snapshot. That is why the ladder is a controlled exp
 than a prompt.
 
 A run that loads a toolkit skill is **documented in practice** whatever its arm says, so the
-adoption table reports skill loads beside plugin and CLI calls.
+adoption table reports skill loads beside plugin calls and CLI attempts.
 
 ## Limits
 

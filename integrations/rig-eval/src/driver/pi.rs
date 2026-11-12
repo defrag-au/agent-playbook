@@ -22,7 +22,7 @@ pub fn run(
     repeat: u32,
     context: &RunContext<'_>,
 ) -> Result<RunResult> {
-    let stem = format!("{}-pi-r{repeat}", scenario.name);
+    let stem = format!("{}-{}-r{repeat}", scenario.name, context.arm);
     let invocation = Invocation {
         program: context.args.pi.clone(),
         args: vec![
@@ -91,6 +91,7 @@ pub fn run(
         toolkit_cli_calls: facts.toolkit_cli_calls,
         loaded_skill: facts.loaded_skill,
         unparsed_lines: facts.unparsed,
+        toolkit: None,
         tags: facts.tags,
         answer,
         citations: scored.cited.iter().map(Citation::render).collect(),

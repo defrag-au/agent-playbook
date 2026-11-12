@@ -110,7 +110,8 @@ Every run scored at least 0.83 and no run was refused. The slim arm had the only
 (`eval-contamination`, 0.83) and the highest median tool calls; the advertised arm had the lowest.
 Those differences are one run each, and precision was 0.10–0.33 across all arms because the models
 over-cite — read recall and output beside the score. The 21 runs cost $0.12 in total (4.1M input and
-82k output tokens). This is a smoke test, not a ranking; the next step is paired repeats (two or
+82k output tokens). These runs predate the 2026-11-12 scoring change and include `tool_says`; the
+ladder's scores do not, so the two are not directly comparable. This is a smoke test, not a ranking; the next step is paired repeats (two or
 three, still under $1) or a harder scenario the baseline fails.
 
 ### The skipped rule: a scenario built around a false zero (2026-11-12)
@@ -145,6 +146,9 @@ harness, and the only separating check is the rig plugin's tool name, which open
 have by construction. The first smoke (before that check was corrected) scored all three rig arms
 0.86 for the same reason.
 
+Under the ladder's scoring (2026-11-12), `tool_says` is evidence and is not scored: all five would
+be 1.00 on this scenario, and the separation is cost and calls rather than a plugin-only check.
+
 Three things it found that are worth acting on:
 
 - **A named path still returns a false zero.** `at-peek search secret
@@ -158,7 +162,9 @@ Three things it found that are worth acting on:
   `agent_playbook.redirection` passes only because `advertising-over-gating` reads the design doc
   that names it. The check in this scenario now names `at_peek_search`, which the stream records as
   the tool result's name. A cross-harness comparison still needs per-check applicability, or
-  opencode and Pi are capped below 1.00 on every scenario that requires a rig tool.
+  opencode and Pi are capped below 1.00 on every scenario that requires a rig tool. **Resolved
+  2026-11-12:** `tool_says` is evidence, reported separately and not scored, so a rig-only check
+  cannot cap another harness.
 - **Snapshot file counts are 478, not 483.** HEAD tracks five of the corpus files; the snapshot
   rewrites them out of history and the working tree. Counting gold against `git archive HEAD`
   includes those five, so a true total measured that way is five files high.
@@ -395,10 +401,11 @@ than a model failure. A scenario whose expectation is the working tree itself us
 from the snapshot's `git status --branch -uall`. The snapshot always has one uncommitted file, so
 the expectation is deterministic. `pre-edit-state` is that scenario.
 
-The score is checks passed. Precision is `path:line` hits over every
-citation the answer makes; recall is hits over gold. Precision is a weak signal when gold is a
-small set — an answer that cites ten correct lines and three gold ones scores 0.3 — so read it
-beside the score, not instead of it. Turns are not a metric.
+The score is scored checks passed: `gold`, paths, `must_say` and the working-tree expectations.
+`tool_says` is evidence the mechanism ran, reported separately and not scored. Precision is
+`path:line` hits over every citation the answer makes; recall is hits over gold. Precision is a
+weak signal when gold is a small set — an answer that cites ten correct lines and three gold ones
+scores 0.3 — so read it beside the score, not instead of it. Turns are not a metric.
 
 A path check is satisfied by the path itself or by a directory above it: `git status` collapses
 an untracked tree to its top directory, and that is as correct an answer as listing every file

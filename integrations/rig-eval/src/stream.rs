@@ -264,7 +264,7 @@ pub fn names_eval_data(text: &str) -> bool {
 
 /// The binaries the toolkit installs. Used to tell a run that reached for the CLI from one that
 /// only used its harness's own tools.
-const TOOLKIT: &[&str] = &[
+pub const TOOLKIT: &[&str] = &[
     "at-peek",
     "at-crate",
     "at-recall",

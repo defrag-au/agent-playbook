@@ -36,13 +36,22 @@ export default {
   theme: ["air", "near-midnight"],
   head: `<link rel="icon" href="/favicon.svg">
     <style>
-      /* Framework renders markdown tables without a scroll container. At a narrow
-         width the right-hand columns are clipped; make the table itself scroll.
-         The direct-child selector leaves Inputs.table's own wrapper alone. */
-      .observablehq > table {
+      /* Framework renders markdown tables at the page width, so at a narrow width the
+         right-hand columns are clipped and numbers wrap mid-cell. Give the table its own
+         horizontal scroll box: max-content keeps every column on one line, max-width caps
+         the box at the page, and overflow scrolls the rest. */
+      main.observablehq > table {
         display: block;
+        max-width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+      }
+      /* With the table as its own scroll box the column layout is still capped at the
+         page width, which wraps numbers mid-cell. nowrap makes each cell its min-content
+         width, so the box scrolls instead. */
+      main.observablehq > table th,
+      main.observablehq > table td {
+        white-space: nowrap;
       }
     </style>`,
   toc: true,

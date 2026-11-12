@@ -130,6 +130,7 @@ mod tests {
     use super::*;
     use crate::manifest::{Arm, Checkout, Corpus, Snapshot, Version};
     use crate::score::{Check, Source};
+    use crate::target::ToolkitMode;
 
     fn manifest() -> Manifest {
         Manifest {
@@ -154,10 +155,12 @@ mod tests {
             },
             snapshot: Snapshot {
                 commit: "a1e3d3f".to_owned(),
+                unadvertised: None,
             },
             targets: vec![Arm {
                 label: "opencode".to_owned(),
                 kind: "opencode".to_owned(),
+                toolkit: Some(ToolkitMode::Documented),
                 location: ".tmp/opencode/opencode.json".to_owned(),
                 config: None,
             }],

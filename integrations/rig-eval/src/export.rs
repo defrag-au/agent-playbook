@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::report::RunResult;
 use crate::score::Source;
 use crate::tag::RunTag;
+use crate::target::ToolkitMode;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TraceRow {
@@ -64,6 +65,7 @@ pub struct Usage {
 /// tools only; a CLI call is a shell call and is reported by `used_cli`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Toolkit {
+    pub mode: Option<ToolkitMode>,
     pub plugin_calls: usize,
     pub used_plugin: bool,
     pub used_cli: bool,
@@ -131,6 +133,7 @@ pub fn traces(results: &[RunResult]) -> Vec<TraceRow> {
                 output_bytes: result.output_bytes,
             },
             toolkit: Toolkit {
+                mode: result.toolkit,
                 plugin_calls: result.plugin_calls(),
                 used_plugin: result.used_plugin_tools,
                 used_cli: result.used_toolkit_cli,
@@ -183,10 +186,13 @@ pub fn checks(results: &[RunResult]) -> Vec<CheckRow> {
 }
 
 /// The notebook cells. A run directory writes them beside the three arrays; the site's sync step
-/// rewrites the attachment paths into loaders.
+/// rewrites the attachment paths into loaders. Authored as markdown so the charts are reviewed
+/// like code, and compiled in so the binary carries its own notebook.
 pub fn notebook() -> &'static str {
     NOTEBOOK
 }
+
+const NOTEBOOK: &str = include_str!("../observable/notebook.md");
 
 pub fn write(directory: &Path, results: &[RunResult]) -> Result<()> {
     fs::create_dir_all(directory).with_context(|| format!("creating {}", directory.display()))?;
@@ -206,112 +212,6 @@ where
     let text = serde_json::to_string_pretty(rows).with_context(|| format!("encoding {name}"))?;
     fs::write(&path, text).with_context(|| format!("writing {}", path.display()))
 }
-
-const NOTEBOOK: &str = r#"# rig-eval · Observable
-
-Three arrays sit beside this file:
-
-- `traces.json` — one row per run, grouped as `outcome`, `work`, `usage`, `toolkit` and `status`.
-- `tools.json` — one row per `(scenario, target, repeat, tool)` with `count`.
-- `checks.json` — one row per check: `required`, `source`, `found`.
-
-```js
-const traces = FileAttachment("traces.json").json();
-const tools = FileAttachment("tools.json").json();
-const checks = FileAttachment("checks.json").json();
-```
-
-```js
-const runs = traces.map(d => ({
-  scenario: d.scenario,
-  target: d.target,
-  repeat: d.repeat,
-  score: d.outcome.value,
-  passed: d.outcome.passed,
-  checks: d.outcome.total,
-  solved: d.outcome.total > 0 && d.outcome.passed === d.outcome.total,
-  tool_calls: d.work.tool_calls,
-  model_calls: d.work.model_calls,
-  wall_ms: d.work.wall_ms,
-  output_bytes: d.usage.output_bytes,
-  cost_usd: d.usage.cost_usd,
-  plugin_calls: d.toolkit.plugin_calls,
-  used_plugin: d.toolkit.used_plugin,
-  used_cli: d.toolkit.used_cli,
-  cli_calls: d.toolkit.cli_calls,
-  loaded_skill: d.toolkit.loaded_skill,
-  // Billed dollars per passed check, and the share of input served from cache. Both are null
-  // where they cannot be stated, so a missing price is not plotted as a free run.
-  cost_per_check: d.outcome.passed > 0 && d.usage.cost_usd > 0
-    ? 1e6 * d.usage.cost_usd / d.outcome.passed : null,
-  cache_pct: d.usage.input_tokens > 0
-    ? 100 * d.usage.cached_input_tokens / d.usage.input_tokens : null,
-  tags: d.tags
-}));
-```
-
-```js
-Inputs.table(runs, {
-  columns: ["scenario", "target", "repeat", "score", "solved", "tool_calls", "output_bytes", "model_calls", "cost_per_check", "cache_pct", "plugin_calls", "tags"],
-  sort: "score"
-})
-```
-
-```js
-Plot.plot({
-  height: 320,
-  marginLeft: 70,
-  x: {label: null},
-  y: {grid: true, label: "checks passed"},
-  color: {legend: true},
-  marks: [
-    Plot.barY(runs, Plot.groupX({y: "median"}, {x: "scenario", y: "score", fill: "target"})),
-    Plot.ruleY([0])
-  ]
-})
-```
-
-```js
-Plot.plot({
-  grid: true,
-  color: {legend: true},
-  marks: [
-    Plot.dot(runs, {x: "tool_calls", y: "score", fill: "target", tip: true}),
-    Plot.ruleY([1])
-  ]
-})
-```
-
-```js
-Plot.plot({
-  height: 320,
-  marginLeft: 80,
-  x: {label: null},
-  y: {grid: true, label: "cost per passed check (µ$)"},
-  color: {legend: true},
-  marks: [
-    Plot.barY(runs, Plot.groupX({y: "median"}, {x: "scenario", y: "cost_per_check", fill: "target"})),
-    Plot.ruleY([0])
-  ]
-})
-```
-
-```js
-Plot.plot({
-  marginLeft: 90,
-  marks: [
-    Plot.barX(tools, Plot.groupY({x: "sum"}, {y: "tool", x: "count", fill: "target"})),
-    Plot.ruleX([0])
-  ]
-})
-```
-
-```js
-Inputs.table(checks.filter(d => !d.found), {
-  columns: ["scenario", "target", "repeat", "required", "source"]
-})
-```
-"#;
 
 #[cfg(test)]
 mod tests {

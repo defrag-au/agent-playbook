@@ -7,7 +7,7 @@ use std::time::Duration;
 use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
 
-use crate::target::Target;
+use crate::target::{Target, ToolkitMode};
 
 const DEFAULT_MODEL: &str = "deepseek/deepseek-flash";
 const DEFAULT_RIG: &str = ".tmp/rig-fork/bin/rig";
@@ -135,7 +135,7 @@ impl Args {
             .map(|spec| parse_target(&root, spec))
             .collect::<Result<Vec<_>>>()?;
         for value in &cli.homes {
-            targets.push(Target::Rig(parse_home(value)?));
+            targets.push(Target::Rig(parse_home(value)?, ToolkitMode::Documented));
         }
         if targets.is_empty() {
             targets = default_targets(&root);
@@ -196,7 +196,7 @@ impl Args {
         }
         for target in &self.targets {
             match target {
-                Target::Rig(home) => {
+                Target::Rig(home, _) => {
                     let settings = home.path.join("settings.toml");
                     if !settings.is_file() {
                         bail!(
@@ -206,7 +206,7 @@ impl Args {
                         );
                     }
                 }
-                Target::Opencode => {
+                Target::Opencode(_) => {
                     if !self.opencode_config.is_file() {
                         bail!(
                             "no opencode provider config at {}",
@@ -220,7 +220,7 @@ impl Args {
                         );
                     }
                 }
-                Target::Pi => {
+                Target::Pi(_) => {
                     if !self.pi.is_file() {
                         bail!(
                             "no Pi launcher at {}; install it with `npm install -g --prefix .tmp/pi --ignore-scripts @earendil-works/pi-coding-agent`",
@@ -282,13 +282,25 @@ fn dedupe(targets: &mut Vec<Target>) {
 }
 
 fn rig_target(root: &Path, label: &str, path: &str) -> Target {
-    Target::Rig(Home {
-        label: label.to_owned(),
-        path: root.join(path),
-    })
+    Target::Rig(
+        Home {
+            label: label.to_owned(),
+            path: root.join(path),
+        },
+        ToolkitMode::Documented,
+    )
 }
 
 fn parse_target(root: &Path, spec: &str) -> Result<Target> {
+    if let Some((name, mode)) = spec.split_once(':') {
+        if let Some(mode) = ToolkitMode::parse(mode) {
+            match name {
+                "opencode" => return Ok(Target::Opencode(mode)),
+                "pi" => return Ok(Target::Pi(mode)),
+                _ => {}
+            }
+        }
+    }
     match spec {
         "rig:advertised" => Ok(rig_target(root, "advertised", ".tmp/rig-home-advertised")),
         "rig:slim" => Ok(rig_target(root, "slim", ".tmp/rig-home-slim")),
@@ -298,8 +310,8 @@ fn parse_target(root: &Path, spec: &str) -> Result<Target> {
         "rig:lean" => Ok(rig_target(root, "lean", ".tmp/rig-home-lean")),
         "rig:baseline" => Ok(rig_target(root, "baseline", ".tmp/rig-home-baseline")),
         "rig:vanilla" => Ok(rig_target(root, "vanilla", ".tmp/rig-home-vanilla")),
-        "opencode" => Ok(Target::Opencode),
-        "pi" => Ok(Target::Pi),
+        "opencode" => Ok(Target::Opencode(ToolkitMode::Documented)),
+        "pi" => Ok(Target::Pi(ToolkitMode::Documented)),
         other => bail!(
             "unknown target `{other}`; known: rig:advertised, rig:slim, rig:gated, rig:permissive, rig:terse, rig:lean, rig:baseline, rig:vanilla, opencode, pi"
         ),
@@ -375,14 +387,31 @@ mod tests {
     #[test]
     fn the_named_targets_resolve_to_their_homes() {
         let root = Path::new("/repo");
-        let Target::Rig(home) = parse_target(root, "rig:vanilla").expect("a target") else {
+        let Target::Rig(home, _) = parse_target(root, "rig:vanilla").expect("a target") else {
             panic!("rig:vanilla is a rig home");
         };
         assert_eq!(home.label, "vanilla");
         assert_eq!(home.path, PathBuf::from("/repo/.tmp/rig-home-vanilla"));
         assert!(matches!(
             parse_target(root, "opencode").expect("a target"),
-            Target::Opencode
+            Target::Opencode(ToolkitMode::Documented)
+        ));
+    }
+
+    #[test]
+    fn a_target_can_name_its_toolkit_mode() {
+        let root = Path::new("/repo");
+        assert!(matches!(
+            parse_target(root, "opencode:absent").expect("a target"),
+            Target::Opencode(ToolkitMode::Absent)
+        ));
+        assert!(matches!(
+            parse_target(root, "opencode:cli").expect("a target"),
+            Target::Opencode(ToolkitMode::Cli)
+        ));
+        assert!(matches!(
+            parse_target(root, "pi:documented").expect("a target"),
+            Target::Pi(ToolkitMode::Documented)
         ));
     }
 
@@ -390,10 +419,13 @@ mod tests {
     fn a_home_named_twice_runs_once() {
         let mut targets = vec![
             parse_target(Path::new("/repo"), "rig:slim").expect("a target"),
-            Target::Rig(Home {
-                label: "slim".to_owned(),
-                path: PathBuf::from("/tmp/rig-home-slim"),
-            }),
+            Target::Rig(
+                Home {
+                    label: "slim".to_owned(),
+                    path: PathBuf::from("/tmp/rig-home-slim"),
+                },
+                ToolkitMode::Documented,
+            ),
             parse_target(Path::new("/repo"), "rig:baseline").expect("a target"),
         ];
         dedupe(&mut targets);

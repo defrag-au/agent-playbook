@@ -27,7 +27,7 @@ summary.md             the human tables, including Cost/check, Cost/solved and C
 traces.json            one row per run, grouped outcome/work/usage/toolkit/status
 tools.json             one row per (scenario, target, repeat, tool)
 checks.json            one row per check: required, source, found
-observable.md          the notebook cells, including cost per check and cache share
+observable.md          the notebook: loader cells and the run's charts
 <scenario>-<target>-r<n>.jsonl        the harness's own stream, verbatim
 <scenario>-<target>-r<n>.effects.jsonl  rig's effect log (rig arms only)
 <scenario>-<target>-r<n>.err          stderr
@@ -47,37 +47,55 @@ Two generated views sit beside the evidence. Neither makes a claim; the authored
 | identity | which corpus, checkout, snapshot and runner | corpus fingerprint, checkout head and branch, dirty, snapshot, runner |
 | totals | how much was run, and what it cost | runs, arms, pass rate, billed cost, input tokens, cache share |
 | By arm | does the arm pass, and what does a passed check cost? | Arm, Runs, Pass rate, Solved, Score (median [min–max]), Cost/check (median [min–max]), Cost/solved, Cache |
-| Work | how much the arm did to get there | Arm, Model calls, Tool calls, Output, Wall (median) |
-| Adoption | did the arm use the toolkit, and how heavily? | Arm, Runs, Plugin tools (runs), Plugin calls/run, CLI runs, CLI calls/run, Skill runs |
+| Work | how much the arm did to get there | Arm, Model calls, Tool calls, Input (median tokens), Output, Wall (median), Precision |
+| Adoption | did the arm attempt the toolkit, and how heavily? | Arm, Runs, Plugin tools (runs), Plugin calls/run, CLI attempts (runs), CLI attempts/run, Skill runs |
 | Score by scenario | where the arm wins and loses | Scenario × arm, median, with min–max when repeats disagree |
+| Solved by scenario | how often an arm passed every check in a scenario | Scenario × arm, solved/run — a median score can hide a bimodal arm that this separates |
 | Cost per check by scenario | the same in money | Scenario × arm |
-| Misses | every failed check, by run | scenario, arm, repeat, required, source |
+| Misses | every failed **scored** check, grouped | scenario, arm, check, source, missed/carried |
+| Tool evidence | which `tool_says` checks ran, separately from the score | Arm, Tool checks seen |
 | Limits | what the numbers do not license | model, runs per cell, saturated scenarios, dirty checkout, parallel jobs |
 
 Rules the generator follows:
 
-- **Score and Cost/check are the claim.** Model calls, tool calls, output bytes and cache share are
-  diagnostics — a run can do more work and cost less because a stable prefix was cached.
+- **Score and Cost/check are the claim.** The score counts `gold`, path and answer checks. Model
+  calls, tool calls, output bytes and cache share are diagnostics — a run can do more work and cost
+  less because a stable prefix was cached. `tool_says` is **evidence, not score**: it says the
+  mechanism ran, and it is reported in its own table so a plugin-only check cannot decide a
+  comparison between harnesses.
 - **Cost/check and Cost/solved are both reported.** `Cost/check` divides by partial credit, which
   can flatter an arm that passes fewer checks cheaply; `Cost/solved` divides by runs that passed
   every check, which cannot. When they disagree, read the pass rate beside them.
+- **`Solved` is all-or-nothing and is reported twice**: per arm, and per scenario. Partial credit is
+  the score; a run that passed every check is the unit `Cost/solved` divides by. A scenario whose
+  arms all solve it, or none do, is visible in the solved matrix even when the median score moves.
 - **A range is min–max across the arm's runs**, so it mixes scenarios with repeats. The scenario
   matrix separates the two.
 - **Adoption is counted from the tool-call table**, not from a driver flag: an arm that called
-  `at_peek_search` used the toolkit even when it was run before the flag existed. CLI calls are
-  counted by the drivers, which see the shell command's arguments; a run is `CLI` if it made at
-  least one, and the per-run count is the median beside it. A result that predates the count shows
-  a dash rather than a zero it cannot support.
+  `at_peek_search` used the toolkit even when it was run before the flag existed. CLI attempts are
+  counted by the drivers, which see the shell command's arguments; a run is CLI-attempting if it
+  named an `at-*` binary at least once. An attempt that exits 127 is still an attempt — the
+  `absent` arm is expected to make them. A result that predates the count shows a dash rather than
+  a zero it cannot support.
+- **A skill load is a covariate, not a pass.** A non-documented arm that loads a toolkit skill is
+  documented in practice: the repository advertisement is removed, not the harness's own skill
+  store.
 - **A scenario every arm passed in full is named under Limits** as separating nothing. That is the
   saturation warning, generated from the data rather than remembered.
 - **The report never states a conclusion.** It says "opencode 91% at 1641 µ$/check; rig:baseline
   82% at 2875"; whether that is good is the authored page's job.
 
-`observable.md` is the interactive view: `traces.json` is mapped once into a flat `runs` table and
-every chart and table uses it. It carries `cost_per_check` and `cache_pct` with nulls preserved, so
-a run the provider did not price is not plotted as a free one. `tools.json` drives the per-tool
-chart, and `checks.json` drives the misses table. The notebook is a starting cell set, not a
-dashboard: a published analysis edits it and keeps the three arrays unchanged.
+`observable.md` is the interactive view, and it is authored markdown kept in
+`integrations/rig-eval/observable/notebook.md` and compiled into the runner. `traces.json` is
+mapped once into a flat `runs` table and every chart uses it. It carries `cost_per_check` and
+`cache_pct` with nulls preserved, so a run the provider did not price is not plotted as a free
+one. `tools.json` drives the tool-call split, and `checks.json` drives the misses table.
+
+The notebook is the run page, not an appendix: it leads with the cost of a solved run, then shows
+the per-run spread under that aggregate, a solved-by-scenario matrix sorted by the spread between
+arms, how each arm reached the toolkit, what the tools were, what the model read, and what was
+missed. The generated tables are a second page beside it. A published analysis forks the cells,
+not the data.
 
 The console is a progress log, not a table: one line per finished run with wall time, model and
 tool calls, cost per check, cache share, output bytes, score and the checks it missed. It is the only
@@ -114,7 +132,8 @@ needs no trust in the runner:
 | `corpus.files[].blob` | `git hash-object --no-filters` of each scenario |
 | `checkout.head` / `checkout.branch` | the commit whose tree the scenarios are about |
 | `checkout.dirty` | whether the working tree differed; a published run must be `false` |
-| `snapshot.commit` | the commit a run executes at — history with the corpus rewritten out |
+| `snapshot.commit` | the advertised tip: history with the corpus rewritten out |
+| `snapshot.unadvertised` | the same history with the toolkit advertisement rewritten out |
 | `targets[].config` | the blob of the settings or config that defines the arm |
 | `runner.version` | the binary that wrote the results |
 
@@ -185,8 +204,9 @@ run's own stream *as recorded by the runner*, not by the harness.
   first is the unit the invoice is made of; the second is what a completed task costs. They
   diverge when an arm passes fewer checks for less money. Model calls and token counts are
   reported as diagnostics, because prompt caching makes them disagree with cost by design.
-- **Adoption**: whether a harness used the toolkit at all, and whether it loaded a skill that
-  advertises it.
+- **Adoption and evidence**: whether a harness attempted the CLI, called a plugin tool, or loaded
+  a skill that advertises it; and which `tool_says` evidence appeared. Evidence is reported, not
+  scored.
 - **The ladder**: absent → CLI → documented → integrated, on the same corpus and model.
 - **Null results**, including the ones already found: the advertised rig arm does *more* work than
   the plain one; the frontier corpus saturates at 1.00 for every arm; the outline verb displaced
@@ -205,8 +225,10 @@ run's own stream *as recorded by the runner*, not by the harness.
 
 ```sh
 cargo run --manifest-path integrations/rig-eval/Cargo.toml -- \
-  --out <dir> --target rig:baseline --target opencode --target pi \
-  --scenario <name> --repeat 3 --jobs 2 --timeout 300
+  --out <dir> \
+  --target opencode:absent --target opencode:cli --target opencode:documented \
+  --target rig:baseline \
+  --repeat 3 --jobs 2 --timeout 300 --publish site/artifacts
 ```
 
 The model key is read from the env file named by `--env-file` (default

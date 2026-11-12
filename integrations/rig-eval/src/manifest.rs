@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::cli::Args;
 use crate::report::RunResult;
-use crate::target::Target;
+use crate::target::{Target, ToolkitMode};
 
 /// The manifest and export schema the site's loaders read. Bump it when a shape changes; a page
 /// that silently charts the old shape is worse than a failed build.
@@ -83,14 +83,20 @@ pub struct Checkout {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Snapshot {
-    /// The commit a run executes at: history with the corpus rewritten out of it.
+    /// The advertised tip: history with the corpus rewritten out.
     pub commit: String,
+    /// The same history with the toolkit's advertisement rewritten out, when the ladder ran.
+    #[serde(default)]
+    pub unadvertised: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Arm {
     pub label: String,
     pub kind: String,
+    /// The toolkit treatment this arm ran under. Absent from a pre-ladder manifest.
+    #[serde(default)]
+    pub toolkit: Option<ToolkitMode>,
     /// The home or config, relative to the checkout where possible.
     pub location: String,
     /// The blob of the config file the arm is defined by, when it has one.
@@ -121,6 +127,7 @@ pub fn build(
     args: &Args,
     env_names: &[String],
     snapshot_commit: &str,
+    unadvertised: Option<&str>,
     started_ms: u64,
     results: &[RunResult],
 ) -> Result<Manifest> {
@@ -139,6 +146,7 @@ pub fn build(
         checkout: checkout(&args.root),
         snapshot: Snapshot {
             commit: snapshot_commit.to_owned(),
+            unadvertised: unadvertised.map(str::to_owned),
         },
         targets: arms(args)?,
         jobs: args.jobs,
@@ -220,18 +228,20 @@ fn arms(args: &Args) -> Result<Vec<Arm>> {
     args.targets
         .iter()
         .map(|target| match target {
-            Target::Rig(home) => {
+            Target::Rig(home, mode) => {
                 let settings = home.path.join("settings.toml");
                 Ok(Arm {
                     label: target.label(),
                     kind: "rig".to_owned(),
+                    toolkit: Some(*mode),
                     location: relative(&args.root, &home.path),
                     config: settings.is_file().then(|| blob(&settings)).transpose()?,
                 })
             }
-            Target::Opencode => Ok(Arm {
+            Target::Opencode(mode) => Ok(Arm {
                 label: target.label(),
                 kind: "opencode".to_owned(),
+                toolkit: Some(*mode),
                 location: relative(&args.root, &args.opencode_config),
                 config: args
                     .opencode_config
@@ -239,9 +249,10 @@ fn arms(args: &Args) -> Result<Vec<Arm>> {
                     .then(|| blob(&args.opencode_config))
                     .transpose()?,
             }),
-            Target::Pi => Ok(Arm {
+            Target::Pi(mode) => Ok(Arm {
                 label: target.label(),
                 kind: "pi".to_owned(),
+                toolkit: Some(*mode),
                 location: relative(&args.root, &args.pi),
                 config: None,
             }),
@@ -353,10 +364,13 @@ mod tests {
             root: root.to_path_buf(),
             scenario_dir: root.join("scenarios"),
             only: Vec::new(),
-            targets: vec![Target::Rig(crate::cli::Home {
-                label: "test".to_owned(),
-                path: root.join("home"),
-            })],
+            targets: vec![Target::Rig(
+                crate::cli::Home {
+                    label: "test".to_owned(),
+                    path: root.join("home"),
+                },
+                ToolkitMode::Documented,
+            )],
             model: "model".to_owned(),
             rig: root.join("rig"),
             opencode_config: root.join("opencode.json"),
@@ -373,13 +387,33 @@ mod tests {
     }
 
     fn build_at(root: &Path) -> Manifest {
-        build(&args(root), &[], "snapshot-commit", 1, &[]).expect("a manifest")
+        build(&args(root), &[], "snapshot-commit", None, 1, &[]).expect("a manifest")
     }
 
     #[test]
     fn a_manifest_names_its_own_schema() {
         let root = fixture("schema");
         assert_eq!(build_at(&root).schema_version, SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn a_ladder_manifest_records_both_snapshots() {
+        let root = fixture("ladder");
+        let manifest = build(
+            &args(&root),
+            &[],
+            "advertised",
+            Some("unadvertised"),
+            1,
+            &[],
+        )
+        .expect("a manifest");
+        assert_eq!(manifest.snapshot.commit, "advertised");
+        assert_eq!(
+            manifest.snapshot.unadvertised.as_deref(),
+            Some("unadvertised")
+        );
+        assert_eq!(manifest.targets[0].toolkit, Some(ToolkitMode::Documented));
     }
 
     #[test]

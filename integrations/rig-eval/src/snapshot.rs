@@ -27,6 +27,7 @@ use std::process::Command;
 use anyhow::{bail, Context, Result};
 
 use crate::cli::Args;
+use crate::target::ToolkitMode;
 
 /// Where the corpus lives in this repository, whatever `--scenarios` points at.
 const REPO_CORPUS: &str = "integrations/rig-eval/scenarios";
@@ -37,9 +38,17 @@ const BRANCH: &str = "eval";
 
 pub struct Template {
     pub path: PathBuf,
-    pub commit: String,
+    /// The corpus-rewritten tip: the repository as it ships.
+    pub advertised: String,
+    /// The same history with the toolkit's advertisement rewritten out.
+    pub unadvertised: String,
     /// The first `PATH` entry for a run: a `direnv` shim that uses the real devshell.
     pub bin: PathBuf,
+    /// The `at-*` stubs the `absent` arm puts before everything else on `PATH`.
+    pub stubs: PathBuf,
+    /// A `direnv` shim that injects the stubs into the devshell too, so `direnv exec . at-peek`
+    /// cannot bypass the treatment.
+    pub bin_absent: PathBuf,
 }
 
 impl Template {
@@ -51,8 +60,14 @@ impl Template {
         let path = base.join("template");
         fs::create_dir_all(&path).with_context(|| format!("creating {}", path.display()))?;
         let bin = base.join("bin");
+        let bin_absent = base.join("bin-absent");
+        let stubs = base.join("absent-bin");
         fs::create_dir_all(&bin).with_context(|| format!("creating {}", bin.display()))?;
-        write_wrapper(&bin, args)?;
+        fs::create_dir_all(&bin_absent)
+            .with_context(|| format!("creating {}", bin_absent.display()))?;
+        write_stubs(&stubs)?;
+        write_wrapper(&bin, args, None)?;
+        write_wrapper(&bin_absent, args, Some(&stubs))?;
         link_fork(&base, args)?;
 
         // Start from the real history, then take the corpus out of every commit. The older
@@ -64,13 +79,35 @@ impl Template {
         rewrite(&path, &corpus)?;
         git(&path, &["reset", "--hard", "HEAD"])?;
         git(&path, &["checkout", "-f", "-B", BRANCH, "HEAD"])?;
+
+        let advertised = output(&path, &["rev-parse", "HEAD"])?;
+        let unadvertised = rewrite_advertisement(&path, &advertised, &base)?;
+        git(&path, &["checkout", "-f", "-B", BRANCH, &advertised])?;
+
         link_targets(args, &path)?;
         exclude_targets(&path)?;
         verify_clean(&path, &corpus)?;
+        verify_advertisement(&path, &unadvertised)?;
 
-        let commit = output(&path, &["rev-parse", "HEAD"])?;
         seed(&path)?;
-        Ok(Self { path, commit, bin })
+        Ok(Self {
+            path,
+            advertised,
+            unadvertised,
+            bin,
+            stubs,
+            bin_absent,
+        })
+    }
+
+    /// The commit an arm executes at. The mode is the treatment; the commit is the repository it
+    /// sees, and `cli`/`absent` share one because only `PATH` differs between them.
+    pub fn commit_for(&self, toolkit: ToolkitMode) -> &str {
+        if toolkit.advertised() {
+            &self.advertised
+        } else {
+            &self.unadvertised
+        }
     }
 }
 
@@ -182,6 +219,153 @@ fn rewrite(path: &Path, corpus: &[PathBuf]) -> Result<()> {
     Ok(())
 }
 
+/// Rewrite the advertisement out of every commit on a second branch.
+///
+/// The corpus rewrite has already run, so this branch starts at its tip. The filter removes
+/// `skills/` and `.skill-store/` and the "Read code and history with the agent tools" section of
+/// `AGENTS.md` from every commit, so `git show` cannot undo the treatment. The advertised branch is
+/// restored afterwards; both tips stay reachable.
+fn rewrite_advertisement(path: &Path, advertised: &str, base: &Path) -> Result<String> {
+    let branch = "eval-unadvertised";
+    git(path, &["checkout", "-f", "-B", branch, advertised])?;
+    let log = output(
+        path,
+        &[
+            "log",
+            "--reverse",
+            "--format=%H",
+            "--",
+            "AGENTS.md",
+            "skills",
+            ".skill-store",
+        ],
+    )?;
+    let Some(oldest) = log.lines().next() else {
+        return Ok(advertised.to_owned());
+    };
+    let range = match output(path, &["rev-parse", &format!("{oldest}^")]) {
+        Ok(_) => format!("{oldest}^..{branch}"),
+        Err(_) => branch.to_owned(),
+    };
+
+    let script = base.join("filter-advertisement.sh");
+    write_filter_script(&script)?;
+    let filter = format!("sh {}", shell_quote(&script));
+    let result = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .env("FILTER_BRANCH_SQUELCH_WARNING", "1")
+        .args([
+            "-c",
+            "commit.gpgsign=false",
+            "filter-branch",
+            "--force",
+            "--tree-filter",
+            &filter,
+            "--prune-empty",
+            "--",
+            &range,
+        ])
+        .output()
+        .context("running git filter-branch for the advertisement")?;
+    if !result.status.success() {
+        bail!(
+            "git filter-branch (advertisement) in {}: {}",
+            path.display(),
+            String::from_utf8_lossy(&result.stderr).trim()
+        );
+    }
+    let unadvertised = output(path, &["rev-parse", "HEAD"])?;
+
+    // The filter may have updated `eval` because it pointed at the same tip. Restore it before
+    // dropping the backups, so the advertised commit stays reachable.
+    git(
+        path,
+        &["update-ref", &format!("refs/heads/{BRANCH}"), advertised],
+    )?;
+    git(path, &["checkout", "-f", BRANCH])?;
+    let refs = output(
+        path,
+        &["for-each-ref", "--format=%(refname)", "refs/original"],
+    )?;
+    for reference in refs.lines() {
+        git(path, &["update-ref", "-d", reference])?;
+    }
+    git(path, &["reflog", "expire", "--expire=now", "--all"])?;
+    git(path, &["gc", "--prune=now"])?;
+    Ok(unadvertised)
+}
+
+fn write_filter_script(path: &Path) -> Result<()> {
+    let script = r#"#!/bin/sh
+set -e
+
+git rm -r --ignore-unmatch -q skills .skill-store >/dev/null 2>&1 || true
+
+if [ -f AGENTS.md ]; then
+  # Drop the generated agent-tools section, then the two repo-specific lines that
+  # still name the toolkit. Everything else in AGENTS.md is left alone.
+  awk 'BEGIN { skip=0 } /^## Read code and history with the agent tools/ { skip=1; next } skip && /^## / { skip=0 } { if (!skip) print }' AGENTS.md > AGENTS.md.new
+  mv AGENTS.md.new AGENTS.md
+
+  perl -pi -e 's/`playbook`, `agent-tools`/`playbook`/' AGENTS.md
+  perl -pi -e 's/for `packages\.agent-tools`, and wires the binaries/and wires the binaries/' AGENTS.md
+  perl -pi -e 's|^Use \[.*skills/capture-rule.*$|The short version:|' AGENTS.md
+
+  grep -v -e 'at-' -e 'at_' -e 'agent-tools' -e 'skills/' AGENTS.md > AGENTS.md.new || true
+  mv AGENTS.md.new AGENTS.md
+  git add AGENTS.md
+fi
+
+git add -A
+"#;
+    fs::write(path, script).with_context(|| format!("writing {}", path.display()))
+}
+
+/// The unadvertised tip must not name the toolkit in `AGENTS.md`, and must not carry the skill
+/// directories. This is the check that the treatment is really absent, not just hidden.
+fn verify_advertisement(path: &Path, commit: &str) -> Result<()> {
+    let agents = output(path, &["show", &format!("{commit}:AGENTS.md")]).unwrap_or_default();
+    for needle in ["at-", "at_"] {
+        if agents.contains(needle) {
+            bail!("unadvertised snapshot still mentions `{needle}` in AGENTS.md");
+        }
+    }
+    let tree = output(path, &["ls-tree", "-r", "--name-only", commit])?;
+    for line in tree.lines() {
+        if line == "skills"
+            || line.starts_with("skills/")
+            || line == ".skill-store"
+            || line.starts_with(".skill-store/")
+        {
+            bail!("unadvertised snapshot still contains {line}");
+        }
+    }
+    Ok(())
+}
+
+/// The `at-*` names the `absent` arm shadows. A stub is silent: the arm is not told the toolkit
+/// exists, only that the command is not available.
+fn write_stubs(bin: &Path) -> Result<PathBuf> {
+    fs::create_dir_all(bin).with_context(|| format!("creating {}", bin.display()))?;
+    for name in crate::stream::TOOLKIT {
+        let path = bin.join(*name);
+        fs::write(&path, "#!/bin/sh\nexit 127\n")
+            .with_context(|| format!("writing {}", path.display()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&path)
+                .with_context(|| format!("reading {}", path.display()))?
+                .permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&path, permissions)
+                .with_context(|| format!("marking {} executable", path.display()))?;
+        }
+    }
+    Ok(bin.to_path_buf())
+}
+
 /// The target symlinks are files to git, and `target/` in `.gitignore` is a directory pattern.
 fn exclude_targets(root: &Path) -> Result<()> {
     let path = root.join(".git/info/exclude");
@@ -236,10 +420,16 @@ fn seed(root: &Path) -> Result<()> {
 /// The snapshot's `.envrc` is a copy, so direnv would block it until it was allowed for that
 /// path — and a copy of `.direnv` is not the same cache. The shim delegates to the real checkout
 /// once, then changes to the snapshot directory the agent asked for; no per-snapshot allow state.
-fn write_wrapper(bin: &Path, args: &Args) -> Result<()> {
+fn write_wrapper(bin: &Path, args: &Args, stubs: Option<&Path>) -> Result<()> {
     let direnv = find_on_path("direnv").context("direnv is not on PATH")?;
     let real_direnv = shell_quote(&direnv);
     let real_root = shell_quote(&args.root);
+    // Inside the devshell, prepend the stubs again: `direnv exec` would otherwise put the real
+    // `at-*` binaries back on PATH and undo the absent treatment.
+    let prefix = match stubs {
+        Some(stubs) => format!("PATH={}:\\$PATH; ", shell_quote(stubs)),
+        None => String::new(),
+    };
     let script = format!(
         "#!/bin/sh\n\
          # Snapshot shim: the real devshell, run in the snapshot directory.\n\
@@ -250,7 +440,7 @@ fn write_wrapper(bin: &Path, args: &Args) -> Result<()> {
              /*) ;;\n\
              *) dir=\"$PWD/$dir\" ;;\n\
            esac\n\
-           exec {real_direnv} exec {real_root} sh -c 'cd \"$1\" && shift && exec \"$@\"' sh \"$dir\" \"$@\"\n\
+           exec {real_direnv} exec {real_root} sh -c \"{prefix}cd \\\"\\$1\\\" && shift && exec \\\"\\$@\\\"\" sh \"$dir\" \"$@\"\n\
          fi\n\
          exec {real_direnv} \"$@\"\n"
     );

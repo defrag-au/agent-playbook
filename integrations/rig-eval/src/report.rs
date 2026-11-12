@@ -1,6 +1,6 @@
 //! What a run produced, the summary written beside the streams, and the dry-run plan.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use crate::cli::Args;
 use crate::manifest::Manifest;
 use crate::scenario::Scenario;
-use crate::score::Check;
+use crate::score::{Check, Source};
 use crate::tag::RunTag;
-use crate::target::Target;
+use crate::target::{Target, ToolkitMode};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct RunResult {
@@ -56,6 +56,9 @@ pub struct RunResult {
     #[serde(default)]
     pub loaded_skill: bool,
     pub unparsed_lines: usize,
+    /// The toolkit treatment this run was given. Absent from a pre-ladder result.
+    #[serde(default)]
+    pub toolkit: Option<ToolkitMode>,
     /// Why this run is excluded, or what it inspected.
     pub tags: BTreeSet<RunTag>,
     pub answer: Option<String>,
@@ -114,7 +117,13 @@ pub fn print_run(result: &RunResult) {
     let missed: Vec<&str> = result
         .checks
         .iter()
-        .filter(|check| !check.found)
+        .filter(|check| !check.found && check.source != Source::Tool)
+        .map(|check| check.required.as_str())
+        .collect();
+    let evidence: Vec<&str> = result
+        .checks
+        .iter()
+        .filter(|check| check.source == Source::Tool && !check.found)
         .map(|check| check.required.as_str())
         .collect();
     let mut line = format!(
@@ -141,12 +150,18 @@ pub fn print_run(result: &RunResult) {
         line.push_str(&format!(" · {} compaction(s)", result.compactions));
     }
     let tail = if missed.is_empty() {
-        "all checks passed".to_owned()
+        "all scored checks passed".to_owned()
     } else {
         format!("missed: {}", missed.join(", "))
     };
     line.push_str(" · ");
     line.push_str(&tail);
+    if !evidence.is_empty() {
+        line.push_str(&format!(
+            " · tool evidence not seen: {}",
+            evidence.join(", ")
+        ));
+    }
     println!("{line}");
     if result.unparsed_lines > 0 {
         println!(
@@ -216,18 +231,18 @@ pub fn print_plan(args: &Args, scenarios: &[Scenario]) {
     println!("jobs     {}", args.jobs);
     for target in &args.targets {
         match target {
-            Target::Rig(home) => {
+            Target::Rig(home, _) => {
                 let state = if home.path.join("settings.toml").is_file() {
                     "settings.toml"
                 } else {
                     "MISSING settings.toml"
                 };
-                println!("{:12} {} ({state})", target.label(), home.path.display());
+                println!("{:24} {} ({state})", target.label(), home.path.display());
             }
-            Target::Opencode => {
-                println!("{:12} {}", target.label(), args.opencode_config.display())
+            Target::Opencode(_) => {
+                println!("{:24} {}", target.label(), args.opencode_config.display())
             }
-            Target::Pi => println!("{:12} {}", target.label(), args.pi.display()),
+            Target::Pi(_) => println!("{:24} {}", target.label(), args.pi.display()),
         }
     }
     println!(
@@ -241,10 +256,11 @@ pub fn print_plan(args: &Args, scenarios: &[Scenario]) {
     println!();
     for scenario in scenarios {
         println!(
-            "{:28} workdir {:<6} {:>2} check(s)  {}",
+            "{:28} workdir {:<6} {:>2} scored + {:>2} tool  {}",
             scenario.name,
             scenario.workdir,
-            scenario.checks(),
+            scenario.scored_checks(),
+            scenario.evidence_checks(),
             scenario.why
         );
     }
@@ -270,9 +286,17 @@ fn summary(results: &[RunResult], identity: Option<&Manifest>) -> String {
 
     match identity {
         Some(identity) => {
+            let snapshot = match &identity.snapshot.unadvertised {
+                Some(unadvertised) => format!(
+                    "snapshot `{}` (advertised) · `{}` (unadvertised)",
+                    short(&identity.snapshot.commit),
+                    short(unadvertised)
+                ),
+                None => format!("snapshot `{}`", short(&identity.snapshot.commit)),
+            };
             let _ = writeln!(
                 text,
-                "Corpus `{}` ({} files) · checkout `{}` on `{}`{} · snapshot `{}` · runner {} {}\n",
+                "Corpus `{}` ({} files) · checkout `{}` on `{}`{} · {snapshot} · runner {} {}\n",
                 identity.corpus.fingerprint,
                 identity.corpus.files.len(),
                 short(identity.checkout.head.as_deref().unwrap_or("unknown")),
@@ -282,7 +306,6 @@ fn summary(results: &[RunResult], identity: Option<&Manifest>) -> String {
                 } else {
                     ""
                 },
-                short(&identity.snapshot.commit),
                 identity.runner.name,
                 identity.runner.version,
             );
@@ -367,9 +390,9 @@ fn summary(results: &[RunResult], identity: Option<&Manifest>) -> String {
     let _ = writeln!(text, "\n## Work\n");
     let _ = writeln!(
         text,
-        "| Arm | Model calls | Tool calls | Output | Wall (median) |"
+        "| Arm | Model calls | Tool calls | Input | Output | Wall (median) | Precision |"
     );
-    let _ = writeln!(text, "| --- | --- | --- | --- | --- |");
+    let _ = writeln!(text, "| --- | --- | --- | --- | --- | --- | --- |");
     for target in &targets {
         let arm: Vec<&RunResult> = clean
             .iter()
@@ -378,19 +401,54 @@ fn summary(results: &[RunResult], identity: Option<&Manifest>) -> String {
             .collect();
         let _ = writeln!(
             text,
-            "| {} | {} | {} | {} | {:.1}s |",
+            "| {} | {} | {} | {} | {} | {:.1}s | {} |",
             target,
             median(arm.iter().map(|result| result.model_calls)),
             median(arm.iter().map(|result| result.tool_call_total)),
+            human_tokens(median(arm.iter().map(|result| result.input_tokens as usize)) as u64),
             human_bytes(median(arm.iter().map(|result| result.output_bytes))),
             median(arm.iter().map(|result| result.wall_ms as usize)) as f64 / 1000.0,
+            median_option(arm.iter().filter_map(|result| result.precision))
+                .map(percent)
+                .unwrap_or_else(dash),
         );
     }
+
+    let _ = writeln!(text, "\n## Diagnostics\n");
+    let _ = writeln!(
+        text,
+        "| Arm | Refused | Failed | Cancelled | Compactions | Unparsed |"
+    );
+    let _ = writeln!(text, "| --- | --- | --- | --- | --- | --- |");
+    for target in &targets {
+        let arm: Vec<&RunResult> = clean
+            .iter()
+            .copied()
+            .filter(|result| result.target.as_str() == target.as_str())
+            .collect();
+        let _ = writeln!(
+            text,
+            "| {} | {} | {} | {} | {} | {} |",
+            target,
+            arm.iter().map(|result| result.refused).sum::<usize>(),
+            arm.iter().map(|result| result.failed).sum::<usize>(),
+            arm.iter().map(|result| result.cancelled).sum::<usize>(),
+            arm.iter().map(|result| result.compactions).sum::<usize>(),
+            arm.iter()
+                .map(|result| result.unparsed_lines)
+                .sum::<usize>(),
+        );
+    }
+    let _ = writeln!(
+        text,
+        "\n`Unparsed` counts stream lines the parser did not understand; a non-zero value means \
+         the counts are incomplete. `Refused`, `Failed` and `Cancelled` are tool-result counts."
+    );
 
     let _ = writeln!(text, "\n## Adoption\n");
     let _ = writeln!(
         text,
-        "| Arm | Runs | Plugin tools | Plugin calls/run | CLI (`at-*`) | CLI calls/run | Skill |"
+        "| Arm | Runs | Plugin tools | Plugin calls/run | CLI attempts | CLI attempts/run | Skill |"
     );
     let _ = writeln!(text, "| --- | --- | --- | --- | --- | --- | --- |");
     for target in &targets {
@@ -439,6 +497,33 @@ fn summary(results: &[RunResult], identity: Option<&Manifest>) -> String {
         let _ = writeln!(text);
     }
 
+    let _ = writeln!(text, "\n## Solved by scenario\n");
+    let _ = writeln!(
+        text,
+        "A cell is the runs that passed every scored check over the runs that carried one; the \
+         median score above can hide a bimodal arm that this table separates.\n"
+    );
+    write_matrix(&mut text, &targets);
+    for scenario in &scenarios {
+        let _ = write!(text, "| {scenario} |");
+        for target in &targets {
+            let runs: Vec<&RunResult> = clean
+                .iter()
+                .copied()
+                .filter(|result| {
+                    result.scenario.as_str() == scenario && result.target.as_str() == target
+                })
+                .collect();
+            let solved = runs.iter().filter(|result| result.solved()).count();
+            if runs.is_empty() {
+                let _ = write!(text, " {} |", dash());
+            } else {
+                let _ = write!(text, " {solved}/{} |", runs.len());
+            }
+        }
+        let _ = writeln!(text);
+    }
+
     let _ = writeln!(text, "\n## Cost per check by scenario (µ$)\n");
     write_matrix(&mut text, &targets);
     for scenario in &scenarios {
@@ -457,30 +542,96 @@ fn summary(results: &[RunResult], identity: Option<&Manifest>) -> String {
     }
 
     let _ = writeln!(text, "\n## Misses\n");
-    let mut missed_any = false;
+    let _ = writeln!(
+        text,
+        "Scored checks only; tool evidence is below. A cell is the runs that missed the check over \
+         the runs that carried it.\n"
+    );
+    let mut misses: BTreeMap<(String, String, String, Source), (usize, usize)> = BTreeMap::new();
     for result in &clean {
-        let missed: Vec<String> = result
-            .checks
-            .iter()
-            .filter(|check| !check.found)
-            .map(|check| format!("`{}` ({:?})", check.required, check.source))
-            .collect();
-        if missed.is_empty() {
-            continue;
+        for check in &result.checks {
+            if check.source == Source::Tool {
+                continue;
+            }
+            let entry = misses
+                .entry((
+                    result.scenario.clone(),
+                    result.target.clone(),
+                    check.required.clone(),
+                    check.source,
+                ))
+                .or_default();
+            entry.1 += 1;
+            if !check.found {
+                entry.0 += 1;
+            }
         }
-        missed_any = true;
-        let _ = writeln!(
-            text,
-            "- {} · {} · run {}: {}",
-            result.scenario,
-            result.target,
-            result.repeat,
-            missed.join(", ")
-        );
     }
-    if !missed_any {
-        let _ = writeln!(text, "None: every check passed in every run.");
+    let mut rows: Vec<_> = misses
+        .into_iter()
+        .filter(|(_, (missed, _))| *missed > 0)
+        .collect();
+    rows.sort_by(|a, b| {
+        a.0 .0
+            .cmp(&b.0 .0)
+            .then(a.0 .1.cmp(&b.0 .1))
+            .then(b.1 .0.cmp(&a.1 .0))
+            .then(a.0 .2.cmp(&b.0 .2))
+    });
+    if rows.is_empty() {
+        let _ = writeln!(text, "None: every scored check passed in every run.");
+    } else {
+        let _ = writeln!(text, "| Scenario | Arm | Check | Source | Missed |");
+        let _ = writeln!(text, "| --- | --- | --- | --- | --- |");
+        for ((scenario, target, required, source), (missed, total)) in rows {
+            let _ = writeln!(
+                text,
+                "| {scenario} | {target} | `{required}` | {source:?} | {missed}/{total} ({}) |",
+                rate_text(missed, total)
+            );
+        }
     }
+
+    let _ = writeln!(text, "\n## Tool evidence\n");
+    let _ = writeln!(text, "| Arm | Tool checks seen |");
+    let _ = writeln!(text, "| --- | --- |");
+    for target in &targets {
+        let arm: Vec<&RunResult> = clean
+            .iter()
+            .copied()
+            .filter(|result| result.target.as_str() == target.as_str())
+            .collect();
+        let total: usize = arm
+            .iter()
+            .map(|result| {
+                result
+                    .checks
+                    .iter()
+                    .filter(|check| check.source == Source::Tool)
+                    .count()
+            })
+            .sum();
+        let seen: usize = arm
+            .iter()
+            .map(|result| {
+                result
+                    .checks
+                    .iter()
+                    .filter(|check| check.source == Source::Tool && check.found)
+                    .count()
+            })
+            .sum();
+        let cell = if total == 0 {
+            dash()
+        } else {
+            format!("{seen}/{total} ({})", rate_text(seen, total))
+        };
+        let _ = writeln!(text, "| {target} | {cell} |");
+    }
+    let _ = writeln!(
+        text,
+        "\nTool checks are evidence the work happened; they are not part of the score."
+    );
 
     let _ = writeln!(text, "\n## Limits\n");
     let _ = writeln!(
@@ -493,6 +644,16 @@ fn summary(results: &[RunResult], identity: Option<&Manifest>) -> String {
          runs that passed every check. They diverge when an arm trades completeness for a smaller \
          bill."
     );
+    let _ = writeln!(
+        text,
+        "- `CLI attempts` counts a shell call that named an `at-*` binary, not one that succeeded; \
+         the `absent` arm is expected to attempt and fail."
+    );
+    let _ = writeln!(
+        text,
+        "- `Skill` counts a harness `skill` call. A non-documented arm that loads one is documented \
+         in practice: the repository advertisement is removed, not the harness's own skill store."
+    );
     let runs_per_cell = runs_per_cell(&clean, &scenarios, &targets);
     let fewest = runs_per_cell.iter().copied().min().unwrap_or(0);
     let most = runs_per_cell.iter().copied().max().unwrap_or(0);
@@ -504,7 +665,7 @@ fn summary(results: &[RunResult], identity: Option<&Manifest>) -> String {
     } else if fewest == most {
         let _ = writeln!(
             text,
-            "- {} runs per scenario and arm; each cell is the median, with min–max where the runs disagree.",
+            "- {} per scenario and arm; each cell is the median, with min–max where the runs disagree.",
             plural(most, "run")
         );
     } else {
@@ -699,10 +860,13 @@ fn spread_at(values: &[f64], places: usize) -> String {
     ) else {
         return dash();
     };
-    if max > min {
-        format!("{median:.places$} [{min:.places$}–{max:.places$}]")
+    let median_text = format!("{median:.places$}");
+    let min_text = format!("{min:.places$}");
+    let max_text = format!("{max:.places$}");
+    if min_text != max_text {
+        format!("{median_text} [{min_text}–{max_text}]")
     } else {
-        format!("{median:.places$}")
+        median_text
     }
 }
 
@@ -879,6 +1043,9 @@ mod tests {
         );
         assert!(text.contains("| alpha | — | 1.00 |"), "{text}");
         assert!(text.contains("| beta | 0.50 | — |"), "{text}");
+        assert!(text.contains("## Solved by scenario"), "{text}");
+        assert!(text.contains("| alpha | — | 1/1 |"), "{text}");
+        assert!(text.contains("| beta | 0/1 | — |"), "{text}");
         assert!(
             text.contains("## Cost per check by scenario (µ$)"),
             "{text}"
@@ -920,6 +1087,36 @@ mod tests {
     }
 
     #[test]
+    fn solved_separates_a_bimodal_arm_from_its_median() {
+        let mut solved = result("pi", BTreeSet::new());
+        solved.scenario = "alpha".to_owned();
+        solved.score = 1.0;
+        solved.passed = 2;
+        solved.checks_total = 2;
+
+        let mut partial = result("pi", BTreeSet::new());
+        partial.scenario = "alpha".to_owned();
+        partial.score = 0.5;
+        partial.passed = 1;
+        partial.checks_total = 2;
+
+        let text = summary(&[solved, partial], None);
+        assert!(text.contains("| alpha | 0.75 [0.50–1.00] |"), "{text}");
+        assert!(text.contains("| alpha | 1/2 |"), "{text}");
+    }
+
+    #[test]
+    fn the_work_table_states_the_input_tokens_of_a_run() {
+        let mut run = result("pi", BTreeSet::new());
+        run.input_tokens = 420_000;
+        let text = summary(&[run], None);
+        assert!(
+            text.contains("| pi | 0 | 0 | 420k | 0 B |"),
+            "the work table's input column is the run's input tokens: {text}"
+        );
+    }
+
+    #[test]
     fn one_run_per_cell_is_called_a_smoke_test() {
         let text = summary(&[result("pi", BTreeSet::new())], None);
         assert!(
@@ -947,6 +1144,70 @@ mod tests {
         assert_eq!(run.cli_calls(), None);
         run.toolkit_cli_calls = 2;
         assert_eq!(run.cli_calls(), Some(2));
+    }
+
+    #[test]
+    fn a_range_that_rounds_to_the_same_number_is_not_shown() {
+        assert_eq!(spread_at(&[1300.0, 1_300.000_000_1], 0), "1300");
+        assert_eq!(spread_at(&[1.0, 0.5], 2), "0.75 [0.50–1.00]");
+    }
+
+    #[test]
+    fn misses_are_grouped_by_check() {
+        let run = || {
+            let mut run = result("pi", BTreeSet::new());
+            run.scenario = "a".to_owned();
+            run.checks = vec![
+                Check {
+                    required: "x.rs:1".to_owned(),
+                    source: Source::Gold,
+                    found: false,
+                },
+                Check {
+                    required: "y".to_owned(),
+                    source: Source::Tool,
+                    found: false,
+                },
+            ];
+            run.passed = 0;
+            run.checks_total = 1;
+            run.score = 0.0;
+            run
+        };
+        let text = summary(&[run(), run()], None);
+        assert!(
+            text.contains("| a | pi | `x.rs:1` | Gold | 2/2 (100%) |"),
+            "{text}"
+        );
+        assert!(!text.contains("| a | pi | `y` | Tool |"), "{text}");
+    }
+
+    #[test]
+    fn tool_evidence_is_reported_but_is_not_a_scored_miss() {
+        let mut run = result("rig:baseline", BTreeSet::new());
+        run.checks = vec![
+            Check {
+                required: "a.rs:1".to_owned(),
+                source: Source::Path,
+                found: true,
+            },
+            Check {
+                required: "agent_playbook.search".to_owned(),
+                source: Source::Tool,
+                found: false,
+            },
+        ];
+        run.passed = 1;
+        run.checks_total = 1;
+        run.score = 1.0;
+        let text = summary(&[run], None);
+        assert!(text.contains("## Tool evidence"), "{text}");
+        assert!(text.contains("| rig:baseline | 0/1 (0%) |"), "{text}");
+        assert!(
+            !text.contains("- s · rig:baseline · run 1: `agent_playbook.search`"),
+            "{text}"
+        );
+        assert!(text.contains("None: every scored check passed"), "{text}");
     }
 
     #[test]
@@ -1010,6 +1271,7 @@ mod tests {
             toolkit_cli_calls: 0,
             loaded_skill: false,
             unparsed_lines: 0,
+            toolkit: None,
             tags,
             answer: None,
             citations: Vec::new(),

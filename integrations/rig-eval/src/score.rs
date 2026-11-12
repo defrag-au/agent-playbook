@@ -109,7 +109,7 @@ fn names_path(answer: &str, path: &str) -> bool {
         .any(|directory| path.starts_with(directory))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Source {
     Gold,
@@ -182,8 +182,14 @@ pub fn score(scenario: &Scenario, answer: Option<&str>, tool_output: &str) -> Sc
         });
     }
 
-    let passed = checks.iter().filter(|check| check.found).count();
-    let total = checks.len();
+    let passed = checks
+        .iter()
+        .filter(|check| check.found && check.source != Source::Tool)
+        .count();
+    let total = checks
+        .iter()
+        .filter(|check| check.source != Source::Tool)
+        .count();
     let score = if total == 0 {
         0.0
     } else {
@@ -250,6 +256,31 @@ mod tests {
         assert!(names_path("?? src/driver/", "src/driver/mod.rs"));
         assert!(names_path("src/driver/", "src/driver/nested/file.rs"));
         assert!(!names_path("src/other/", "src/driver/mod.rs"));
+    }
+
+    #[test]
+    fn tool_evidence_is_not_scored() {
+        let scenario = Scenario {
+            name: "a".to_owned(),
+            why: String::new(),
+            prompt: "p".to_owned(),
+            workdir: ".".to_owned(),
+            gold: vec!["a.rs:1".to_owned()],
+            extra_paths: Vec::new(),
+            must_say: Vec::new(),
+            tool_says: vec!["agent_playbook.search".to_owned()],
+            git: None,
+            git_branch: None,
+            git_paths: Vec::new(),
+        };
+        let scored = score(&scenario, Some("`a.rs:1`"), "");
+        assert_eq!(scored.total, 1);
+        assert_eq!(scored.passed, 1);
+        assert_eq!(scored.score, 1.0);
+        assert!(scored
+            .checks
+            .iter()
+            .any(|check| check.source == Source::Tool && !check.found));
     }
 
     #[test]

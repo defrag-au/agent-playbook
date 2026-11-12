@@ -1,7 +1,7 @@
 # The scenario corpus
 
 One JSON file per scenario. A scenario is a prompt, the working directory it runs in, and the
-checks the answer is scored against. [`rig-eval`](../src/main.rs) loads every `*.json` here, validates
+checks the answer is scored or reported against. [`rig-eval`](../src/main.rs) loads every `*.json` here, validates
 it against a snapshot of this repository, and runs it under every target.
 
 The corpus is removed from every commit in a run's snapshot and denied at runtime, so an agent
@@ -33,14 +33,15 @@ cannot read its own gold. Adding or editing a file changes the corpus fingerprin
 | `gold` | no | `path:line` citations the answer must contain. |
 | `extra_paths` | no | Paths the answer must name, where a line is not required. |
 | `must_say` | no | Literals the answer must contain. |
-| `tool_says` | no | Literals the tool output must contain — evidence the work happened. |
+| `tool_says` | no | Literals the tool output must contain — evidence the work happened, reported separately and **not scored**. |
 | `git` | no | `"status"`: the branch and changed paths are read from the snapshot at load time. |
 
-A scenario needs at least one check; a file with no gold, paths, literals or git expectation is an
-error. Every `gold` line must exist in the snapshot — a stale line fails validation rather than
-scoring as a model miss. Every `extra_paths` entry must exist.
+A scenario needs at least one **scored** check; tool evidence alone is not enough. A file with no
+gold, paths, literals or git expectation is an error. Every `gold` line must exist in the snapshot
+— a stale line fails validation rather than scoring as a model miss. Every `extra_paths` entry must
+exist.
 
-## How a check is scored
+## How a check is scored or reported
 
 - **Gold.** A citation matches when its path is the same path (or one ends with `/` plus the other,
   so `src/lib.rs:82` matches `integrations/rig/src/lib.rs:82`) and its line, or the range it is
@@ -49,7 +50,8 @@ scoring as a model miss. Every `extra_paths` entry must exist.
   `/` that contains it. `git status` collapsing an untracked tree to its top directory counts.
 - **Answer.** A literal substring of the answer.
 - **Tool.** A literal substring of the concatenated tool output, where each result is its tool name
-  and its text.
+  and its text. This is **evidence, not score**: it says the mechanism ran. It is reported in the
+  run's tool-evidence table; it never changes the pass rate or `Cost/solved`.
 
 A scenario whose expectation comes from the working tree uses `"git": "status"`: the runner reads
 the branch and every changed path from the snapshot's `git status --branch -uall`. The snapshot

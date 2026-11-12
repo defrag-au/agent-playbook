@@ -6,8 +6,8 @@
   "gold": [
     "integrations/rig/README.md:14",
     "integrations/rig/README.md:29",
-    "docs/design/rig.md:136",
-    "docs/design/rig.md:143"
+    "integrations/rig/README.md:44",
+    "docs/design/rig.md:136"
   ],
   "extra_paths": [],
   "must_say": [],

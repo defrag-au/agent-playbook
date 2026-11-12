@@ -24,23 +24,29 @@ if (runs.length === 0) {
   display(
     Inputs.table(
       runs.map((run) => ({
-        run: html`<a href="./runs/${run.id}/">${run.label}</a>`,
-        arms: run.arms.join(", "),
-        "pass rate": run.checks
-          ? `${Math.round((100 * run.passed) / run.checks)}%`
-          : "—",
+        id: run.id,
+        date: run.label.split(" · ")[0],
+        model: run.label.split(" · ")[1],
+        arms: run.arms.length,
+        "pass rate": run.checks ? `${Math.round((100 * run.passed) / run.checks)}%` : "—",
         cost: run.cost_usd ? `$${run.cost_usd.toFixed(3)}` : "—",
         corpus: run.corpus,
       })),
       {
+        columns: ["date", "model", "arms", "pass rate", "cost", "corpus"],
+        width: {date: 100, model: 210, arms: 55, "pass rate": 80, cost: 80},
         header: {
-          run: "Run",
+          date: "Date",
+          model: "Model",
           arms: "Arms",
           "pass rate": "Pass rate",
           cost: "Cost",
           corpus: "Corpus",
         },
-        sort: "run",
+        format: {
+          model: (label, i, data) => html`<a href="./runs/${data[i].id}/">${label}</a>`,
+        },
+        sort: "date",
         reverse: true,
       },
     ),

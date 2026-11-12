@@ -7,6 +7,16 @@ result
 *.swp
 .claude/settings.local.json
 
+# The benchmark site builds from site/artifacts/, which is committed. Everything else
+# under site/frontend is generated: node_modules, the Framework build, the run pages,
+# and the data loaders sync-runs.mjs writes beside them.
+/site/frontend/node_modules/
+/site/frontend/build/
+/site/frontend/src/runs/*/
+/site/frontend/src/data/*-traces.json.js
+/site/frontend/src/data/*-tools.json.js
+/site/frontend/src/data/*-checks.json.js
+
 # A private fleet inventory lives outside this public repository. These guards catch a
 # local copy before it can be committed; the real tree is named by --fleet-root or
 # AGENT_FLEET_ROOT.
