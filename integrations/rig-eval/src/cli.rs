@@ -89,6 +89,18 @@ struct Cli {
     #[arg(long, value_name = "SECONDS")]
     timeout: Option<u64>,
 
+    /// Run every trial in this image instead of on the host (requires Apple's `container`)
+    #[arg(long, value_name = "IMAGE")]
+    container: Option<String>,
+
+    /// CPUs each trial container gets (multiplied by --jobs)
+    #[arg(long, value_name = "N", default_value_t = 8)]
+    container_cpus: u32,
+
+    /// Memory each trial container gets (multiplied by --jobs)
+    #[arg(long, value_name = "SIZE", default_value = "16G")]
+    container_memory: String,
+
     /// Validate the scenarios and targets, print the plan, run nothing
     #[arg(long)]
     dry_run: bool,
@@ -111,7 +123,16 @@ pub struct Args {
     pub repeat: u32,
     pub jobs: usize,
     pub timeout: Option<Duration>,
+    pub container: Option<ContainerArgs>,
     pub dry_run: bool,
+}
+
+/// A container image to run trials in, and the resources each one gets.
+#[derive(Debug, Clone)]
+pub struct ContainerArgs {
+    pub reference: String,
+    pub cpus: u32,
+    pub memory: String,
 }
 
 #[derive(Debug, Clone)]
@@ -170,6 +191,11 @@ impl Args {
             repeat: cli.repeat,
             jobs: cli.jobs as usize,
             timeout: cli.timeout.map(Duration::from_secs),
+            container: cli.container.map(|reference| ContainerArgs {
+                reference,
+                cpus: cli.container_cpus,
+                memory: cli.container_memory,
+            }),
             dry_run: cli.dry_run,
         };
         args.validate()?;
@@ -182,6 +208,28 @@ impl Args {
             return Ok(());
         }
         if self.dry_run {
+            return Ok(());
+        }
+        // In a container the corpus is not in the image and the host's launchers are irrelevant;
+        // what must exist here is the settings each arm is defined by.
+        if self.container.is_some() {
+            if !on_path(Path::new("container")) {
+                bail!(
+                    "no `container` on PATH; container isolation runs through Apple's container CLI"
+                );
+            }
+            for target in &self.targets {
+                if let Target::Rig(home, _) = target {
+                    let settings = home.path.join("settings.toml");
+                    if !settings.is_file() {
+                        bail!(
+                            "home `{}` has no settings.toml at {}; the image's arm is built from it",
+                            home.label,
+                            settings.display()
+                        );
+                    }
+                }
+            }
             return Ok(());
         }
         // The corpus ships in the checkout. The sandbox is what keeps the agent from reading its

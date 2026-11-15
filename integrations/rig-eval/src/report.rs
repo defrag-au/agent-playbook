@@ -237,7 +237,11 @@ pub fn print_plan(args: &Args, scenarios: &[Scenario]) {
                 } else {
                     "MISSING settings.toml"
                 };
-                println!("{:24} {} ({state})", target.label(), home.path.display());
+                let location = match &args.container {
+                    Some(_) => crate::container::home_dir(&home.label),
+                    None => home.path.display().to_string(),
+                };
+                println!("{:24} {location} ({state})", target.label());
             }
             Target::Opencode(_) => {
                 println!("{:24} {}", target.label(), args.opencode_config.display())
@@ -245,14 +249,20 @@ pub fn print_plan(args: &Args, scenarios: &[Scenario]) {
             Target::Pi(_) => println!("{:24} {}", target.label(), args.pi.display()),
         }
     }
-    println!(
-        "sandbox  {}",
-        if crate::sandbox::profile(args).is_some() {
-            "the corpus and results are unreadable to the agent"
-        } else {
-            "NOT available: the agent can read the corpus and the results"
-        }
-    );
+    match &args.container {
+        Some(container) => println!(
+            "isolation container {}\n         the snapshot is /repo and the corpus is not in the image",
+            container.reference
+        ),
+        None => println!(
+            "sandbox  {}",
+            if crate::sandbox::profile(args).is_some() {
+                "the corpus and results are unreadable to the agent"
+            } else {
+                "NOT available: the agent can read the corpus and the results"
+            }
+        ),
+    }
     println!();
     for scenario in scenarios {
         println!(
@@ -316,6 +326,29 @@ fn summary(results: &[RunResult], identity: Option<&Manifest>) -> String {
                 "No manifest: this summary was rendered from results alone, so the corpus and \
                  checkout it measured are not recorded.\n"
             );
+        }
+    }
+
+    if let Some(identity) = identity {
+        match identity.isolation {
+            Some(crate::manifest::Isolation::Container) => {
+                if let Some(container) = &identity.container {
+                    let _ = writeln!(
+                        text,
+                        "Isolation container `{}` ({}) · image built from `{}`\n",
+                        container.image,
+                        container.digest,
+                        short(&container.head),
+                    );
+                }
+            }
+            Some(crate::manifest::Isolation::Seatbelt) => {
+                let _ = writeln!(text, "Isolation: macOS seatbelt\n");
+            }
+            Some(crate::manifest::Isolation::Unsealed) => {
+                let _ = writeln!(text, "Isolation: none — the agent could read the corpus\n");
+            }
+            None => {}
         }
     }
 

@@ -74,8 +74,9 @@ Pi and opencode. Equal ambient authority is the only fair baseline: a sandbox en
 arm alone would measure refused commands, not a better harness.
 
 An unattended harness would sandbox at launch (container, VM or seatbelt), or inside rig with a
-plugin that sets `Processes`. The Gate is policy above either. That work starts after the
-comparison.
+plugin that sets `Processes`. The Gate is policy above either. The container launch is now landed:
+`integrations/rig-eval/container/` builds the image and `rig-eval --container` mounts each snapshot
+at `/repo` in it. The seatbelt profile remains for a host run.
 
 ## What each harness exposes
 

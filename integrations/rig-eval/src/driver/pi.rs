@@ -42,7 +42,7 @@ pub fn run(
         &context.args.out,
         &stem,
         context.args.timeout,
-        context.sandbox.as_deref(),
+        context.isolation,
     )?;
     let mut facts = parse(&completed.stdout)?;
     if completed.timed_out {

@@ -1,0 +1,16 @@
+#!/bin/sh
+# The devshell is this image: the toolchain is already on PATH.
+#
+# The rules tell an agent to run `direnv exec . cargo test`. That command has to work, or a trial
+# spends a turn discovering that the environment is not the one the rules describe. `exec` runs the
+# command in the requested directory; `allow` is already satisfied.
+if [ "$1" = "exec" ]; then
+	shift
+	[ $# -gt 0 ] && shift
+	exec "$@"
+fi
+if [ "$1" = "allow" ]; then
+	exit 0
+fi
+echo "direnv: only \`exec\` and \`allow\` are available in the eval image; the toolchain is on PATH" >&2
+exit 1

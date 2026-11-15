@@ -27,7 +27,7 @@ pub fn run(
     let stem = format!("{}-{}-r{repeat}", scenario.name, context.arm);
     let mut env = vec![(
         "OPENCODE_CONFIG".to_owned(),
-        context.args.opencode_config.display().to_string(),
+        context.opencode_config().display().to_string(),
     )];
     env.extend(context.env.iter().cloned());
 
@@ -52,7 +52,7 @@ pub fn run(
         &context.args.out,
         &stem,
         context.args.timeout,
-        context.sandbox.as_deref(),
+        context.isolation,
     )?;
     let mut facts = parse(&completed.stdout)?;
     if completed.timed_out {

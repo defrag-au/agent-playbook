@@ -1,5 +1,8 @@
 //! The seatbelt profile that seals the eval data from the agent.
 //!
+//! This is the host isolation. `--container` is the other one: the snapshot is mounted at `/repo`
+//! and the corpus is not in the image, so there is nothing to deny. See `container.rs`.
+//!
 //! The corpus now ships in the repository, so a repo-wide search can see its path. The content is
 //! what matters: `sandbox-exec` denies the agent every read of the corpus, the output directory,
 //! and the repository's eval scratch. It denies the corpus **directory**, not its parent — a
@@ -80,6 +83,7 @@ mod tests {
             repeat: 1,
             jobs: 1,
             timeout: None,
+            container: None,
             dry_run: false,
         };
         // The paths do not exist here, so the profile has nothing to deny; the test is that the

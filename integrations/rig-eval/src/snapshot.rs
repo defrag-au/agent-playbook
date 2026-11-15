@@ -66,8 +66,12 @@ impl Template {
         fs::create_dir_all(&bin_absent)
             .with_context(|| format!("creating {}", bin_absent.display()))?;
         write_stubs(&stubs)?;
-        write_wrapper(&bin, args, None)?;
-        write_wrapper(&bin_absent, args, Some(&stubs))?;
+        // The wrappers delegate to the host's devshell through direnv. A container has no direnv
+        // and needs none: the image's `PATH` is the toolchain.
+        if args.container.is_none() {
+            write_wrapper(&bin, args, None)?;
+            write_wrapper(&bin_absent, args, Some(&stubs))?;
+        }
         link_fork(&base, args)?;
 
         // Start from the real history, then take the corpus out of every commit. The older
@@ -471,8 +475,12 @@ fn shell_quote(path: &Path) -> String {
 }
 
 /// `integrations/rig` resolves its dev-dependencies at `../../../rig`. The snapshot sits one
-/// directory deeper than the real checkout, so the sibling fork has to be linked beside it.
+/// directory deeper than the real checkout, so the sibling fork has to be linked beside it. In a
+/// container the mount is `/repo`, so `../../../rig` is `/rig`, which the image already holds.
 fn link_fork(base: &Path, args: &Args) -> Result<()> {
+    if args.container.is_some() {
+        return Ok(());
+    }
     let Some(parent) = args.root.parent() else {
         return Ok(());
     };
@@ -487,19 +495,26 @@ fn link_fork(base: &Path, args: &Args) -> Result<()> {
     Ok(())
 }
 
-/// Point the snapshot's build directories at the real checkout's warm ones.
+/// Point the snapshot's build directories at the warm ones. On the host those are the real
+/// checkout's; in a container they are the image's, at the path the image built them at, so the
+/// build fingerprints match and cargo does no work.
 fn link_targets(args: &Args, snapshot: &Path) -> Result<()> {
+    let container = args.container.is_some();
     for relative in [
         "target",
         "integrations/rig/target",
         "integrations/rig-eval/target",
     ] {
-        let source = args.root.join(relative);
-        if !source.is_dir() {
+        let source = if container {
+            Path::new(crate::container::IMAGE_ROOT).join(relative)
+        } else {
+            args.root.join(relative)
+        };
+        if !container && !source.is_dir() {
             continue;
         }
         let link = snapshot.join(relative);
-        if link.exists() {
+        if fs::symlink_metadata(&link).is_ok() {
             continue;
         }
         if let Some(parent) = link.parent() {
@@ -614,6 +629,7 @@ mod tests {
             repeat: 1,
             jobs: 1,
             timeout: None,
+            container: None,
             dry_run: false,
         };
         assert_eq!(corpus_paths(&args), [PathBuf::from(REPO_CORPUS)]);

@@ -353,7 +353,9 @@ cargo run --manifest-path integrations/rig-eval/Cargo.toml -- --out /tmp/rig-eva
 The corpus ships at `integrations/rig-eval/scenarios`; `--scenarios` points elsewhere for a private
 copy, and `--out` is required. The corpus is committed, so a filesystem deny on `scenarios/` alone
 does not hide it: `git show` and `git diff` read the committed content from `.git`. Each run
-therefore executes in a snapshot of the worktree under `$TMPDIR`:
+therefore executes in a snapshot of the worktree under `$TMPDIR`. A host run also uses the seatbelt
+profile below; `--container` replaces that part with the image boundary described under
+[Container isolation](#container-isolation). The snapshot itself works the same way in both:
 
 - the snapshot copies the real `.git` and rewrites the corpus out of the commits that hold it, then
   prunes the old objects; the reachable history has no corpus, while the branch commits remain for
@@ -417,6 +419,98 @@ document is marked contaminated and excluded from the tables and medians. A tool
 names the sealed corpus is recorded as `inspected-corpus` instead: the sandbox refuses the read,
 so a blocked probe says the agent noticed the seal, not that it saw the gold. Both appear in the
 run's `tags` in `results.json`, and the summary names the excluded and inspected runs.
+
+## Container isolation
+
+The seatbelt profile and the snapshot's rewritten history kept the gold out of reach on macOS. They
+were also specific to the machine: `sandbox-exec` exists nowhere else, and the profile's guarantees
+came from paths that only exist in this checkout. A run now uses a container per trial instead, with
+an image built from this repository. The boundary is structural: the snapshot is mounted at `/repo`,
+and the corpus is in neither the image nor the mount, so there is nothing to deny.
+
+```sh
+integrations/rig-eval/container/build.sh            # playbook-eval/rig-eval:local, gated + baseline
+integrations/rig-eval/container/build.sh --homes "gated baseline terse"
+
+rig-eval --container playbook-eval/rig-eval:local --out .tmp/rig-eval …
+```
+
+The image is built from a staged context under `.tmp/rig-eval/container-context`: the repository
+without `integrations/rig-eval/scenarios`, the rig fork at `../rig`, one `settings.toml` per
+requested home, and a metadata file. `container build` is Apple's `container`; Docker is not
+involved and the machine has no working Docker daemon.
+
+The layout inside the image:
+
+| Path | What |
+| --- | --- |
+| `/workspace` | the checkout: the toolkit, `integrations/rig` and the baked rig homes |
+| `/rig` | the fork, which `rig` was compiled against and `integrations/rig` patches to |
+| `/repo` | the trial's snapshot, mounted read-write for the length of the run |
+| `/opt/playbook/bin` | the `at-*` binaries and `playbook` |
+| `/usr/local/bin/{rig,pi,bunx}` | the three harness launchers |
+
+A trial runs as uid 1000 (`eval`) with a fixed `PATH`. The `absent` arm drops
+`/opt/playbook/bin` from it rather than shadowing the binaries, because the image's own `PATH` is
+the only route to them. `RIG_HOME` is `/workspace/.tmp/rig-home` for `gated` and
+`/workspace/.tmp/rig-home-<label>` otherwise — the same depth as the host's
+`.tmp/rig-home[-<label>]`, so a `settings.toml` that names `../../integrations/rig` resolves to the
+image's checkout without being rewritten. The home's `sessions` directory is a host mount, so
+`effects.jsonl` outlives the container. The opencode config is mounted read-only at
+`/opt/opencode/opencode.json`.
+
+Each home is built in the image with its target directory warm. `rig` runs `cargo build` before
+every start; a cold Bevy build per trial would dominate the measurement, and a warm one is 0.6 s.
+The image is 4.1 GB with `gated` and `baseline`, and the build is configured without debug
+information (`CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_PROFILE_TEST_DEBUG=0`) for both the agent and the
+tests.
+
+**The image is the devshell.** The rules tell an agent to run `nix develop -c cargo test` and the
+sandboxed-shell note offers `direnv exec . cargo test`. Both are shims in `/usr/local/bin` that run
+the command, because the toolchain is already on `PATH`. That is a deliberate difference from the
+host: an agent that follows the rules should not spend a turn discovering that the environment is
+not the one they describe, and that turn would be measured as a harness failure.
+
+### What the run checks before the first trial
+
+- every arm's home is in the image, and its settings blob is the one the host names — a changed
+  `settings.toml` needs a rebuild, or the report would name an arm the image does not run;
+- `rig`, `pi`, `bunx` and `cargo` are installed when the targets need them, and `at-peek` is there
+  when the toolkit is not absent;
+- `/workspace/integrations/rig-eval/scenarios` does not exist. The build script removes it, and the
+  image refuses to be used if it is there.
+
+The image's repository revision is recorded and compared with the checkout's; a mismatch is printed
+but not refused. The image fixes the harness and the toolkit, while the snapshot is the subject, so
+the two can legitimately differ during development. Both are in `manifest.json`, beside the image
+digest, and the digest is what a published run ran.
+
+The key reaches the container through a `--env-file` written mode 600 in the run's staging
+directory, never through `--env` on the command line. The container CLI's own progress and its
+SIGWINCH warning are filtered out of the run's stderr, so an empty `.err` means the harness wrote
+nothing.
+
+### What this does not do
+
+- The container's network is the host's. A trial can call the model API, and nothing else is
+  filtered.
+- Writes the agent makes to `/repo` land in the mounted snapshot and are discarded with it. There
+  is no answer-file handoff: the answer arrives on the harness's stream, which is what is scored.
+- The image is built from the working tree, not only from `HEAD`. The digest is the identity, and
+  the manifest records the checkout's `dirty` flag. A published run should use a clean checkout and
+  a rebuild.
+
+The first container runs, 2026-11-13, `pre-edit-state` on `deepseek/deepseek-flash`:
+
+| Arm | Image | Wall | Model calls | Tool calls | Score |
+| --- | --- | --- | --- | --- | --- |
+| `rig:gated` | `:spike`, one home | 5.9 s | 3 | 4 | 1.00 |
+| `rig:baseline` | `:local`, two homes | 10.7 s | 4 | 4 | 1.00 |
+| `opencode` | `:local` | 8.4 s | 2 | 2 | 1.00 |
+| `pi` | `:local` | 10.0 s | 5 | 5 | 1.00 |
+
+One run each is a smoke test, not evidence of a ranking; it is the proof that the same boundary runs
+all three harnesses.
 
 ## The first result
 

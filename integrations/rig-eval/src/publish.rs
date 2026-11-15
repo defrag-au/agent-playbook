@@ -143,6 +143,8 @@ mod tests {
             finished_ms: 1_763_000_001_000,
             model: "deepseek/deepseek-flash".to_owned(),
             env_names: vec!["DEEPSEEK_API_KEY".to_owned()],
+            isolation: None,
+            container: None,
             corpus: Corpus {
                 directory: "integrations/rig-eval/scenarios".to_owned(),
                 fingerprint: "11a2a7894e671df91621c06b3d87e8b4794a9651".to_owned(),

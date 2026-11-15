@@ -8,6 +8,7 @@
 //! an arm's config without the runner and without trusting this code. Environment variables are
 //! recorded by name only: the run needs a key, and a manifest is meant to be published.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -39,6 +40,12 @@ pub struct Manifest {
     pub model: String,
     /// Names only. A published manifest must never carry a credential.
     pub env_names: Vec<String>,
+    /// What confined the trial. Absent from a manifest written before the field existed.
+    #[serde(default)]
+    pub isolation: Option<Isolation>,
+    /// The image a container run used, and the arms it baked. Absent for a host run.
+    #[serde(default)]
+    pub container: Option<ContainerRecord>,
     pub corpus: Corpus,
     pub checkout: Checkout,
     pub snapshot: Snapshot,
@@ -48,6 +55,30 @@ pub struct Manifest {
     pub repeat: u32,
     /// Every run's outcome, summed. The rows are in `results.json`.
     pub totals: Totals,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Isolation {
+    /// The macOS seatbelt profile sealed the corpus and the results.
+    Seatbelt,
+    /// The snapshot was mounted in a container; the corpus was not in the image.
+    Container,
+    /// Neither: the agent could read the corpus and the results.
+    Unsealed,
+}
+
+/// What a container run measured: the image digest is the environment, `head` is the repository
+/// the image's toolkit and plugin were built from, and `homes` ties each arm's label to the
+/// settings blob its baked build was made from.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ContainerRecord {
+    pub image: String,
+    pub digest: String,
+    pub cpus: u32,
+    pub memory: String,
+    pub head: String,
+    pub homes: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -123,12 +154,19 @@ pub fn now_ms() -> Result<u64> {
     Ok(elapsed.as_millis() as u64)
 }
 
+/// The run's identity, beside the results it produced.
+pub struct Identity<'a> {
+    pub snapshot: &'a str,
+    pub unadvertised: Option<&'a str>,
+    pub started_ms: u64,
+    pub isolation: Isolation,
+    pub container: Option<ContainerRecord>,
+}
+
 pub fn build(
     args: &Args,
     env_names: &[String],
-    snapshot_commit: &str,
-    unadvertised: Option<&str>,
-    started_ms: u64,
+    identity: Identity<'_>,
     results: &[RunResult],
 ) -> Result<Manifest> {
     let corpus = corpus(args)?;
@@ -138,15 +176,17 @@ pub fn build(
             name: "rig-eval".to_owned(),
             version: env!("CARGO_PKG_VERSION").to_owned(),
         },
-        started_ms,
+        started_ms: identity.started_ms,
         finished_ms: now_ms()?,
         model: args.model.clone(),
         env_names: env_names.to_vec(),
+        isolation: Some(identity.isolation),
+        container: identity.container,
         corpus,
         checkout: checkout(&args.root),
         snapshot: Snapshot {
-            commit: snapshot_commit.to_owned(),
-            unadvertised: unadvertised.map(str::to_owned),
+            commit: identity.snapshot.to_owned(),
+            unadvertised: identity.unadvertised.map(str::to_owned),
         },
         targets: arms(args)?,
         jobs: args.jobs,
@@ -224,6 +264,11 @@ fn checkout(root: &Path) -> Checkout {
     }
 }
 
+/// The checkout's `HEAD`: the revision an image's build is compared to at startup.
+pub fn head(root: &Path) -> Option<String> {
+    git_line(root, &["rev-parse", "HEAD"])
+}
+
 fn arms(args: &Args) -> Result<Vec<Arm>> {
     args.targets
         .iter()
@@ -283,7 +328,7 @@ fn relative(root: &Path, path: &Path) -> String {
         .to_string()
 }
 
-fn blob(path: &Path) -> Result<String> {
+pub(crate) fn blob(path: &Path) -> Result<String> {
     let output = Command::new("git")
         .args(["hash-object", "--no-filters", "--"])
         .arg(path)
@@ -382,12 +427,25 @@ mod tests {
             repeat: 1,
             jobs: 1,
             timeout: None,
+            container: None,
             dry_run: false,
         }
     }
 
     fn build_at(root: &Path) -> Manifest {
-        build(&args(root), &[], "snapshot-commit", None, 1, &[]).expect("a manifest")
+        build(
+            &args(root),
+            &[],
+            Identity {
+                snapshot: "snapshot-commit",
+                unadvertised: None,
+                started_ms: 1,
+                isolation: Isolation::Seatbelt,
+                container: None,
+            },
+            &[],
+        )
+        .expect("a manifest")
     }
 
     #[test]
@@ -402,9 +460,13 @@ mod tests {
         let manifest = build(
             &args(&root),
             &[],
-            "advertised",
-            Some("unadvertised"),
-            1,
+            Identity {
+                snapshot: "advertised",
+                unadvertised: Some("unadvertised"),
+                started_ms: 1,
+                isolation: Isolation::Seatbelt,
+                container: None,
+            },
             &[],
         )
         .expect("a manifest");
@@ -470,5 +532,36 @@ mod tests {
         let totals = build_at(&root).totals;
         assert_eq!(totals.runs, 0);
         assert_eq!(totals.cost_usd, 0.0);
+    }
+
+    #[test]
+    fn a_container_run_records_its_image_and_the_arm_it_baked() {
+        let root = fixture("container");
+        let mut homes = BTreeMap::new();
+        homes.insert("gated".to_owned(), "a-blob".to_owned());
+        let manifest = build(
+            &args(&root),
+            &[],
+            Identity {
+                snapshot: "snapshot-commit",
+                unadvertised: None,
+                started_ms: 1,
+                isolation: Isolation::Container,
+                container: Some(ContainerRecord {
+                    image: "playbook-eval/rig-eval:local".to_owned(),
+                    digest: "sha256:abc".to_owned(),
+                    cpus: 8,
+                    memory: "16G".to_owned(),
+                    head: "deadbeef".to_owned(),
+                    homes,
+                }),
+            },
+            &[],
+        )
+        .expect("a manifest");
+        assert_eq!(manifest.isolation, Some(Isolation::Container));
+        let container = manifest.container.expect("a container record");
+        assert_eq!(container.digest, "sha256:abc");
+        assert_eq!(container.homes.get("gated"), Some(&"a-blob".to_owned()));
     }
 }

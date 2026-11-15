@@ -22,7 +22,10 @@ pub fn run(
     context: &RunContext<'_>,
 ) -> Result<RunResult> {
     let stem = format!("{}-{}-r{repeat}", scenario.name, context.arm);
-    let mut env = vec![("RIG_HOME".to_owned(), home.path.display().to_string())];
+    let mut env = vec![(
+        "RIG_HOME".to_owned(),
+        context.rig_home(home).display().to_string(),
+    )];
     env.extend(context.env.iter().cloned());
     let invocation = Invocation {
         program: context.args.rig.clone(),
@@ -42,7 +45,7 @@ pub fn run(
         &context.args.out,
         &stem,
         context.args.timeout,
-        context.sandbox.as_deref(),
+        context.isolation,
     )?;
     let mut facts = stream::parse(&completed.stdout)?;
     if completed.timed_out {
@@ -52,8 +55,8 @@ pub fn run(
     let scored = score::score(scenario, answer.as_deref(), &facts.tool_output);
 
     let effects = facts.session.as_ref().and_then(|session| {
-        let source = home
-            .path
+        let source = context
+            .effects_root(home)
             .join("sessions")
             .join(session)
             .join("files")
