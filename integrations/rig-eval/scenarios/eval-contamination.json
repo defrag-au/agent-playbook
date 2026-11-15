@@ -1,16 +1,16 @@
 {
   "name": "eval-contamination",
-  "why": "Zed thread 7768745e, 2026-11-09: the contamination rule for the harness comparison.",
+  "why": "Zed thread 7768745e, 2026-11-09: the contamination rule for the harness comparison. Gold re-derived 2026-11-15 against the current design doc and the sandbox module's shifted header.",
   "prompt": "Explain the eval's contamination rule and how it is enforced. Say what makes a run contaminated, what a blocked corpus probe is tagged instead, and the two places the gold is sealed: the snapshot's history and the sandbox profile. Cite each finding as `path:line`.",
   "workdir": ".",
   "gold": [
-    "docs/design/rig-eval.md:197",
-    "docs/design/rig-eval.md:198",
-    "docs/design/rig-eval.md:199",
+    "docs/design/rig-eval.md:417",
+    "docs/design/rig-eval.md:418",
+    "docs/design/rig-eval.md:419",
     "integrations/rig-eval/src/snapshot.rs:3",
     "integrations/rig-eval/src/snapshot.rs:5",
-    "integrations/rig-eval/src/sandbox.rs:4",
-    "integrations/rig-eval/src/sandbox.rs:7"
+    "integrations/rig-eval/src/sandbox.rs:7",
+    "integrations/rig-eval/src/sandbox.rs:10"
   ],
   "extra_paths": [],
   "must_say": [
