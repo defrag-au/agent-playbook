@@ -9,6 +9,7 @@
 //! out, and the answer comes from the same tables the parsers enforce.
 
 use at_cardano::catalogue as chain;
+use at_continue_thread::catalogue as thread;
 use at_cost::catalogue as cost;
 use at_crate::catalogue as crate_source;
 use at_peek::catalogue as peek;
@@ -36,13 +37,14 @@ fn run(args: &[String]) -> i32 {
         }
         "--version" => {
             println!(
-                "{TOOL} {VERSION} · at-peek {} · at-crate {} · at-recall {} · at-reach {} · at-cost {} · at-cardano {}",
+                "{TOOL} {VERSION} · at-peek {} · at-crate {} · at-recall {} · at-reach {} · at-cost {} · at-cardano {} · at-continue-thread {}",
                 at_peek::VERSION,
                 at_crate::VERSION,
                 at_recall::VERSION,
                 at_reach::VERSION,
                 at_cost::VERSION,
-                at_cardano::VERSION
+                at_cardano::VERSION,
+                at_continue_thread::VERSION
             );
             0
         }
@@ -70,6 +72,10 @@ fn run(args: &[String]) -> i32 {
             print!("{}", chain::help_all());
             0
         }
+        "at-continue-thread" => {
+            print!("{}", thread::help_all());
+            0
+        }
         name => {
             let found = peek::find(name)
                 .map(peek::help_for)
@@ -77,7 +83,8 @@ fn run(args: &[String]) -> i32 {
                 .or_else(|| recall::find(name).map(recall::help_for))
                 .or_else(|| reach::find(name).map(reach::help_for))
                 .or_else(|| cost::find(name).map(cost::help_for))
-                .or_else(|| chain::find(name).map(chain::help_for));
+                .or_else(|| chain::find(name).map(chain::help_for))
+                .or_else(|| thread::find(name).map(thread::help_for));
             match found {
                 Some(help) => {
                     print!("{help}");
@@ -85,13 +92,14 @@ fn run(args: &[String]) -> i32 {
                 }
                 None => {
                     eprintln!(
-                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-crate, at-recall, at-reach, at-cost, at-cardano · verbs: {}, {}, {}, {}, {}, {}",
+                        "{TOOL}: unknown `{name}` · binaries: at-peek, at-crate, at-recall, at-reach, at-cost, at-cardano, at-continue-thread · verbs: {}, {}, {}, {}, {}, {}, {}",
                         peek::names(),
                         crate_source::names(),
                         recall::names(),
                         reach::names(),
                         cost::names(),
-                        chain::names()
+                        chain::names(),
+                        thread::names()
                     );
                     2
                 }
@@ -105,7 +113,7 @@ fn run(args: &[String]) -> i32 {
 fn toolkit() -> String {
     let mut out = String::new();
     out.push_str(
-        "# binaries in this build: at-peek, at-crate, at-recall, at-reach, at-cost, at-cardano\n",
+        "# binaries in this build: at-peek, at-crate, at-recall, at-reach, at-cost, at-cardano, at-continue-thread\n",
     );
     out.push_str("# every `at-` binary is read-only: no write path, in any flag or any option\n\n");
 
@@ -179,6 +187,18 @@ fn toolkit() -> String {
         out.push('\n');
     }
 
+    out.push_str(&format!(
+        "\nat-continue-thread {} — a text-only continuation digest of a Zed agent thread\n",
+        at_continue_thread::VERSION
+    ));
+    out.push_str(
+        "#   Read-only: opens Zed's threads.db, no subprocess, no network, no write path.\n",
+    );
+    for line in thread::verb_lines() {
+        out.push_str(&line);
+        out.push('\n');
+    }
+
     out.push_str("\nRecipes\n");
     for line in recall::recipe_lines() {
         out.push_str(&line);
@@ -201,6 +221,7 @@ fn toolkit() -> String {
     );
     out.push_str("# does not appear here. Ask for detail with `at-describe at-peek`,\n");
     out.push_str("# `at-describe at-crate`, `at-describe at-recall`, `at-describe at-reach`,\n");
-    out.push_str("# `at-describe at-cost`, `at-describe at-cardano`, or `at-describe <verb>`.\n");
+    out.push_str("# `at-describe at-cost`, `at-describe at-cardano`,\n");
+    out.push_str("# `at-describe at-continue-thread`, or `at-describe <verb>`.\n");
     out
 }

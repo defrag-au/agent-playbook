@@ -168,6 +168,20 @@ pub fn load_record(connection: &Connection, id: &str) -> Result<ThreadRecord, Er
     }
 }
 
+/// One thread's headers, opening and closing the store in one call. A reader that must not name
+/// `rusqlite` — every `at-*` tool, which links this crate for the format and not the driver — uses
+/// this rather than holding a connection.
+pub fn list_headers_at(path: &Path) -> Result<Vec<ThreadHeader>, Error> {
+    let connection = open_read_only(path)?;
+    list_headers(&connection)
+}
+
+/// One thread, including its compressed blob, opening and closing the store in one call.
+pub fn load_record_at(path: &Path, id: &str) -> Result<ThreadRecord, Error> {
+    let connection = open_read_only(path)?;
+    load_record(&connection, id)
+}
+
 /// Walk `parent_id` up to the top-level thread. Exporting a subagent includes
 /// its ancestors so a reimport cannot produce a dangling parent reference.
 pub fn thread_root_id(connection: &Connection, id: &str) -> Result<String, Error> {

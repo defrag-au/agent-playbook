@@ -14,6 +14,7 @@
 pub mod archive;
 pub mod audit;
 pub mod db;
+pub mod digest;
 pub mod export;
 pub mod metadata;
 pub mod recover;
@@ -28,6 +29,7 @@ pub use audit::{
     ThreadExplanation, ToolOutputDetail,
 };
 pub use db::{default_db_path, ThreadHeader, ThreadRecord};
+pub use digest::{candidates, digest, Digest, DigestOptions, DigestStats};
 pub use export::{export, ExportOptions, ExportOutcome, SnapshotManifest};
 pub use recover::{
     prepare_recovery, write_recovery, PreparedRecovery, RecoverOptions, RecoveryMode, RecoveryPlan,

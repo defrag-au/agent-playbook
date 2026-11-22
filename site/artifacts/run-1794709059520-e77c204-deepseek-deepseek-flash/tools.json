@@ -1,0 +1,2319 @@
+[
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 3
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 7
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 5
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 4
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 2
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 6
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 4
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 6
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 12
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 11
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 14
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 12
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 9
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 6
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 14
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "glob",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 25
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 29
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 7
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_recall_diff",
+    "count": 3
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_recall_pr",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_recall_diff",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_recall_pr",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_recall_diff",
+    "count": 2
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_recall_pr",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 2
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_diff",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_pr",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 4
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 5
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 9
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 12
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 9
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 11
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 7
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 4
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 6
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 7
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 6
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "read",
+    "count": 8
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "read",
+    "count": 6
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 8
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 4
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 5
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 2
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 9
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 7
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 2
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "grep",
+    "count": 2
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 12
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 17
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 18
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 18
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "read",
+    "count": 5
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 9
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "read",
+    "count": 5
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 14
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 4
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 16
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 4
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 3
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 5
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 7
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "glob",
+    "count": 1
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 15
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 14
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_recall_diff",
+    "count": 2
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 4
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "glob",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 6
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 4
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_recall_diff",
+    "count": 1
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_recall_diff",
+    "count": 1
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_recall_diff",
+    "count": 2
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 2
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_diff",
+    "count": 2
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 2
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 1
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 2
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 2
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 3
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 9
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_recall_diff",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_recall_log",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 5
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 2
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 4
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_recall_diff",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_recall_log",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "read",
+    "count": 13
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 13
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_outline",
+    "count": 3
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 3
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_recall_diff",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_recall_log",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "read",
+    "count": 8
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 10
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_diff",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_log",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 6
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 11
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 5
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 4
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 3
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "grep",
+    "count": 3
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 26
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 14
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 4
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 3
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 3
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "read",
+    "count": 4
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 2
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 8
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 3
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 2
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 2
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 15
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 4
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 3
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 9
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 3
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 3
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 3
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 2
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 16
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 8
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 7
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 7
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_stat",
+    "count": 2
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 3
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 5
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 7
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 3
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 2
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 1
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 3
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 12
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 3
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 6
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 16
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 9
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 10
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 6
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 6
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "read",
+    "count": 11
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 4
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "read",
+    "count": 5
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 8
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_stat",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_recall_state",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 10
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "glob",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 4
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 5
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "glob",
+    "count": 2
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "grep",
+    "count": 3
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 13
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 12
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "read",
+    "count": 2
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 5
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_outline",
+    "count": 1
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 6
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "read",
+    "count": 5
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 2
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_search",
+    "count": 2
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "read",
+    "count": 4
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "tool": "shell",
+    "count": 4
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_search",
+    "count": 1
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "at_peek_slice",
+    "count": 1
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "read",
+    "count": 3
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "tool": "shell",
+    "count": 5
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 4
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "grep",
+    "count": 1
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "tool": "read",
+    "count": 4
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 5
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "tool": "bash",
+    "count": 4
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "tool": "bash",
+    "count": 5
+  }
+]

@@ -101,6 +101,7 @@ tools/            the agent toolkit, plus the skill store
   at-reach/         a private fleet tree — root, hosts, probe
   at-cost/          what the machine is costing, by repository — repos, tree, pid
   at-cardano/       read-only Cardano chain enquiry through Koios
+  at-continue-thread/ a text-only continuation digest of a Zed agent thread
   at-describe/      the catalogue, which opens nothing
   browser-shot/     browser captures, scenarios and frame bursts
   tui-shot/         terminal captures and scenario runs in a PTY it owns
@@ -125,7 +126,7 @@ models/           compose-time overlays: generic, claude-code, deepseek-flash, z
 templates/        scaffolds for new rules, skills, projects and overlays
 integrations/     consumers of the playbook, outside the workspace; rig/ is the rig plugin
 docs/             precedence model, rule format, skills delivery, migration inventory, inspection and browser tools;
-                  docs/design/ holds design records: rig, and the toolkit's typed core
+                  docs/design/ holds design records: rig, the toolkit's typed core, and container flows
 dist/             generated output (gitignored)
 ```
 
@@ -136,8 +137,14 @@ verbs return typed facts, and the CLI and a harness render the same text from th
 [`rig-eval.md`](docs/design/rig-eval.md) is the measurement plan, the runner, and the first result:
 scenarios drawn from real Zed threads, scored under two homes. [`harness-comparison.md`](docs/design/harness-comparison.md)
 is the four-way comparison — rig, opencode, Pi and Zed — with the fairness controls and what each
-harness can report. The plugin is in `integrations/rig` and the runner in `integrations/rig-eval`,
-both outside this workspace so the composer and `cargo test` stay dependency-light.
+harness can report. [`perpish-flows.md`](docs/design/perpish-flows.md) is the investigation into
+Perpish — Dr. Vape's conlang — as a trace and policy surface for rig, with every example rendered by
+the language's own crate and every unbuilt claim named.
+[`container-flows.md`](docs/design/container-flows.md) is the hands-off builder: why the agent gets a
+working tree rather than a VCS, the typed handoff it returns, and the experiment that decides
+whether DeltaDB replaces the patch. The plugin is in `integrations/rig` and the runner in
+`integrations/rig-eval`, both outside this workspace so the composer and `cargo test` stay
+dependency-light.
 
 `models/` holds **targets**, not just models. A target is whatever consumes rules — usually
 a model+harness pair. `claude-code/` declares `model: claude`, `harness: claude-code`;
@@ -250,7 +257,7 @@ crate has no dependencies at all, so it still builds with no network and no regi
 ## The inspection toolkit
 
 The other half of this repository is not a rule. It is the thing that makes it possible to stop
-writing rules about shell pipelines: seven binaries, built from `tools/`, that give an agent the
+writing rules about shell pipelines: eight binaries, built from `tools/`, that give an agent the
 reads it needs without an approval per command and without a bound hidden in a pipe.
 
 | Binary | Reads | Verbs |
@@ -261,7 +268,8 @@ reads it needs without an approval per command and without a bound hidden in a p
 | `at-reach` | a private fleet tree, and one read-only probe over `ssh` (or `sh` locally) | `root`, `hosts`, `probe` |
 | `at-cost` | the process table, attributed to repositories; spawns nothing | `repos`, `tree`, `pid` |
 | `at-cardano` | Koios over HTTPS, GET and query-POST only; the key is never printed | nouns and aspects: `tip`, `network`, `epoch`, `block`, `blocks`, `tx`, `utxo`, `address`, `account`, `asset`, `policy`, `pool`, `drep`, `proposal`, `script`, `datum`, `endpoints`, `query`, `run` |
-| `at-describe` | nothing; it prints the catalogue | the six verb tables |
+| `at-continue-thread` | Zed's `threads.db`, read-only; spawns nothing | `find`, `digest` |
+| `at-describe` | nothing; it prints the catalogue | the seven verb tables |
 
 `rg` becomes `at-peek search`, `sed -n '40,60p' f.rs` becomes `at-peek slice f.rs:40-60`,
 `grep -rn … ~/.cargo/registry/src` becomes `at-crate search <pattern> <crate>`, and `git status`
@@ -284,6 +292,8 @@ at-cardano pool delegators <pool>         # who delegates, and their stake
 at-cardano endpoints                      # every Koios path, and what answers it
 at-cardano query tx_info --post --body '{"_tx_hashes":["<hash>"]}'   # the long tail
 at-cardano run --scenario .tmp/block.dsl  # several questions, a value carried between them
+at-continue-thread find exoplanet          # which threads match a title fragment
+at-continue-thread digest <id-or-title>    # enough of one thread to continue it in a new one
 at-describe                             # the catalogue, one screen
 ```
 
@@ -303,7 +313,7 @@ intention:
   invocation that produced it and runs exactly as printed — an *address*, never a handle, so no
   state crosses invocations.
 
-The tier each binary sits in is the reason there are seven, because a prefix allowlist can only
+The tier each binary sits in is the reason there are eight, because a prefix allowlist can only
 see a difference that is in the binary. `at-describe` opens no file at all. `at-peek` reads files
 and runs nothing. `at-crate` reads the cargo home, `Cargo.lock` and `target/`, and runs nothing —
 in particular it never invokes `cargo`, so an uninstalled crate is an answer rather than a fetch.
@@ -314,7 +324,9 @@ probe over `ssh` or `sh`; it has no write, sudo or secret verb. Its contract is
 [`docs/fleet.md`](docs/fleet.md). `at-cost` reads the macOS process table and nothing else.
 `at-cardano` is the one member with a socket: HTTPS to a Koios host chosen only by `--network`, GET
 and query-POST only, redirects disabled, `/submittx` refused by name, and a key read from
-`~/.config/koios/api_key` that no output ever prints.
+`~/.config/koios/api_key` that no output ever prints. `at-continue-thread` opens Zed's thread store
+read-only and spawns nothing; its digest replaces image payloads with a one-line placeholder, so a
+thread that a provider refuses on body size can still be continued in a new one.
 
 `defrag-nix` installs them into every defrag devshell, so they are on `PATH` in an interactive
 shell in any of those repositories; a shell an agent spawned reaches for them as

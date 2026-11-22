@@ -22,6 +22,7 @@ Budget: ≤ 200 lines and ≤ 8 KB per file. The test suite enforces a 10 KB cei
 | chrono | 0.4.45 | `chrono-0.4.md` | `## Parse an RFC 3339 timestamp` |
 | clap | 4.6.7 | `clap-4.6.md` | `## Derive a parser` |
 | dotenvy | 0.15.7 | `dotenvy-0.15.md` | `## Read without leaking values` |
+| h3o | 0.11.1 | `h3o-0.11.1.md` | `## Lat/lng ↔ cell` |
 | headless_chrome | 1.0.22 | `headless_chrome-1.0.22.md` | `## Launch a browser and own it` |
 | libproc | 0.14.11 | `libproc-0.14.11.md` | `## Enumerate, then describe` |
 | liquid | 0.26 | `liquid-0.26.md` | `## Building a Parser with Custom Extensions` |
@@ -42,6 +43,7 @@ Budget: ≤ 200 lines and ≤ 8 KB per file. The test suite enforces a 10 KB cei
 | anyhow | `Result<T>` with a context chain, `bail!`, and an exit-code `main` |
 | chrono | RFC 3339 parsing and `DateTime<Utc>` without the serde feature |
 | clap | Derive parser, subcommands and the feature set that produces them |
+| h3o | H3 hex cells on a sphere: lat/lng ↔ cell, rings, distance, local IJ, pentagons, pairing with `pathfinding` A* |
 | dotenvy | `.env` parsing without touching the process environment, and the `$` trap |
 | headless_chrome | Headless Chromium over CDP: process lifecycle, true viewport, input, console events, raw commands |
 | libproc | macOS process table: ppid, rusage, per-thread time — and the calls that are stubs |

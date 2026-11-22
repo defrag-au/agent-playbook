@@ -116,6 +116,8 @@
             "at-cardano"
             "-p"
             "at-describe"
+            "-p"
+            "at-continue-thread"
           ];
           # `cargo install` takes one package per invocation and the workspace root is the
           # composer, so the default install phase would install `playbook` and neither
@@ -125,7 +127,7 @@
           installPhase = ''
             runHook preInstall
             mkdir -p $out/bin
-            for tool in at-peek at-crate at-recall at-reach at-cost at-cardano at-describe; do
+            for tool in at-peek at-crate at-recall at-reach at-cost at-cardano at-describe at-continue-thread; do
               install -m755 \
                 "$(find target -maxdepth 3 -type f -name "$tool" -perm -u+x | head -n1)" \
                 "$out/bin/$tool"

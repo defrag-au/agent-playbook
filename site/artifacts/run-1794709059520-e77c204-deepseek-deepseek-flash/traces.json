@@ -1,0 +1,4790 @@
+[
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 10,
+      "value": 1.0,
+      "precision": 0.20833333333333334,
+      "citations": 24
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 7,
+      "tool_results": 7,
+      "compactions": 0,
+      "wall_ms": 21293,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 74119,
+      "output_tokens": 3055,
+      "cached_input_tokens": 61056,
+      "cost_usd": 0.003975617999999999,
+      "output_bytes": 44267
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 6,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 10,
+      "value": 1.0,
+      "precision": 0.2631578947368421,
+      "citations": 19
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 14,
+      "tool_results": 14,
+      "compactions": 0,
+      "wall_ms": 24746,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 103690,
+      "output_tokens": 3317,
+      "cached_input_tokens": 90752,
+      "cost_usd": 0.0042031559999999996,
+      "output_bytes": 42535
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 13,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 10,
+      "value": 1.0,
+      "precision": 0.29411764705882354,
+      "citations": 17
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 8,
+      "tool_results": 8,
+      "compactions": 0,
+      "wall_ms": 18562,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 74195,
+      "output_tokens": 2754,
+      "cached_input_tokens": 60544,
+      "cost_usd": 0.003881682,
+      "output_bytes": 45306
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 7,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 10,
+      "value": 1.0,
+      "precision": 0.3125,
+      "citations": 16
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 12,
+      "tool_results": 12,
+      "compactions": 0,
+      "wall_ms": 24018,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 103094,
+      "output_tokens": 2966,
+      "cached_input_tokens": 93952,
+      "cost_usd": 0.003432756,
+      "output_bytes": 28610
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 12,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 10,
+      "value": 1.0,
+      "precision": 0.7142857142857143,
+      "citations": 7
+    },
+    "work": {
+      "model_calls": 7,
+      "tool_calls": 9,
+      "tool_results": 9,
+      "compactions": 0,
+      "wall_ms": 20661,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 113024,
+      "output_tokens": 942,
+      "cached_input_tokens": 101632,
+      "cost_usd": 0.003300096,
+      "output_bytes": 37734
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 10,
+      "value": 0.8,
+      "precision": 0.75,
+      "citations": 4
+    },
+    "work": {
+      "model_calls": 3,
+      "tool_calls": 3,
+      "tool_results": 3,
+      "compactions": 0,
+      "wall_ms": 9308,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 37867,
+      "output_tokens": 366,
+      "cached_input_tokens": 32000,
+      "cost_usd": 0.00139245,
+      "output_bytes": 18922
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 10,
+      "value": 0.8,
+      "precision": 0.5,
+      "citations": 6
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 15,
+      "tool_results": 15,
+      "compactions": 0,
+      "wall_ms": 18971,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 94527,
+      "output_tokens": 2250,
+      "cached_input_tokens": 81664,
+      "cost_usd": 0.007048883999999999,
+      "output_bytes": 42862
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 10,
+      "value": 1.0,
+      "precision": 0.22727272727272727,
+      "citations": 22
+    },
+    "work": {
+      "model_calls": 7,
+      "tool_calls": 11,
+      "tool_results": 11,
+      "compactions": 0,
+      "wall_ms": 17028,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 62322,
+      "output_tokens": 2190,
+      "cached_input_tokens": 51456,
+      "cost_usd": 0.006196536,
+      "output_bytes": 36594
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": 0.08333333333333333,
+      "citations": 12
+    },
+    "work": {
+      "model_calls": 13,
+      "tool_calls": 20,
+      "tool_results": 20,
+      "compactions": 0,
+      "wall_ms": 38968,
+      "refused": 1,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 143337,
+      "output_tokens": 3428,
+      "cached_input_tokens": 135040,
+      "cost_usd": 0.0037064699999999995,
+      "output_bytes": 23659
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 3,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 1,
+      "total": 2,
+      "value": 0.5,
+      "precision": 0.07142857142857142,
+      "citations": 14
+    },
+    "work": {
+      "model_calls": 11,
+      "tool_calls": 15,
+      "tool_results": 15,
+      "compactions": 0,
+      "wall_ms": 34389,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 123810,
+      "output_tokens": 3214,
+      "cached_input_tokens": 115712,
+      "cost_usd": 0.0034902359999999994,
+      "output_bytes": 23078
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 1,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": 0.1111111111111111,
+      "citations": 9
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 13,
+      "tool_results": 13,
+      "compactions": 0,
+      "wall_ms": 29849,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 68733,
+      "output_tokens": 2479,
+      "cached_input_tokens": 64128,
+      "cost_usd": 0.002370534,
+      "output_bytes": 12619
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 2,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": 0.1,
+      "citations": 10
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 11,
+      "tool_results": 11,
+      "compactions": 0,
+      "wall_ms": 30731,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 82078,
+      "output_tokens": 2377,
+      "cached_input_tokens": 76416,
+      "cost_usd": 0.002504748,
+      "output_bytes": 16831
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 4,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": 0.25,
+      "citations": 4
+    },
+    "work": {
+      "model_calls": 12,
+      "tool_calls": 16,
+      "tool_results": 16,
+      "compactions": 0,
+      "wall_ms": 38371,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 178521,
+      "output_tokens": 1228,
+      "cached_input_tokens": 168704,
+      "cost_usd": 0.0038572619999999993,
+      "output_bytes": 28713
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": 1.0,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 19,
+      "tool_calls": 27,
+      "tool_results": 27,
+      "compactions": 0,
+      "wall_ms": 64224,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 398472,
+      "output_tokens": 2025,
+      "cached_input_tokens": 375296,
+      "cost_usd": 0.007145687999999998,
+      "output_bytes": 67272
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [
+      "inspected-corpus"
+    ],
+    "answer": null
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": 0.3333333333333333,
+      "citations": 3
+    },
+    "work": {
+      "model_calls": 19,
+      "tool_calls": 29,
+      "tool_results": 29,
+      "compactions": 0,
+      "wall_ms": 57246,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 418868,
+      "output_tokens": 4781,
+      "cached_input_tokens": 388224,
+      "cost_usd": 0.017259743999999997,
+      "output_bytes": 95091
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": 0.2,
+      "citations": 5
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 7,
+      "tool_results": 7,
+      "compactions": 0,
+      "wall_ms": 18225,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 28295,
+      "output_tokens": 1331,
+      "cached_input_tokens": 19968,
+      "cost_usd": 0.0042151079999999995,
+      "output_bytes": 27096
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 5,
+      "total": 5,
+      "value": 1.0,
+      "precision": null,
+      "citations": 55
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 11,
+      "tool_results": 11,
+      "compactions": 0,
+      "wall_ms": 22681,
+      "refused": 1,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 72155,
+      "output_tokens": 3284,
+      "cached_input_tokens": 62464,
+      "cost_usd": 0.0036114419999999994,
+      "output_bytes": 33633
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 8,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 5,
+      "total": 5,
+      "value": 1.0,
+      "precision": null,
+      "citations": 36
+    },
+    "work": {
+      "model_calls": 5,
+      "tool_calls": 6,
+      "tool_results": 6,
+      "compactions": 0,
+      "wall_ms": 17180,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 55120,
+      "output_tokens": 2568,
+      "cached_input_tokens": 45184,
+      "cost_usd": 0.003166752,
+      "output_bytes": 33232
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 6,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 5,
+      "total": 5,
+      "value": 1.0,
+      "precision": null,
+      "citations": 45
+    },
+    "work": {
+      "model_calls": 5,
+      "tool_calls": 6,
+      "tool_results": 6,
+      "compactions": 0,
+      "wall_ms": 15994,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 54052,
+      "output_tokens": 2030,
+      "cached_input_tokens": 45440,
+      "cost_usd": 0.00264612,
+      "output_bytes": 29371
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 4,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 5,
+      "value": 0.8,
+      "precision": null,
+      "citations": 43
+    },
+    "work": {
+      "model_calls": 5,
+      "tool_calls": 9,
+      "tool_results": 9,
+      "compactions": 0,
+      "wall_ms": 15122,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 53273,
+      "output_tokens": 2109,
+      "cached_input_tokens": 45568,
+      "cost_usd": 0.002557854,
+      "output_bytes": 27068
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 4,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 5,
+      "value": 0.8,
+      "precision": null,
+      "citations": 32
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 5,
+      "tool_results": 5,
+      "compactions": 0,
+      "wall_ms": 14230,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 46498,
+      "output_tokens": 1271,
+      "cached_input_tokens": 42624,
+      "cost_usd": 0.001769772,
+      "output_bytes": 12417
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 5,
+      "value": 0.8,
+      "precision": null,
+      "citations": 29
+    },
+    "work": {
+      "model_calls": 5,
+      "tool_calls": 9,
+      "tool_results": 9,
+      "compactions": 0,
+      "wall_ms": 16451,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 68457,
+      "output_tokens": 1504,
+      "cached_input_tokens": 59008,
+      "cost_usd": 0.0028489739999999998,
+      "output_bytes": 32012
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 5,
+      "value": 0.8,
+      "precision": null,
+      "citations": 30
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 12,
+      "tool_results": 12,
+      "compactions": 0,
+      "wall_ms": 21567,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 87633,
+      "output_tokens": 2968,
+      "cached_input_tokens": 74752,
+      "cost_usd": 0.007874411999999999,
+      "output_bytes": 43007
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 5,
+      "value": 0.8,
+      "precision": null,
+      "citations": 34
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 9,
+      "tool_results": 9,
+      "compactions": 0,
+      "wall_ms": 19245,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 62588,
+      "output_tokens": 2976,
+      "cached_input_tokens": 49408,
+      "cost_usd": 0.007821648,
+      "output_bytes": 45076
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 11,
+      "value": 0.9090909090909091,
+      "precision": 0.18181818181818182,
+      "citations": 33
+    },
+    "work": {
+      "model_calls": 16,
+      "tool_calls": 28,
+      "tool_results": 28,
+      "compactions": 0,
+      "wall_ms": 45490,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 376315,
+      "output_tokens": 6198,
+      "cached_input_tokens": 348032,
+      "cost_usd": 0.009005346,
+      "output_bytes": 99457
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 18,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 11,
+      "value": 0.8181818181818182,
+      "precision": 0.14705882352941177,
+      "citations": 34
+    },
+    "work": {
+      "model_calls": 14,
+      "tool_calls": 21,
+      "tool_results": 21,
+      "compactions": 0,
+      "wall_ms": 31310,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 210301,
+      "output_tokens": 3964,
+      "cached_input_tokens": 193792,
+      "cost_usd": 0.0054361259999999995,
+      "output_bytes": 58681
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 13,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 11,
+      "value": 0.7272727272727273,
+      "precision": 0.14814814814814814,
+      "citations": 27
+    },
+    "work": {
+      "model_calls": 12,
+      "tool_calls": 16,
+      "tool_results": 16,
+      "compactions": 0,
+      "wall_ms": 29190,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 214433,
+      "output_tokens": 3287,
+      "cached_input_tokens": 196992,
+      "cost_usd": 0.005179325999999999,
+      "output_bytes": 64024
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 2,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 11,
+      "value": 0.8181818181818182,
+      "precision": 0.1875,
+      "citations": 32
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 14,
+      "tool_results": 14,
+      "compactions": 0,
+      "wall_ms": 23233,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 145580,
+      "output_tokens": 3119,
+      "cached_input_tokens": 129920,
+      "cost_usd": 0.00461016,
+      "output_bytes": 56162
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 7,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 11,
+      "total": 11,
+      "value": 1.0,
+      "precision": 0.30434782608695654,
+      "citations": 23
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 17,
+      "tool_results": 17,
+      "compactions": 0,
+      "wall_ms": 28153,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 188652,
+      "output_tokens": 1732,
+      "cached_input_tokens": 166144,
+      "cost_usd": 0.005994432000000001,
+      "output_bytes": 78461
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 11,
+      "value": 0.7272727272727273,
+      "precision": 0.2857142857142857,
+      "citations": 14
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 16,
+      "tool_results": 16,
+      "compactions": 0,
+      "wall_ms": 22732,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 128080,
+      "output_tokens": 1453,
+      "cached_input_tokens": 106496,
+      "cost_usd": 0.005333088,
+      "output_bytes": 73190
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 11,
+      "value": 0.9090909090909091,
+      "precision": 0.20588235294117646,
+      "citations": 34
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 17,
+      "tool_results": 17,
+      "compactions": 0,
+      "wall_ms": 26312,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 133931,
+      "output_tokens": 4203,
+      "cached_input_tokens": 107520,
+      "cost_usd": 0.01361202,
+      "output_bytes": 97683
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 11,
+      "total": 11,
+      "value": 1.0,
+      "precision": 0.30434782608695654,
+      "citations": 23
+    },
+    "work": {
+      "model_calls": 7,
+      "tool_calls": 18,
+      "tool_results": 18,
+      "compactions": 0,
+      "wall_ms": 22455,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 90735,
+      "output_tokens": 3600,
+      "cached_input_tokens": 68224,
+      "cost_usd": 0.011482644,
+      "output_bytes": 83463
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 8,
+      "value": 1.0,
+      "precision": 0.14705882352941177,
+      "citations": 34
+    },
+    "work": {
+      "model_calls": 15,
+      "tool_calls": 22,
+      "tool_results": 22,
+      "compactions": 0,
+      "wall_ms": 45525,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 389605,
+      "output_tokens": 5721,
+      "cached_input_tokens": 363008,
+      "cost_usd": 0.008511174,
+      "output_bytes": 95303
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 1,
+      "used_plugin": true,
+      "used_cli": true,
+      "cli_calls": 6,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 8,
+      "value": 1.0,
+      "precision": 0.125,
+      "citations": 40
+    },
+    "work": {
+      "model_calls": 10,
+      "tool_calls": 16,
+      "tool_results": 16,
+      "compactions": 0,
+      "wall_ms": 37801,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 244355,
+      "output_tokens": 5391,
+      "cached_input_tokens": 217344,
+      "cost_usd": 0.007938282,
+      "output_bytes": 99714
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 2,
+      "used_plugin": true,
+      "used_cli": true,
+      "cli_calls": 5,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 5,
+      "total": 8,
+      "value": 0.625,
+      "precision": 0.14285714285714285,
+      "citations": 14
+    },
+    "work": {
+      "model_calls": 12,
+      "tool_calls": 20,
+      "tool_results": 20,
+      "compactions": 0,
+      "wall_ms": 40055,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 329744,
+      "output_tokens": 4963,
+      "cached_input_tokens": 298624,
+      "cost_usd": 0.008541672,
+      "output_bytes": 115232
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 1,
+      "used_plugin": true,
+      "used_cli": true,
+      "cli_calls": 5,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 8,
+      "value": 1.0,
+      "precision": 0.1388888888888889,
+      "citations": 36
+    },
+    "work": {
+      "model_calls": 13,
+      "tool_calls": 21,
+      "tool_results": 21,
+      "compactions": 0,
+      "wall_ms": 42582,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 311272,
+      "output_tokens": 5872,
+      "cached_input_tokens": 285824,
+      "cost_usd": 0.008197872,
+      "output_bytes": 93299
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 1,
+      "used_plugin": true,
+      "used_cli": true,
+      "cli_calls": 6,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 8,
+      "value": 1.0,
+      "precision": 0.3125,
+      "citations": 16
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 12,
+      "tool_results": 12,
+      "compactions": 0,
+      "wall_ms": 21747,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 175741,
+      "output_tokens": 1254,
+      "cached_input_tokens": 154752,
+      "cost_usd": 0.004905006000000001,
+      "output_bytes": 70852
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": true,
+      "cli_calls": 1,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 8,
+      "value": 1.0,
+      "precision": 0.3333333333333333,
+      "citations": 15
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 11,
+      "tool_results": 11,
+      "compactions": 0,
+      "wall_ms": 19060,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 117090,
+      "output_tokens": 1066,
+      "cached_input_tokens": 89600,
+      "cost_usd": 0.005600099999999999,
+      "output_bytes": 93619
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": true,
+      "cli_calls": 2,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 8,
+      "value": 1.0,
+      "precision": 0.2777777777777778,
+      "citations": 18
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 15,
+      "tool_results": 15,
+      "compactions": 0,
+      "wall_ms": 23069,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 109329,
+      "output_tokens": 3391,
+      "cached_input_tokens": 88064,
+      "cost_usd": 0.010977084,
+      "output_bytes": 74873
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": true,
+      "cli_calls": 7,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 8,
+      "value": 1.0,
+      "precision": 0.10869565217391304,
+      "citations": 46
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 14,
+      "tool_results": 14,
+      "compactions": 0,
+      "wall_ms": 32939,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 197696,
+      "output_tokens": 4665,
+      "cached_input_tokens": 155136,
+      "cost_usd": 0.019296815999999998,
+      "output_bytes": 153545
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": true,
+      "cli_calls": 7,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 9,
+      "value": 1.0,
+      "precision": 0.2777777777777778,
+      "citations": 18
+    },
+    "work": {
+      "model_calls": 5,
+      "tool_calls": 5,
+      "tool_results": 5,
+      "compactions": 0,
+      "wall_ms": 13631,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 48416,
+      "output_tokens": 1781,
+      "cached_input_tokens": 40320,
+      "cost_usd": 0.00240396,
+      "output_bytes": 25309
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 4,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 9,
+      "value": 0.8888888888888888,
+      "precision": 0.16666666666666666,
+      "citations": 24
+    },
+    "work": {
+      "model_calls": 5,
+      "tool_calls": 6,
+      "tool_results": 6,
+      "compactions": 0,
+      "wall_ms": 15946,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 46209,
+      "output_tokens": 1976,
+      "cached_input_tokens": 40320,
+      "cost_usd": 0.0021899099999999998,
+      "output_bytes": 18988
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 5,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 9,
+      "value": 1.0,
+      "precision": 0.19230769230769232,
+      "citations": 26
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 6,
+      "tool_results": 6,
+      "compactions": 0,
+      "wall_ms": 14141,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 37396,
+      "output_tokens": 1965,
+      "cached_input_tokens": 30592,
+      "cost_usd": 0.002291376,
+      "output_bytes": 21771
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 6,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 9,
+      "value": 1.0,
+      "precision": 0.2777777777777778,
+      "citations": 18
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 4,
+      "tool_results": 4,
+      "compactions": 0,
+      "wall_ms": 11620,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 45457,
+      "output_tokens": 1632,
+      "cached_input_tokens": 36480,
+      "cost_usd": 0.00243519,
+      "output_bytes": 29391
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 4,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 9,
+      "value": 1.0,
+      "precision": 0.7142857142857143,
+      "citations": 7
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 6,
+      "tool_results": 6,
+      "compactions": 0,
+      "wall_ms": 12747,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 50170,
+      "output_tokens": 711,
+      "cached_input_tokens": 43904,
+      "cost_usd": 0.001886412,
+      "output_bytes": 19927
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 9,
+      "value": 1.0,
+      "precision": 0.7142857142857143,
+      "citations": 7
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 5,
+      "tool_results": 5,
+      "compactions": 0,
+      "wall_ms": 13440,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 47378,
+      "output_tokens": 651,
+      "cached_input_tokens": 41728,
+      "cost_usd": 0.0016434840000000002,
+      "output_bytes": 17522
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 8,
+      "total": 9,
+      "value": 0.8888888888888888,
+      "precision": 0.18181818181818182,
+      "citations": 22
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 6,
+      "tool_results": 6,
+      "compactions": 0,
+      "wall_ms": 17987,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 33438,
+      "output_tokens": 2961,
+      "cached_input_tokens": 21504,
+      "cost_usd": 0.007262424,
+      "output_bytes": 39536
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 9,
+      "value": 1.0,
+      "precision": 0.3333333333333333,
+      "citations": 15
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 6,
+      "tool_results": 6,
+      "compactions": 0,
+      "wall_ms": 12840,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 34648,
+      "output_tokens": 1686,
+      "cached_input_tokens": 30464,
+      "cost_usd": 0.003461184,
+      "output_bytes": 12669
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": null,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 3,
+      "tool_calls": 2,
+      "tool_results": 2,
+      "compactions": 0,
+      "wall_ms": 5510,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 18201,
+      "output_tokens": 316,
+      "cached_input_tokens": 17664,
+      "cost_usd": 0.000323142,
+      "output_bytes": 449
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 2,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": null,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 3,
+      "tool_results": 3,
+      "compactions": 0,
+      "wall_ms": 7012,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 24518,
+      "output_tokens": 418,
+      "cached_input_tokens": 23808,
+      "cost_usd": 0.000428724,
+      "output_bytes": 457
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 2,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": null,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 5,
+      "tool_results": 5,
+      "compactions": 0,
+      "wall_ms": 7657,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 25060,
+      "output_tokens": 629,
+      "cached_input_tokens": 24320,
+      "cost_usd": 0.0005613600000000001,
+      "output_bytes": 1119
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 3,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": null,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 4,
+      "tool_results": 4,
+      "compactions": 0,
+      "wall_ms": 8012,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 24885,
+      "output_tokens": 502,
+      "cached_input_tokens": 24192,
+      "cost_usd": 0.00047772599999999993,
+      "output_bytes": 1088
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 3,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": null,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 2,
+      "tool_calls": 2,
+      "tool_results": 2,
+      "compactions": 0,
+      "wall_ms": 5198,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 18636,
+      "output_tokens": 127,
+      "cached_input_tokens": 18304,
+      "cost_usd": 0.000242112,
+      "output_bytes": 32
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": null,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 2,
+      "tool_calls": 1,
+      "tool_results": 1,
+      "compactions": 0,
+      "wall_ms": 4631,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 18602,
+      "output_tokens": 92,
+      "cached_input_tokens": 18176,
+      "cost_usd": 0.000203628,
+      "output_bytes": 44
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": null,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 3,
+      "tool_calls": 2,
+      "tool_results": 2,
+      "compactions": 0,
+      "wall_ms": 4877,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 10799,
+      "output_tokens": 271,
+      "cached_input_tokens": 10240,
+      "cost_usd": 0.00055434,
+      "output_bytes": 416
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 2,
+      "value": 1.0,
+      "precision": null,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 3,
+      "tool_calls": 2,
+      "tool_results": 2,
+      "compactions": 0,
+      "wall_ms": 5021,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 10782,
+      "output_tokens": 324,
+      "cached_input_tokens": 10240,
+      "cost_usd": 0.0006128399999999999,
+      "output_bytes": 188
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 4,
+      "value": 1.0,
+      "precision": 0.09523809523809523,
+      "citations": 42
+    },
+    "work": {
+      "model_calls": 13,
+      "tool_calls": 22,
+      "tool_results": 22,
+      "compactions": 0,
+      "wall_ms": 52965,
+      "refused": 1,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 269449,
+      "output_tokens": 8738,
+      "cached_input_tokens": 241024,
+      "cost_usd": 0.010229621999999999,
+      "output_bytes": 94944
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 16,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 2,
+      "total": 4,
+      "value": 0.5,
+      "precision": 0.05405405405405406,
+      "citations": 37
+    },
+    "work": {
+      "model_calls": 22,
+      "tool_calls": 36,
+      "tool_results": 36,
+      "compactions": 0,
+      "wall_ms": 72738,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 627889,
+      "output_tokens": 10049,
+      "cached_input_tokens": 597632,
+      "cost_usd": 0.012360845999999998,
+      "output_bytes": 100832
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 10,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 3,
+      "total": 4,
+      "value": 0.75,
+      "precision": 0.07692307692307693,
+      "citations": 39
+    },
+    "work": {
+      "model_calls": 18,
+      "tool_calls": 28,
+      "tool_results": 28,
+      "compactions": 0,
+      "wall_ms": 66398,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 415532,
+      "output_tokens": 9123,
+      "cached_input_tokens": 390400,
+      "cost_usd": 0.0104148,
+      "output_bytes": 82109
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 10,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 3,
+      "total": 4,
+      "value": 0.75,
+      "precision": 0.05555555555555555,
+      "citations": 54
+    },
+    "work": {
+      "model_calls": 13,
+      "tool_calls": 22,
+      "tool_results": 22,
+      "compactions": 0,
+      "wall_ms": 56275,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 292674,
+      "output_tokens": 8572,
+      "cached_input_tokens": 266752,
+      "cost_usd": 0.009831756,
+      "output_bytes": 85319
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 5,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 4,
+      "value": 1.0,
+      "precision": 0.2857142857142857,
+      "citations": 14
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 10,
+      "tool_results": 10,
+      "compactions": 0,
+      "wall_ms": 20137,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 110512,
+      "output_tokens": 1096,
+      "cached_input_tokens": 88448,
+      "cost_usd": 0.004933344,
+      "output_bytes": 73592
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 3,
+      "total": 4,
+      "value": 0.75,
+      "precision": 0.25,
+      "citations": 12
+    },
+    "work": {
+      "model_calls": 5,
+      "tool_calls": 9,
+      "tool_results": 9,
+      "compactions": 0,
+      "wall_ms": 24362,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 140906,
+      "output_tokens": 1126,
+      "cached_input_tokens": 109824,
+      "cost_usd": 0.007102572,
+      "output_bytes": 105469
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 4,
+      "value": 1.0,
+      "precision": 0.16666666666666666,
+      "citations": 24
+    },
+    "work": {
+      "model_calls": 14,
+      "tool_calls": 26,
+      "tool_results": 26,
+      "compactions": 0,
+      "wall_ms": 56168,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 444514,
+      "output_tokens": 8194,
+      "cached_input_tokens": 395520,
+      "cost_usd": 0.02690412,
+      "output_bytes": 167818
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [
+      "inspected-corpus"
+    ],
+    "answer": null
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 4,
+      "value": 1.0,
+      "precision": 0.11764705882352941,
+      "citations": 34
+    },
+    "work": {
+      "model_calls": 14,
+      "tool_calls": 17,
+      "tool_results": 17,
+      "compactions": 0,
+      "wall_ms": 37217,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 245479,
+      "output_tokens": 4529,
+      "cached_input_tokens": 221056,
+      "cost_usd": 0.014088035999999998,
+      "output_bytes": 81565
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 12,
+      "value": 0.8333333333333334,
+      "precision": 0.24,
+      "citations": 25
+    },
+    "work": {
+      "model_calls": 10,
+      "tool_calls": 14,
+      "tool_results": 14,
+      "compactions": 0,
+      "wall_ms": 27899,
+      "refused": 1,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 170783,
+      "output_tokens": 3858,
+      "cached_input_tokens": 152320,
+      "cost_usd": 0.00554121,
+      "output_bytes": 63879
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 9,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 11,
+      "total": 12,
+      "value": 0.9166666666666666,
+      "precision": 0.1875,
+      "citations": 32
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 11,
+      "tool_results": 11,
+      "compactions": 0,
+      "wall_ms": 24205,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 104871,
+      "output_tokens": 3336,
+      "cached_input_tokens": 88832,
+      "cost_usd": 0.004673946,
+      "output_bytes": 59235
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 5,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 12,
+      "value": 0.75,
+      "precision": 0.25,
+      "citations": 20
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 12,
+      "tool_results": 12,
+      "compactions": 0,
+      "wall_ms": 28984,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 145548,
+      "output_tokens": 4185,
+      "cached_input_tokens": 130048,
+      "cost_usd": 0.005226143999999999,
+      "output_bytes": 54947
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 2,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 6,
+      "total": 12,
+      "value": 0.5,
+      "precision": 0.25,
+      "citations": 4
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 10,
+      "tool_results": 10,
+      "compactions": 0,
+      "wall_ms": 25378,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 97425,
+      "output_tokens": 3466,
+      "cached_input_tokens": 85632,
+      "cost_usd": 0.004105446,
+      "output_bytes": 42324
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 4,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 12,
+      "value": 0.8333333333333334,
+      "precision": 0.25,
+      "citations": 20
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 7,
+      "tool_results": 7,
+      "compactions": 0,
+      "wall_ms": 17165,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 100588,
+      "output_tokens": 811,
+      "cached_input_tokens": 85376,
+      "cost_usd": 0.0036167279999999996,
+      "output_bytes": 52084
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 12,
+      "value": 0.3333333333333333,
+      "precision": 0.0,
+      "citations": 1
+    },
+    "work": {
+      "model_calls": 3,
+      "tool_calls": 3,
+      "tool_results": 3,
+      "compactions": 0,
+      "wall_ms": 16946,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 49129,
+      "output_tokens": 501,
+      "cached_input_tokens": 32640,
+      "cost_usd": 0.00394647,
+      "output_bytes": 56831
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 11,
+      "total": 12,
+      "value": 0.9166666666666666,
+      "precision": 0.5,
+      "citations": 12
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 15,
+      "tool_results": 15,
+      "compactions": 0,
+      "wall_ms": 24742,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 130663,
+      "output_tokens": 2902,
+      "cached_input_tokens": 110464,
+      "cost_usd": 0.010204884,
+      "output_bytes": 71357
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 12,
+      "value": 0.75,
+      "precision": 0.36363636363636365,
+      "citations": 11
+    },
+    "work": {
+      "model_calls": 3,
+      "tool_calls": 4,
+      "tool_results": 4,
+      "compactions": 0,
+      "wall_ms": 12977,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 26746,
+      "output_tokens": 1714,
+      "cached_input_tokens": 10880,
+      "cost_usd": 0.00688188,
+      "output_bytes": 56758
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 7,
+      "total": 7,
+      "value": 1.0,
+      "precision": 0.3333333333333333,
+      "citations": 12
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 13,
+      "tool_results": 13,
+      "compactions": 0,
+      "wall_ms": 18513,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 123516,
+      "output_tokens": 2115,
+      "cached_input_tokens": 111616,
+      "cost_usd": 0.003388848,
+      "output_bytes": 38779
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 3,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 7,
+      "total": 7,
+      "value": 1.0,
+      "precision": 0.21052631578947367,
+      "citations": 19
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 7,
+      "tool_results": 7,
+      "compactions": 0,
+      "wall_ms": 13410,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 49343,
+      "output_tokens": 1672,
+      "cached_input_tokens": 43392,
+      "cost_usd": 0.002026026,
+      "output_bytes": 18388
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 6,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 7,
+      "total": 7,
+      "value": 1.0,
+      "precision": 0.2857142857142857,
+      "citations": 14
+    },
+    "work": {
+      "model_calls": 7,
+      "tool_calls": 8,
+      "tool_results": 8,
+      "compactions": 0,
+      "wall_ms": 17565,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 79830,
+      "output_tokens": 2336,
+      "cached_input_tokens": 69504,
+      "cost_usd": 0.003159012,
+      "output_bytes": 33306
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 5,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 7,
+      "total": 7,
+      "value": 1.0,
+      "precision": 0.2,
+      "citations": 20
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 7,
+      "tool_results": 7,
+      "compactions": 0,
+      "wall_ms": 18426,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 85133,
+      "output_tokens": 2415,
+      "cached_input_tokens": 72832,
+      "cost_usd": 0.0035126460000000003,
+      "output_bytes": 41119
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 6,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 7,
+      "total": 7,
+      "value": 1.0,
+      "precision": 0.4,
+      "citations": 10
+    },
+    "work": {
+      "model_calls": 5,
+      "tool_calls": 7,
+      "tool_results": 7,
+      "compactions": 0,
+      "wall_ms": 16196,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 133032,
+      "output_tokens": 725,
+      "cached_input_tokens": 106112,
+      "cost_usd": 0.005592336,
+      "output_bytes": 89962
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 7,
+      "total": 7,
+      "value": 1.0,
+      "precision": 0.8,
+      "citations": 5
+    },
+    "work": {
+      "model_calls": 3,
+      "tool_calls": 3,
+      "tool_results": 3,
+      "compactions": 0,
+      "wall_ms": 10417,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 39919,
+      "output_tokens": 466,
+      "cached_input_tokens": 30720,
+      "cost_usd": 0.00204561,
+      "output_bytes": 28979
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 7,
+      "total": 7,
+      "value": 1.0,
+      "precision": 0.5,
+      "citations": 8
+    },
+    "work": {
+      "model_calls": 11,
+      "tool_calls": 17,
+      "tool_results": 17,
+      "compactions": 0,
+      "wall_ms": 25838,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 118294,
+      "output_tokens": 3416,
+      "cached_input_tokens": 107008,
+      "cost_usd": 0.008127048000000001,
+      "output_bytes": 34641
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 7,
+      "total": 7,
+      "value": 1.0,
+      "precision": 0.5,
+      "citations": 8
+    },
+    "work": {
+      "model_calls": 7,
+      "tool_calls": 10,
+      "tool_results": 10,
+      "compactions": 0,
+      "wall_ms": 15656,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 70908,
+      "output_tokens": 2090,
+      "cached_input_tokens": 59136,
+      "cost_usd": 0.006394416,
+      "output_bytes": 39514
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 6,
+      "total": 6,
+      "value": 1.0,
+      "precision": 0.2857142857142857,
+      "citations": 7
+    },
+    "work": {
+      "model_calls": 7,
+      "tool_calls": 12,
+      "tool_results": 12,
+      "compactions": 0,
+      "wall_ms": 26150,
+      "refused": 1,
+      "failed": 2,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 57336,
+      "output_tokens": 3801,
+      "cached_input_tokens": 53504,
+      "cost_usd": 0.003015912,
+      "output_bytes": 11121
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 4,
+      "used_plugin": true,
+      "used_cli": true,
+      "cli_calls": 5,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 6,
+      "total": 6,
+      "value": 1.0,
+      "precision": 0.2857142857142857,
+      "citations": 7
+    },
+    "work": {
+      "model_calls": 12,
+      "tool_calls": 18,
+      "tool_results": 18,
+      "compactions": 0,
+      "wall_ms": 39484,
+      "refused": 2,
+      "failed": 4,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 109166,
+      "output_tokens": 5766,
+      "cached_input_tokens": 105600,
+      "cost_usd": 0.0043113000000000005,
+      "output_bytes": 7033
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 12,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 6,
+      "total": 6,
+      "value": 1.0,
+      "precision": 0.2222222222222222,
+      "citations": 9
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 14,
+      "tool_results": 14,
+      "compactions": 0,
+      "wall_ms": 30277,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 69276,
+      "output_tokens": 4508,
+      "cached_input_tokens": 65408,
+      "cost_usd": 0.0034812239999999998,
+      "output_bytes": 10379
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 5,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 6,
+      "total": 6,
+      "value": 1.0,
+      "precision": 0.4,
+      "citations": 5
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 10,
+      "tool_results": 10,
+      "compactions": 0,
+      "wall_ms": 34116,
+      "refused": 0,
+      "failed": 2,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 66813,
+      "output_tokens": 5234,
+      "cached_input_tokens": 64256,
+      "cost_usd": 0.003716718,
+      "output_bytes": 5605
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 6,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 6,
+      "total": 6,
+      "value": 1.0,
+      "precision": 0.2857142857142857,
+      "citations": 7
+    },
+    "work": {
+      "model_calls": 12,
+      "tool_calls": 21,
+      "tool_results": 21,
+      "compactions": 0,
+      "wall_ms": 50952,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 264763,
+      "output_tokens": 1853,
+      "cached_input_tokens": 243968,
+      "cost_usd": 0.008052354,
+      "output_bytes": 69822
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": true,
+      "cli_calls": 10,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 6,
+      "total": 6,
+      "value": 1.0,
+      "precision": 0.3333333333333333,
+      "citations": 6
+    },
+    "work": {
+      "model_calls": 11,
+      "tool_calls": 20,
+      "tool_results": 20,
+      "compactions": 0,
+      "wall_ms": 46906,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 216316,
+      "output_tokens": 1699,
+      "cached_input_tokens": 199168,
+      "cost_usd": 0.0068861040000000005,
+      "output_bytes": 55080
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": true,
+      "cli_calls": 6,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 5,
+      "total": 6,
+      "value": 0.8333333333333334,
+      "precision": 0.5,
+      "citations": 4
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 9,
+      "tool_results": 9,
+      "compactions": 0,
+      "wall_ms": 31023,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 45681,
+      "output_tokens": 4936,
+      "cached_input_tokens": 40960,
+      "cost_usd": 0.00758526,
+      "output_bytes": 13924
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 6,
+      "total": 6,
+      "value": 1.0,
+      "precision": 0.5,
+      "citations": 4
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 10,
+      "tool_results": 10,
+      "compactions": 0,
+      "wall_ms": 28381,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 91105,
+      "output_tokens": 4294,
+      "cached_input_tokens": 71168,
+      "cost_usd": 0.011560908000000002,
+      "output_bytes": 66407
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": true,
+      "cli_calls": 5,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 4,
+      "value": 1.0,
+      "precision": 0.10256410256410256,
+      "citations": 39
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 12,
+      "tool_results": 12,
+      "compactions": 0,
+      "wall_ms": 32304,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 180631,
+      "output_tokens": 4527,
+      "cached_input_tokens": 158208,
+      "cost_usd": 0.0065542740000000006,
+      "output_bytes": 81419
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 3,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 4,
+      "value": 1.0,
+      "precision": 0.18181818181818182,
+      "citations": 22
+    },
+    "work": {
+      "model_calls": 14,
+      "tool_calls": 22,
+      "tool_results": 22,
+      "compactions": 0,
+      "wall_ms": 38484,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 211439,
+      "output_tokens": 4844,
+      "cached_input_tokens": 197632,
+      "cost_usd": 0.0055703459999999995,
+      "output_bytes": 47920
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 7,
+      "used_plugin": true,
+      "used_cli": true,
+      "cli_calls": 1,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 4,
+      "value": 1.0,
+      "precision": 0.16666666666666666,
+      "citations": 24
+    },
+    "work": {
+      "model_calls": 14,
+      "tool_calls": 17,
+      "tool_results": 17,
+      "compactions": 0,
+      "wall_ms": 34517,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 238976,
+      "output_tokens": 3954,
+      "cached_input_tokens": 222976,
+      "cost_usd": 0.0054413280000000005,
+      "output_bytes": 55858
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 4,
+      "used_plugin": true,
+      "used_cli": true,
+      "cli_calls": 1,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 4,
+      "total": 4,
+      "value": 1.0,
+      "precision": 0.125,
+      "citations": 32
+    },
+    "work": {
+      "model_calls": 12,
+      "tool_calls": 18,
+      "tool_results": 18,
+      "compactions": 0,
+      "wall_ms": 28867,
+      "refused": 0,
+      "failed": 1,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 191988,
+      "output_tokens": 3153,
+      "cached_input_tokens": 173056,
+      "cost_usd": 0.005250767999999999,
+      "output_bytes": 68777
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 5,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 3,
+      "total": 4,
+      "value": 0.75,
+      "precision": 0.42857142857142855,
+      "citations": 7
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 7,
+      "tool_results": 7,
+      "compactions": 0,
+      "wall_ms": 15206,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 93165,
+      "output_tokens": 602,
+      "cached_input_tokens": 67072,
+      "cost_usd": 0.004867565999999999,
+      "output_bytes": 90150
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 3,
+      "total": 4,
+      "value": 0.75,
+      "precision": 0.3,
+      "citations": 10
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 13,
+      "tool_results": 13,
+      "compactions": 0,
+      "wall_ms": 23593,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 162563,
+      "output_tokens": 1013,
+      "cached_input_tokens": 138368,
+      "cost_usd": 0.0052947540000000005,
+      "output_bytes": 82060
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 3,
+      "total": 4,
+      "value": 0.75,
+      "precision": 0.3333333333333333,
+      "citations": 9
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 13,
+      "tool_results": 13,
+      "compactions": 0,
+      "wall_ms": 21042,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 124404,
+      "output_tokens": 2480,
+      "cached_input_tokens": 103168,
+      "cost_usd": 0.009965808,
+      "output_bytes": 74872
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 3,
+      "total": 4,
+      "value": 0.75,
+      "precision": 0.2727272727272727,
+      "citations": 11
+    },
+    "work": {
+      "model_calls": 7,
+      "tool_calls": 12,
+      "tool_results": 12,
+      "compactions": 0,
+      "wall_ms": 24261,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 158916,
+      "output_tokens": 3110,
+      "cached_input_tokens": 116224,
+      "cost_usd": 0.017236943999999997,
+      "output_bytes": 148512
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": true,
+      "cli_calls": 2,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 7,
+      "total": 11,
+      "value": 0.6363636363636364,
+      "precision": 0.3333333333333333,
+      "citations": 9
+    },
+    "work": {
+      "model_calls": 9,
+      "tool_calls": 10,
+      "tool_results": 10,
+      "compactions": 0,
+      "wall_ms": 24014,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 196877,
+      "output_tokens": 2686,
+      "cached_input_tokens": 176128,
+      "cost_usd": 0.005252334000000001,
+      "output_bytes": 72360
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 3,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 10,
+      "total": 11,
+      "value": 0.9090909090909091,
+      "precision": 0.4166666666666667,
+      "citations": 12
+    },
+    "work": {
+      "model_calls": 10,
+      "tool_calls": 14,
+      "tool_results": 14,
+      "compactions": 0,
+      "wall_ms": 23219,
+      "refused": 1,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 105553,
+      "output_tokens": 2820,
+      "cached_input_tokens": 96896,
+      "cost_usd": 0.0032812379999999997,
+      "output_bytes": 26162
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 7,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 11,
+      "total": 11,
+      "value": 1.0,
+      "precision": 0.75,
+      "citations": 8
+    },
+    "work": {
+      "model_calls": 7,
+      "tool_calls": 11,
+      "tool_results": 11,
+      "compactions": 0,
+      "wall_ms": 18923,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 139643,
+      "output_tokens": 2026,
+      "cached_input_tokens": 118528,
+      "cost_usd": 0.004738434,
+      "output_bytes": 73909
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 3,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 11,
+      "total": 11,
+      "value": 1.0,
+      "precision": 0.5,
+      "citations": 12
+    },
+    "work": {
+      "model_calls": 8,
+      "tool_calls": 10,
+      "tool_results": 10,
+      "compactions": 0,
+      "wall_ms": 20504,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 182179,
+      "output_tokens": 2205,
+      "cached_input_tokens": 158208,
+      "cost_usd": 0.005393274,
+      "output_bytes": 85662
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 2,
+      "used_plugin": true,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 11,
+      "value": 0.8181818181818182,
+      "precision": 1.0,
+      "citations": 5
+    },
+    "work": {
+      "model_calls": 5,
+      "tool_calls": 9,
+      "tool_results": 9,
+      "compactions": 0,
+      "wall_ms": 17033,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 135355,
+      "output_tokens": 687,
+      "cached_input_tokens": 102912,
+      "cost_usd": 0.006202986000000001,
+      "output_bytes": 113116
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 9,
+      "total": 11,
+      "value": 0.8181818181818182,
+      "precision": 1.0,
+      "citations": 5
+    },
+    "work": {
+      "model_calls": 4,
+      "tool_calls": 5,
+      "tool_results": 5,
+      "compactions": 0,
+      "wall_ms": 11160,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 76922,
+      "output_tokens": 493,
+      "cached_input_tokens": 57728,
+      "cost_usd": 0.003664284,
+      "output_bytes": 66857
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 11,
+      "total": 11,
+      "value": 1.0,
+      "precision": 1.0,
+      "citations": 6
+    },
+    "work": {
+      "model_calls": 3,
+      "tool_calls": 4,
+      "tool_results": 4,
+      "compactions": 0,
+      "wall_ms": 10253,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 29404,
+      "output_tokens": 1322,
+      "cached_input_tokens": 11264,
+      "cost_usd": 0.007095984,
+      "output_bytes": 63934
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": false,
+      "cli_calls": 0,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "model": "deepseek/deepseek-flash",
+    "outcome": {
+      "passed": 11,
+      "total": 11,
+      "value": 1.0,
+      "precision": 0.6666666666666666,
+      "citations": 9
+    },
+    "work": {
+      "model_calls": 6,
+      "tool_calls": 5,
+      "tool_results": 5,
+      "compactions": 0,
+      "wall_ms": 17847,
+      "refused": 0,
+      "failed": 0,
+      "cancelled": 0
+    },
+    "usage": {
+      "input_tokens": 71262,
+      "output_tokens": 2125,
+      "cached_input_tokens": 53248,
+      "cost_usd": 0.008273688,
+      "output_bytes": 65614
+    },
+    "toolkit": {
+      "mode": "documented",
+      "plugin_calls": 0,
+      "used_plugin": false,
+      "used_cli": true,
+      "cli_calls": 1,
+      "loaded_skill": false
+    },
+    "status": {
+      "exit_code": 0,
+      "exit_error": null,
+      "session": null,
+      "unparsed_lines": 0
+    },
+    "tags": [],
+    "answer": null
+  }
+]

@@ -5,7 +5,8 @@ contract, path containment and text reading), `tools/at-peek` (`stat`, `slice`, 
 `tools/at-crate` (`where`, `installed`, `files`, `slice`, `search`, `out`), `tools/at-recall`
 (`state`, `log`, `diff`, and the `pr` recipe), `tools/at-reach` (fleet inspection),
 `tools/at-cost` (`repos`, `tree`, `pid` — the process table, attributed to repositories),
-`tools/at-cardano` (read-only Cardano chain enquiry through Koios), and `tools/at-describe` (the
+`tools/at-cardano` (read-only Cardano chain enquiry through Koios), `tools/at-continue-thread`
+(a text-only continuation digest of a Zed agent thread), and `tools/at-describe` (the
 catalogue). The toolkit is packaged by this repository's `flake.nix` and wired into the org's
 shells by `defrag-nix`. Everything else here is still the plan: the remaining verbs (`tree`, `find`,
 `scope` in `peek`; `show`, `blame`, `why`, `churn` in `recall`), the other two recipes
@@ -56,9 +57,10 @@ rather than hidden in a pipe.
 
 ## The shape
 
-One namespace (`at-` for agent tools), seven binaries, because they are separate trust tiers and
-an approval should grant the smallest one that answers the question. Six read the filesystem, a
-private inventory, or the chain; the seventh, `at-describe`, opens nothing and is the catalogue.
+One namespace (`at-` for agent tools), eight binaries, because they are separate trust tiers and
+an approval should grant the smallest one that answers the question. Seven read the filesystem, a
+private inventory, the chain, or Zed's thread store; the eighth, `at-describe`, opens nothing and
+is the catalogue.
 
 | | `at-describe` | `at-peek` | `at-crate` | `at-recall` |
 | --- | --- | --- | --- | --- |
@@ -84,6 +86,14 @@ derived views, so it sits with `browser-shot` and `tui-shot` rather than pretend
 see [`tools/image-shot/README.md`](../tools/image-shot/README.md). A future `at-image` would have
 to be an observation-only subset with no derived-file path, which is not the tool the image work
 needs.
+
+`at-continue-thread` is the second store outside the worktree, and it exists because a thread can
+fail on **bytes** rather than tokens: every screenshot a thread has read is re-sent as base64, so a
+visual pass grows a request until a provider refuses it with a 413 — while Zed's compaction, which
+is token-based, never fires. The digest keeps the user's direction, the source files touched and a
+head-and-tail window of the agent's activity; images become a one-line placeholder naming the file
+and its size. Running it is a read: the store is opened read-only, and a new thread continues from
+the digest while the old one stays exactly as it was.
 
 ```mermaid
 graph TD
