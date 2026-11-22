@@ -4,13 +4,10 @@ name: Build
 # and the `*-shot` tools from this repository and wires them into every repository's
 # devshell, so a package that stops building breaks every shell in the org.
 #
-# The environment matters more than the source. `defrag-nix` pins its own nixpkgs, and
-# this repository pins another; nixpkgs' Rust hook is not the same in both. In the
-# consumer pin it enables `cargoUseSystemLibs`, which exports
-# `ZSTD_SYS_USE_PKG_CONFIG` for `zstd-sys`, so a crate that bundles its C zstd under
-# plain cargo instead needs `pkg-config` and `zstd` in the derivation. Building `.#`
-# here exercises only this repository's pin and does not see that. The consumer build
-# below is therefore the gate that matters.
+# They are built with Nix, not only with cargo: the derivation environment is part of
+# the contract. nixpkgs' Rust hook can make a crate link a system library that a plain
+# cargo build bundles, so `cargo test` is not evidence that the package builds. This
+# job builds what this flake advertises, under this flake's own pin.
 on:
   push:
     branches: [main]
@@ -46,20 +43,14 @@ jobs:
             # settings compete and turns the build log into interleaved noise.
             max-jobs = 1
 
-      # The consumer build, and the reason this workflow exists. `defrag-nix` evaluates
-      # `agent-playbook.packages` with its own nixpkgs and its own Rust hook; override
-      # the input so it builds this checkout, exactly as a devshell does. With no
-      # `--keep-going`, the failing package is the answer, and the other packages are
-      # never started.
-      - name: Build the consumer toolkit
-        run: |
-          nix build --no-link --print-build-logs \
-            --override-input agent-playbook "path:$GITHUB_WORKSPACE" \
-            "github:defrag-au/defrag-nix#agent-tools"
+      # The toolkit first: it is the package every consumer devshell takes, and a
+      # regression there is the one that breaks the org. With no `--keep-going` the
+      # failing package is the answer, rather than one item in a list that still spends
+      # runner time on the other eight.
+      - name: Build the toolkit
+        run: nix build --no-link --print-build-logs .#agent-tools .#zed-thread-tools
 
-      # Under this repository's own pin, which is what `nix build .#…` and the tests
-      # use. `agent-tools` is absent here because the consumer build above already
-      # built it, under the stricter nixpkgs.
+      # Only reached when the toolkit builds.
       - name: Build the remaining packages
         run: |
           nix build --no-link --print-build-logs \
@@ -70,8 +61,7 @@ jobs:
             .#image-shot \
             .#fleet-sync \
             .#travel-secrets \
-            .#skill-store \
-            .#zed-thread-tools
+            .#skill-store
 
       # `flake.nix` says `nix flake check` runs the suite rather than only evaluating
       # the outputs. Run it here so that claim is a gate instead of a note. The suite
