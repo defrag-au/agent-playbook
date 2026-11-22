@@ -1,0 +1,40 @@
+{
+  "id": "urn:skill:rig-session-query",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v2",
+  "manifest": {
+    "8a5635dc37054402e3db778342b51518882660efe6e49381b5fb7d45024547020b1d41082bda5ab197401ba13305d56cba93c1393676b352e2e28709c95c35e4": [
+      "v1/content/SKILL.md"
+    ],
+    "b441b14fb8cf530afe4bbbf2a46b2ce85a3188b95e2b7e1a9ce0f72b76e6c8f9dcfd11016061ea8b16dda8ab647e7e867b58ea6a68d8afbe79c3feef1e245764": [
+      "v2/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-11-08T12:24:23Z",
+      "state": {
+        "8a5635dc37054402e3db778342b51518882660efe6e49381b5fb7d45024547020b1d41082bda5ab197401ba13305d56cba93c1393676b352e2e28709c95c35e4": [
+          "SKILL.md"
+        ]
+      },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    },
+    "v2": {
+      "created": "2026-11-22T08:02:38Z",
+      "state": {
+        "b441b14fb8cf530afe4bbbf2a46b2ce85a3188b95e2b7e1a9ce0f72b76e6c8f9dcfd11016061ea8b16dda8ab647e7e867b58ea6a68d8afbe79c3feef1e245764": [
+          "SKILL.md"
+        ]
+      },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "urn:skill:capture-rule",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v2",
+  "manifest": {
+    "47b202582974e7ab326741fe80d018375c15501871b00d60e5cea20969c50a71699c4998b9b776667bfa1b8e05868be237d37be4fe4d80d0dc0b697dfd1cb35c": [
+      "v1/content/SKILL.md"
+    ],
+    "480b38a6b140b06eefd01fe95d11bb659d0d228c005878025295b5ea432e43a032315a8a3bbb8583939202036b4bf4eccf8f229e6fc558f7a7536a6bf28d23c0": [
+      "v2/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-10-25T06:00:43Z",
+      "state": {
+        "47b202582974e7ab326741fe80d018375c15501871b00d60e5cea20969c50a71699c4998b9b776667bfa1b8e05868be237d37be4fe4d80d0dc0b697dfd1cb35c": [
+          "SKILL.md"
+        ]
+      },
+      "message": "first published version",
+      "user": {
+        "name": "damo"
+      }
+    },
+    "v2": {
+      "created": "2026-11-22T08:02:38Z",
+      "state": {
+        "480b38a6b140b06eefd01fe95d11bb659d0d228c005878025295b5ea432e43a032315a8a3bbb8583939202036b4bf4eccf8f229e6fc558f7a7536a6bf28d23c0": [
+          "SKILL.md"
+        ]
+      },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}

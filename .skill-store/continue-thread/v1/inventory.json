@@ -1,0 +1,25 @@
+{
+  "id": "urn:skill:continue-thread",
+  "type": "https://ocfl.io/1.1/spec/#inventory",
+  "digestAlgorithm": "sha512",
+  "head": "v1",
+  "manifest": {
+    "66ce7ee9f5a79e553bf32d840739801b0d800001f777abd0eec196cfbeff0e9fc707651c08d022572361541d18ee0eb7ca19d6a42c566efd7af002756b3c7b64": [
+      "v1/content/SKILL.md"
+    ]
+  },
+  "versions": {
+    "v1": {
+      "created": "2026-11-22T08:02:38Z",
+      "state": {
+        "66ce7ee9f5a79e553bf32d840739801b0d800001f777abd0eec196cfbeff0e9fc707651c08d022572361541d18ee0eb7ca19d6a42c566efd7af002756b3c7b64": [
+          "SKILL.md"
+        ]
+      },
+      "user": {
+        "name": "Damon Oehlman",
+        "address": "https://github.com/defrag-au/agent-playbook"
+      }
+    }
+  }
+}
