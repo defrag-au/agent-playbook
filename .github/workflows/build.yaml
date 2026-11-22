@@ -1,0 +1,58 @@
+name: Build
+
+# `flake.nix`'s packages are the contract. `defrag-nix` takes `agent-tools`, `playbook`
+# and the `*-shot` tools from this repository and wires them into every repository's
+# devshell, so a package that stops building breaks every shell in the org.
+#
+# A cargo build does not reproduce the derivation. nixpkgs' cargo setup hook exports
+# `ZSTD_SYS_USE_PKG_CONFIG` (and the sqlite/git2 equivalents), so a crate that bundles
+# its own C zstd under plain cargo links against the system one here instead — and a
+# derivation without `pkg-config` and `zstd` fails on the build script. That is the
+# class of failure this job exists to find: it is invisible to `cargo test` and first
+# surfaced in whichever devshell next evaluated.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nix:
+    name: Nix
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v32
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # Every package the flake advertises, not only `default`: a consumer picks one
+      # by name, and the toolkit is the one that breaks a devshell first. `--keep-going`
+      # so one broken derivation does not hide the rest — the run should report every
+      # failure it can, not the first one alphabetically.
+      - name: Build the packages
+        run: |
+          nix build --keep-going --print-build-logs \
+            .#agent-tools \
+            .#playbook \
+            .#browser-shot \
+            .#tui-shot \
+            .#android-shot \
+            .#image-shot \
+            .#fleet-sync \
+            .#travel-secrets \
+            .#skill-store \
+            .#zed-thread-tools
+
+      # `flake.nix` says `nix flake check` runs the suite rather than only evaluating
+      # the outputs. Run it here so that claim is a gate instead of a note.
+      - name: Flake checks
+        run: nix flake check --print-build-logs
