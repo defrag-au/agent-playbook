@@ -1,0 +1,72 @@
+name: Build
+
+# `flake.nix`'s packages are the contract. `defrag-nix` takes `agent-tools`, `playbook`
+# and the `*-shot` tools from this repository and wires them into every repository's
+# devshell, so a package that stops building breaks every shell in the org.
+#
+# They are built with Nix, not only with cargo: the derivation environment is part of
+# the contract. nixpkgs' Rust hook can make a crate link a system library that a plain
+# cargo build bundles, so `cargo test` is not evidence that the package builds. This
+# job builds what this flake advertises, under this flake's own pin.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packages:
+    name: Nix (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      # A failure on one platform is not a reason to hide the other: the Linux leg is
+      # the cross-platform conformance check, and the macOS leg is the one consumers
+      # actually evaluate.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v32
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            # One derivation at a time. These are 3-4 core runners with a small disk;
+            # letting Nix start several release builds at once makes their cargo `-j`
+            # settings compete and turns the build log into interleaved noise.
+            max-jobs = 1
+
+      # The toolkit first: it is the package every consumer devshell takes, and a
+      # regression there is the one that breaks the org. With no `--keep-going` the
+      # failing package is the answer, rather than one item in a list that still spends
+      # runner time on the other eight.
+      - name: Build the toolkit
+        run: nix build --no-link --print-build-logs .#agent-tools .#zed-thread-tools
+
+      # Only reached when the toolkit builds.
+      - name: Build the remaining packages
+        run: |
+          nix build --no-link --print-build-logs \
+            .#playbook \
+            .#browser-shot \
+            .#tui-shot \
+            .#android-shot \
+            .#image-shot \
+            .#fleet-sync \
+            .#travel-secrets \
+            .#skill-store
+
+      # `flake.nix` says `nix flake check` runs the suite rather than only evaluating
+      # the outputs. Run it here so that claim is a gate instead of a note. The suite
+      # stays on the developer platform: the Linux leg's job is the package contract,
+      # and running the whole test build twice buys nothing for this check.
+      - name: Flake checks
+        if: runner.os == 'macOS'
+        run: nix flake check --print-build-logs

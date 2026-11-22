@@ -93,14 +93,26 @@
       # in a way that reads like a permissions problem. A store path also cannot be
       # re-pointed by editing this repository — which matters, because the whole point of
       # these binaries is to be allowlisted once and trusted thereafter.
+
+      # `at-continue-thread` pulls in `zed-thread-tools`, which pulls in `zstd` and
+      # `libsqlite3-sys`. nixpkgs' cargo setup hook exports `ZSTD_SYS_USE_PKG_CONFIG` and
+      # `LIBSQLITE3_SYS_USE_PKG_CONFIG`, which make those crates link the system libraries
+      # instead of bundling their own, so this derivation needs `pkg-config`, `zstd` and
+      # `sqlite`. A plain cargo build does not set the variables, which is why the failure
+      # only appears in the derivation.
       toolkitFor =
-        rustPlatform:
-        rustPlatform.buildRustPackage {
+        pkgs:
+        (rustPlatformFor pkgs).buildRustPackage {
           pname = "agent-tools";
           # From the crate that names the toolkit, so the two cannot drift.
           version = (lib.importTOML ./tools/at-peek/Cargo.toml).package.version;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [
+            pkgs.zstd
+            pkgs.sqlite
+          ];
           cargoBuildFlags = [
             "-p"
             "at-peek"
@@ -339,12 +351,19 @@
       # private store outside the worktree, and the recover binary writes to it. Neither belongs in
       # a namespace whose promise is that its entire grammar is safe to allowlist.
       zedThreadToolsFor =
-        rustPlatform:
-        rustPlatform.buildRustPackage {
+        pkgs:
+        (rustPlatformFor pkgs).buildRustPackage {
           pname = "zed-thread-tools";
           version = (lib.importTOML ./tools/zed-thread-tools/Cargo.toml).package.version;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          # Same system-library inputs as `toolkitFor`: this package uses `zstd` and
+          # `sqlite` directly.
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [
+            pkgs.zstd
+            pkgs.sqlite
+          ];
           cargoBuildFlags = [
             "-p"
             "zed-thread-tools"
@@ -369,7 +388,7 @@
           pkgs = pkgsFor system;
           rustPlatform = rustPlatformFor pkgs;
           playbook = composerFor rustPlatform;
-          agent-tools = toolkitFor rustPlatform;
+          agent-tools = toolkitFor pkgs;
         in
         {
           inherit playbook agent-tools;
@@ -380,7 +399,7 @@
           fleet-sync = fleetSyncFor rustPlatform;
           travel-secrets = travelSecretsFor pkgs;
           skill-store = skillStoreFor pkgs;
-          zed-thread-tools = zedThreadToolsFor rustPlatform;
+          zed-thread-tools = zedThreadToolsFor pkgs;
           # What this repository is *for*; the toolkit is what it also ships.
           default = playbook;
         }
@@ -459,6 +478,13 @@
             nativeBuildInputs = [
               pkgs.git
               pkgs.gnupg
+              # `cargo build --workspace` compiles `zed-thread-tools`, so the same
+              # system-library inputs as `toolkitFor` are required here.
+              pkgs.pkg-config
+            ];
+            buildInputs = [
+              pkgs.zstd
+              pkgs.sqlite
             ];
             buildPhase = "cargo build --workspace --offline";
             doCheck = true;
