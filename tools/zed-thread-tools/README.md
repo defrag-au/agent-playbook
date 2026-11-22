@@ -1,10 +1,11 @@
 # zed-thread-tools
 
-Three commands over Zed's agent thread store:
+Four commands over Zed's agent thread store:
 
 | Binary | Reads | Writes |
 | --- | --- | --- |
 | `zed-thread-audit` | `threads.db`, read-only | Never |
+| `zed-thread-export` | `threads.db`, read-only | A new snapshot directory |
 | `zed-thread-tui` | both stores, read-only until an action is confirmed | Archive flag, one delete, one import, or one `Compaction(Summary)`; backup first |
 | `zed-thread-recover` | one thread | One `Compaction(Summary)` message, plus a backup |
 
@@ -45,6 +46,34 @@ substring is an error rather than a guess. `--limit 0` shows every result.
 
 This is the first command after a session has compacted unexpectedly: it names
 the page or file that cost the context, not just the tool that fetched it.
+
+### Behaviour
+
+```sh
+zed-thread-audit --behaviour <thread-id-or-title>
+zed-thread-audit --behaviour "mithril snapshot" --limit 0 --json
+```
+
+`--behaviour` counts what the agent *did*, not what it cost. Four measures, each
+with the message index and request argument behind it:
+
+| Measure | Definition |
+| --- | --- |
+| Dead ends | results the tool reported as an error, and results that carried no text at all |
+| Repetitions | a call whose `(tool, argument)` already appeared earlier in the thread |
+| Habits | a terminal command piping into `head` or `tail`, or echoing a `===`/`---` separator |
+| Exits | `# next:` lines a tool printed, whether a later call ran one as printed, and the call that came next |
+
+A read repeated after a write to the same path is a re-read, not a re-derivation,
+and is not counted. Only tools that carry a structured `path` can be paired this
+way.
+
+`--limit` truncates each site list; `0` lists every site. Counts are always
+complete.
+
+This verb reads result bodies, unlike `--explain`, because a followed exit exists
+only in the text a tool printed. It never stores or prints a body: the report
+carries counts, message indices and request arguments.
 
 ## TUI
 
@@ -113,6 +142,40 @@ never overwritten; a conflict is an error, not a merge.
 `threads.db` tree and the matching `sidebar_threads` row; for an ACP thread it
 removes the sidebar metadata only. Both databases get a timestamped backup
 beside themselves first, and the action refuses while Zed is running.
+
+## Snapshot for an external reader
+
+`e` in the TUI writes raw `.data` blobs, which is what an import needs. A
+visualiser needs decoded JSON instead:
+
+```sh
+zed-thread-export --out .tmp/zed-snapshot --max-mb 50
+zed-thread-export --db <threads.db> --out <dir> --max-mb 0
+```
+
+The output is a new directory:
+
+```
+.tmp/zed-snapshot/
+  README.md
+  manifest.json
+  threads/<thread-id>.json
+```
+
+Each thread file is the JSON Zed stored before compressing it, decoded without
+rewriting; unknown fields are preserved. `manifest.json` records the source
+database, the budget, one typed entry per exported thread (title, model,
+message count, version, project paths, file) and every tree that was skipped.
+
+Selection is newest `updated_at` first and by whole tree: a top-level thread and
+all its subagents are included or left out together, so a `parent_id` in the
+snapshot always resolves. A tree that would take the total past `--max-mb` is
+skipped rather than truncated and listed under `skipped`; `--max-mb 0` removes
+the budget. The store is opened read-only, and the output path must not already
+exist.
+
+The transcript is unredacted — prompts, tool output, absolute paths and file
+contents — so a snapshot is as sensitive as the thread store itself.
 
 ## Recovery
 

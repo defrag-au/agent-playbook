@@ -7,6 +7,9 @@
 //! the number the listing was drawn from rather than a guess. The read itself lives in
 //! [`crate::facts`], because the `pr` recipe prints the same lines.
 //!
+//! The answer is a [`LogFacts`] value. [`collect`] reads it; [`LogFacts::report`] renders the CLI's
+//! bytes. A harness calls `collect` and keeps the commits rather than parsing the listing.
+//!
 //! Two things it deliberately does not do yet: filter by author or date, and follow a file's
 //! renames. Both are flags on this question rather than new questions, and neither showed up in a
 //! session — so they are not in the grammar until they do.
@@ -17,12 +20,21 @@ use crate::facts::{self, Commits};
 use crate::verbs::{again, plural, split_rev_and_paths, Budget, Opts, Outcome};
 use crate::TOOL;
 
-pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
-    let mut report = Report::new();
-    if let Some(asked) = opts.limit_clamped_from {
-        report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
-    }
+/// The answer to a log read, before it is a report.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct LogFacts {
+    /// The revision walked, or `None` on a branch with no commits yet.
+    pub rev: Option<String>,
+    /// The path filter the caller named, in the order given.
+    pub paths: Vec<String>,
+    /// What the header says was walked.
+    pub target: String,
+    /// The commits, or `None` when there is no revision to walk.
+    pub commits: Option<Commits>,
+}
 
+pub fn collect(args: &[String], opts: &Opts) -> Result<LogFacts, Fail> {
     let (rev, paths) = split_rev_and_paths(args, opts)?;
     // With no revision, HEAD — stated rather than implied, so the header says what was walked.
     let rev = match rev {
@@ -39,29 +51,51 @@ pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
         // header and the exit code carries it: 1, read fine, nothing to walk.
         (None, _) => "HEAD · no commits yet".to_string(),
     };
-    report.header(TOOL, "log", opts.root.name(), &target);
 
-    let Some(rev) = rev else {
-        return Ok(Outcome::from_report(report));
+    let commits = match &rev {
+        Some(rev) => Some(facts::commits(&opts.git, rev, &paths, opts.limit)?),
+        None => None,
     };
 
-    let commits = facts::commits(&opts.git, &rev, &paths, opts.limit)?;
-    let shown = push(&mut report, opts, &commits);
+    Ok(LogFacts {
+        rev,
+        paths,
+        target,
+        commits,
+    })
+}
 
-    if shown < commits.total {
-        report.next(
-            again(
-                opts,
-                "log",
-                Some(&rev),
-                &paths,
-                &[format!("--limit {}", commits.total.min(MAX_LIMIT))],
-            ),
-            format!("all {}", plural(commits.total, "commit")),
-        );
+impl LogFacts {
+    /// Render the CLI's answer.
+    pub fn report(&self, opts: &Opts) -> Outcome {
+        let mut report = Report::new();
+        if let Some(asked) = opts.limit_clamped_from {
+            report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
+        }
+
+        report.header(TOOL, "log", opts.root.name(), &self.target);
+
+        let (Some(rev), Some(commits)) = (&self.rev, &self.commits) else {
+            return Outcome::from_report(report);
+        };
+
+        let shown = push(&mut report, opts, commits);
+
+        if shown < commits.total {
+            report.next(
+                again(
+                    opts,
+                    "log",
+                    Some(rev),
+                    &self.paths,
+                    &[format!("--limit {}", commits.total.min(MAX_LIMIT))],
+                ),
+                format!("all {}", plural(commits.total, "commit")),
+            );
+        }
+
+        Outcome::from_report(report)
     }
-
-    Ok(Outcome::from_report(report))
 }
 
 /// Print the rows and the count under them, and return how many rows were printed. Shared with the
@@ -83,4 +117,8 @@ pub fn push(report: &mut Report, opts: &Opts, commits: &Commits) -> usize {
     });
     budget.width_caveat(report);
     shown
+}
+
+pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
+    collect(args, opts).map(|facts| facts.report(opts))
 }

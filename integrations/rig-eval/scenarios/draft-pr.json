@@ -1,0 +1,17 @@
+{
+  "name": "draft-pr",
+  "why": "The branch summary a thread writes before opening a pull request.",
+  "prompt": "Summarise this branch relative to `main` for a pull request body: how many commits it has, their hashes and subjects, and the main areas of the change. Cite the commit hashes and name representative files.",
+  "workdir": ".",
+  "gold": [],
+  "extra_paths": [
+    "integrations/rig/src/tools.rs",
+    "tools/at-peek/src/verbs/search.rs",
+    "docs/design/rig.md"
+  ],
+  "must_say": [
+    "3b39d5c",
+    "c206304"
+  ],
+  "tool_says": []
+}

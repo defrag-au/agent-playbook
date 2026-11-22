@@ -19,6 +19,7 @@ targets:
 | --- | --- |
 | `rg`, `grep` | `at-peek search <pattern> [path…]` |
 | `sed -n '40,60p' <file>`, `head`, `cat` | `at-peek slice <file>:40-60` |
+| `grep -n '^## ' <file>` — a file's shape | `at-peek outline <path>…` |
 | `wc -l`, `ls -l`, `stat` | `at-peek stat <path>…` |
 | `grep -rn … ~/.cargo/…` | `at-crate search <pattern> <crate>` · `slice` · `where` |
 | `git status` | `at-recall state` |

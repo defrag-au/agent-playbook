@@ -1,0 +1,12 @@
+[package]
+name = "command-classify"
+version = "0.1.0"
+edition = "2021"
+description = "Classify a shell command line with a real bash grammar: what it runs, and whether it can write"
+license = "MIT"
+
+# The grammar is `brush-parser`'s, not ours. It is the parser behind brush-shell and is validated
+# against bash; hand-writing the tokenizer and operator grammar is what this crate exists to avoid.
+# The command table below is ours, and is the only part that is a list of names.
+[dependencies]
+brush-parser = "0.4"

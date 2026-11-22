@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::db;
 use crate::metadata::{self, SidebarThread};
 use crate::recover::{backup_database, backup_path, zed_is_running};
-use crate::util::{hex_decode, slugify};
+use crate::util::{hex_decode, safe_id, slugify};
 use crate::{Error, VERSION};
 
 pub const BUNDLE_FORMAT_VERSION: u32 = 1;
@@ -761,11 +761,4 @@ pub fn delete_thread(
         threads_backup,
         zed_backup,
     })
-}
-
-fn safe_id(id: &str) -> bool {
-    !id.is_empty()
-        && id
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
 }

@@ -1,0 +1,14 @@
+[package]
+name = "at-continue-thread"
+version = "0.1.0"
+edition = "2021"
+description = "Tier 2 of the agent toolkit: a text-only continuation digest of a Zed agent thread"
+license = "MIT"
+
+# `at-core` is the shared contract. `zed-thread-tools` is the one crate that already knows how to
+# open Zed's thread store and decode its zstd blobs; the digest lives there, beside the format it
+# reads, and this binary is the grammar and the rendering around it. Neither adds a capability:
+# the store is opened read-only, and the tool never spawns anything.
+[dependencies]
+at-core = { workspace = true }
+zed-thread-tools = { workspace = true }

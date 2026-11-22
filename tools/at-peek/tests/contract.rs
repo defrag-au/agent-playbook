@@ -426,6 +426,68 @@ fn unknown_flag_is_a_usage_error() {
 }
 
 #[test]
+fn an_outline_names_every_heading_and_the_file_size() {
+    let fixture = Fixture::new("outline");
+    fixture.write(
+        "docs/design.md",
+        "# One\n\ntext\n\n## Two\n\n```sh\n# a comment\n```\n### Three\n",
+    );
+
+    let out = at_peek(fixture.path(), "outline", &["docs/design.md"]);
+    let text = stdout(&out);
+
+    assert_eq!(out.status.code(), Some(0));
+    assert!(text.contains("1  # One"), "{text}");
+    assert!(text.contains("5  ## Two"), "{text}");
+    assert!(text.contains("10  ### Three"), "{text}");
+    assert!(
+        !text.contains("a comment"),
+        "a fenced shell comment is not a heading: {text}"
+    );
+    assert!(text.contains("3 headings · 10 lines"), "{text}");
+}
+
+#[test]
+fn an_outline_states_what_a_limit_left_out() {
+    let fixture = Fixture::new("outline-limit");
+    fixture.write("docs/one.md", "# One\n\n## Two\n\n### Three\n");
+    fixture.write("docs/two.md", "# Four\n");
+
+    let text = stdout(&at_peek(
+        fixture.path(),
+        "outline",
+        &["docs/one.md", "docs/two.md", "--limit", "2"],
+    ));
+
+    assert!(
+        text.contains("2 of 3 headings · 5 lines · --limit 2"),
+        "{text}"
+    );
+    assert!(text.contains("1 target not shown"), "{text}");
+}
+
+#[test]
+fn an_outline_refuses_a_range_rather_than_ignoring_it() {
+    let fixture = Fixture::new("outline-range");
+    fixture.write("docs/one.md", "# One\n");
+
+    let out = at_peek(fixture.path(), "outline", &["docs/one.md:1-1"]);
+
+    assert_eq!(out.status.code(), Some(2));
+    assert!(stderr(&out).contains("whole file"), "{}", stderr(&out));
+}
+
+#[test]
+fn a_file_with_no_headings_says_so() {
+    let fixture = Fixture::new("outline-none");
+    fixture.write("src/one.rs", "fn main() {}\nfn other() {}\n");
+
+    let text = stdout(&at_peek(fixture.path(), "outline", &["src/one.rs"]));
+
+    assert!(text.contains("0 headings · 2 lines"), "{text}");
+}
+
+#[test]
 fn a_flag_before_the_verb_says_where_flags_go() {
     let out = Command::new(BIN)
         .arg("--limit")
@@ -602,6 +664,7 @@ fn no_command_writes() {
     let before = snapshot(fixture.path());
     for (verb, args) in [
         ("stat", vec!["src/one.rs"]),
+        ("outline", vec!["src/one.rs"]),
         ("slice", vec!["src/one.rs:1-2"]),
         ("slice", vec!["src/one.rs"]),
         ("slice", vec![".."]),

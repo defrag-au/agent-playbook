@@ -1,0 +1,3 @@
+# at-peek search · <root> · /nomatch/ in .
+# walked 3 files · skipped by rule: .git
+# 0 matches in 0 files

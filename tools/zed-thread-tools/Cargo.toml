@@ -2,7 +2,7 @@
 name = "zed-thread-tools"
 version = "0.1.0"
 edition = "2021"
-description = "Read-only audit, and compaction-based recovery, of Zed agent thread transcripts"
+description = "Audit, decoded export, and compaction-based recovery of Zed agent thread transcripts"
 license = "MIT"
 
 [lib]
@@ -20,6 +20,10 @@ path = "src/bin/zed-thread-recover.rs"
 [[bin]]
 name = "zed-thread-tui"
 path = "src/bin/zed-thread-tui.rs"
+
+[[bin]]
+name = "zed-thread-export"
+path = "src/bin/zed-thread-export.rs"
 
 # `rusqlite` is the only way to read the thread store without going through an
 # external `sqlite3` binary, and `bundled` avoids depending on the SQLite the

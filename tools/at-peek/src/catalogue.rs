@@ -86,6 +86,18 @@ pub static VERBS: &[Verb] = &[
             HOW,
         ],
     },
+    Verb {
+        name: "outline",
+        question: "The sections of a file",
+        usage: "at-peek outline <path>… [--limit N] [--root <path>] [--include-secret-paths]",
+        notes: "Every ATX heading (`#` to `######`) with its line number, outside fenced code \
+                blocks, and the file's true line count. A closing hash run is decoration, so \
+                `## Status ##` is the heading `Status`, while `## C#` keeps its hash. `--limit` \
+                bounds headings across the invocation, not per file. A file with no headings says \
+                so rather than reading as an empty answer; a setext underline is not guessed at. \
+                A range on a target is refused rather than ignored: an outline is the whole file.",
+        flags: VERB_FLAGS,
+    },
 ];
 
 static SPEC: Tool = Tool {

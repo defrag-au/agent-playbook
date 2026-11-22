@@ -1,0 +1,6466 @@
+[
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:138",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:144",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:145",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:150",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:153",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "refusal",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "redirect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "model call",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "agent_playbook.redirection",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "bounded",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "agent_playbook.redirection",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:138",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:144",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:145",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:150",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:153",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "refusal",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "redirect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "model call",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "agent_playbook.redirection",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "bounded",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "agent_playbook.redirection",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:138",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:144",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:145",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:150",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:153",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "refusal",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "redirect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "model call",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "agent_playbook.redirection",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "bounded",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "agent_playbook.redirection",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:138",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:144",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:145",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:150",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:153",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "refusal",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "redirect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "model call",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "agent_playbook.redirection",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "bounded",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "agent_playbook.redirection",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:138",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:144",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:145",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:150",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:153",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "refusal",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "redirect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "model call",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "agent_playbook.redirection",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "bounded",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "agent_playbook.redirection",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:138",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:144",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:145",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:150",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:153",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "refusal",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "redirect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "model call",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "agent_playbook.redirection",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "bounded",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "agent_playbook.redirection",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:138",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:144",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:145",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:150",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:153",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "refusal",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "redirect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "model call",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "agent_playbook.redirection",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "bounded",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "agent_playbook.redirection",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:138",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:144",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:145",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:150",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:153",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "refusal",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "redirect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "model call",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "agent_playbook.redirection",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "bounded",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "advertising-over-gating",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "agent_playbook.redirection",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/tests/redirect.rs:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "0 failed",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "test result: ok",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "0 failed",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/tests/redirect.rs:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "0 failed",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "test result: ok",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "0 failed",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/tests/redirect.rs:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "0 failed",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "test result: ok",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "0 failed",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/tests/redirect.rs:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "0 failed",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "test result: ok",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "0 failed",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/tests/redirect.rs:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "0 failed",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "test result: ok",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "0 failed",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/tests/redirect.rs:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "0 failed",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "test result: ok",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "0 failed",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/tests/redirect.rs:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "0 failed",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "test result: ok",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "0 failed",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/tests/redirect.rs:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "0 failed",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "test result: ok",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "devshell-tests",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "0 failed",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "3b39d5c",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "c206304",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "3b39d5c",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "c206304",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "3b39d5c",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "c206304",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs",
+    "source": "path",
+    "found": false
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "3b39d5c",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "c206304",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs",
+    "source": "path",
+    "found": false
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "3b39d5c",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "c206304",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs",
+    "source": "path",
+    "found": false
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "3b39d5c",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "c206304",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs",
+    "source": "path",
+    "found": false
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "3b39d5c",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "c206304",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs",
+    "source": "path",
+    "found": false
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "3b39d5c",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "draft-pr",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "c206304",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:417",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:418",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:419",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/snapshot.rs:3",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/snapshot.rs:5",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/sandbox.rs:7",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/sandbox.rs:10",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "contaminated",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "inspected-corpus",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "sandbox",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "history",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "inspected-corpus",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:417",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:418",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:419",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/snapshot.rs:3",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/snapshot.rs:5",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/sandbox.rs:7",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/sandbox.rs:10",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "contaminated",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "inspected-corpus",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "sandbox",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "history",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "inspected-corpus",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:417",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:418",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:419",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/snapshot.rs:3",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/snapshot.rs:5",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/sandbox.rs:7",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/sandbox.rs:10",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "contaminated",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "inspected-corpus",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "sandbox",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "history",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "inspected-corpus",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:417",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:418",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:419",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/snapshot.rs:3",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/snapshot.rs:5",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/sandbox.rs:7",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/sandbox.rs:10",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "contaminated",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "inspected-corpus",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "sandbox",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "history",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "inspected-corpus",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:417",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:418",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:419",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/snapshot.rs:3",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/snapshot.rs:5",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/sandbox.rs:7",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/sandbox.rs:10",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "contaminated",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "inspected-corpus",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "sandbox",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "history",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "inspected-corpus",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:417",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:418",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:419",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/snapshot.rs:3",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/snapshot.rs:5",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/sandbox.rs:7",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/sandbox.rs:10",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "contaminated",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "inspected-corpus",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "sandbox",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "history",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "inspected-corpus",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:417",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:418",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md:419",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/snapshot.rs:3",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/snapshot.rs:5",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/sandbox.rs:7",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig-eval/src/sandbox.rs:10",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "contaminated",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "inspected-corpus",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "sandbox",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "history",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "inspected-corpus",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:417",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:418",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md:419",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/snapshot.rs:3",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/snapshot.rs:5",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/sandbox.rs:7",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig-eval/src/sandbox.rs:10",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "contaminated",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "inspected-corpus",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "sandbox",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "history",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "eval-contamination",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "inspected-corpus",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs:98",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs:299",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:310",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:313",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:411",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "SearchFacts",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "collect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "agent_playbook.search",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "agent_playbook.search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs:98",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs:299",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:310",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:313",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:411",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "SearchFacts",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "collect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "agent_playbook.search",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "agent_playbook.search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs:98",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs:299",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:310",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:313",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:411",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "SearchFacts",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "collect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "agent_playbook.search",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "agent_playbook.search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs:98",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs:299",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:310",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:313",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:411",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "SearchFacts",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "collect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "agent_playbook.search",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "agent_playbook.search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs:98",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs:299",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:310",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:313",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:411",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "SearchFacts",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "collect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "agent_playbook.search",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "agent_playbook.search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs:98",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs:299",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:310",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:313",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:411",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "SearchFacts",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "collect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "agent_playbook.search",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "agent_playbook.search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs:98",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "tools/at-peek/src/verbs/search.rs:299",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:310",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:313",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/tools.rs:411",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "SearchFacts",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "collect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "agent_playbook.search",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "agent_playbook.search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs:98",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "tools/at-peek/src/verbs/search.rs:299",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:310",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:313",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/tools.rs:411",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "SearchFacts",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "collect",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "agent_playbook.search",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "facts-without-subprocess",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "agent_playbook.search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:195",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:199",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:212",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:230",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:232",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "effect log",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "DuckDB",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "decided_by",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "filelog",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "decided_by",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:195",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:199",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:212",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:230",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:232",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "effect log",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "DuckDB",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "decided_by",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "filelog",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "decided_by",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:195",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:199",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:212",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:230",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:232",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "effect log",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "DuckDB",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "decided_by",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "filelog",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "decided_by",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:195",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:199",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:212",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:230",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:232",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "effect log",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "DuckDB",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "decided_by",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "filelog",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "decided_by",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:195",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:199",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:212",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:230",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:232",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "effect log",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "DuckDB",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "decided_by",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "filelog",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "decided_by",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:195",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:199",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:212",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:230",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:232",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "effect log",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "DuckDB",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "decided_by",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "filelog",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "decided_by",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:195",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:199",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:212",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:230",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:232",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "effect log",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "DuckDB",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "decided_by",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "filelog",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "decided_by",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:195",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:199",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:212",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:230",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:232",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "effect log",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "DuckDB",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "decided_by",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "filelog",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "otel-or-duckdb",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "decided_by",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "eval",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "eval",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "eval",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "eval",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "eval",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "eval",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "eval",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig-eval.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "eval",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "pre-edit-state",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig-eval.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:14",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:44",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:136",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:14",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:44",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:136",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:14",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:44",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:136",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:14",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:44",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:136",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:14",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:44",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:136",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:14",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:44",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:136",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:14",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/README.md:44",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:136",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:14",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:29",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/README.md:44",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "recover-investigation",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:136",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:378",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:406",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:424",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:564",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:585",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:622",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:653",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "pipeline",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "&&",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "--porcelain",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "--cached",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "rg",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "is_redirect",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:378",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:406",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:424",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:564",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:585",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:622",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:653",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "pipeline",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "&&",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "--porcelain",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "--cached",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "rg",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "is_redirect",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:378",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:406",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:424",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:564",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:585",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:622",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:653",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "pipeline",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "&&",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "--porcelain",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "--cached",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "rg",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "is_redirect",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:378",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:406",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:424",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:564",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:585",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:622",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:653",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "pipeline",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "&&",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "--porcelain",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "--cached",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "rg",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "is_redirect",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:378",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:406",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:424",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:564",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:585",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:622",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:653",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "pipeline",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "&&",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "--porcelain",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "--cached",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "rg",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "is_redirect",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:378",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:406",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:424",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:564",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:585",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:622",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:653",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "pipeline",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "&&",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "--porcelain",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "--cached",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "rg",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "is_redirect",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:378",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:406",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:424",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:564",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:585",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:622",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:653",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "pipeline",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "&&",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "--porcelain",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "--cached",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "rg",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "is_redirect",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:378",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:406",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:424",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:564",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:585",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:622",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:653",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "pipeline",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "&&",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "--porcelain",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "--cached",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "rg",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "redirect-declines",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "is_redirect",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:18",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:170",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:120",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/design/rig.md:251",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "multi-client",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "v2",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "factotum",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "multi-client session",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:18",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:170",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:120",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/design/rig.md:251",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "multi-client",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "v2",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "factotum",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "multi-client session",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:18",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:170",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:120",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/design/rig.md:251",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "multi-client",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "v2",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "factotum",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "multi-client session",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:18",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:170",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:120",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/design/rig.md:251",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "multi-client",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "v2",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "factotum",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "multi-client session",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:18",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:170",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:120",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:251",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "multi-client",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "v2",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "factotum",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "multi-client session",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:18",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:170",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:120",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:251",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "multi-client",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "v2",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "factotum",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "multi-client session",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:18",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:170",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:120",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/design/rig.md:251",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "multi-client",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "v2",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "factotum",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "multi-client session",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:18",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:170",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:120",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/design/rig.md:251",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "multi-client",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "v2",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "factotum",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "rig-vs-factotum",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "multi-client session",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md:13",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md:30",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "no-committed-secrets.md",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "secret-shaped",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "report it",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "at_peek_search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md:13",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md:30",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "no-committed-secrets.md",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "secret-shaped",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "report it",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "at_peek_search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md:13",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md:30",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "no-committed-secrets.md",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "secret-shaped",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "report it",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "at_peek_search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md:13",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md:30",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "no-committed-secrets.md",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "secret-shaped",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "report it",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "at_peek_search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md:13",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md:30",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "no-committed-secrets.md",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "secret-shaped",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "report it",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "at_peek_search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md:13",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md:30",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "no-committed-secrets.md",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "secret-shaped",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "report it",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "at_peek_search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md:13",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md:30",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "rules/core/no-committed-secrets.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "no-committed-secrets.md",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "secret-shaped",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "report it",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "at_peek_search",
+    "source": "tool",
+    "found": false
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md:13",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md:30",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "rules/core/no-committed-secrets.md",
+    "source": "path",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "no-committed-secrets.md",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "secret-shaped",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "report it",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "the-skipped-rule",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "at_peek_search",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:95",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:123",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:290",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:408",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:95",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:123",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:290",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:408",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:95",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:123",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:290",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:408",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:95",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:123",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:290",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:408",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:95",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:123",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:290",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:408",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:95",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:123",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:290",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:408",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:95",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:123",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:290",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "integrations/rig/src/redirect.rs:408",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:95",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:123",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:290",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "trace-redirect",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "integrations/rig/src/redirect.rs:408",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:875",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:876",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:877",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:31",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:43",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:75",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "private store",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "whole-grammar",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "message text",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "result body",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "request argument",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 1,
+    "required": "private store",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:875",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:876",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:877",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:31",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:43",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:75",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "private store",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "whole-grammar",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "message text",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "result body",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "request argument",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:gated",
+    "repeat": 2,
+    "required": "private store",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:875",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:876",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:877",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:31",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:43",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:75",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "private store",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "whole-grammar",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "message text",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "result body",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "request argument",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 1,
+    "required": "private store",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:875",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:876",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:877",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:31",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:43",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:75",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "private store",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "whole-grammar",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "message text",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "result body",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "request argument",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "rig:baseline",
+    "repeat": 2,
+    "required": "private store",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:875",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:876",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:877",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:31",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:43",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:75",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "private store",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "whole-grammar",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "message text",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "result body",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "request argument",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 1,
+    "required": "private store",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:875",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:876",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:877",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:31",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:43",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:75",
+    "source": "gold",
+    "found": false
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "private store",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "whole-grammar",
+    "source": "answer",
+    "found": false
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "message text",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "result body",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "request argument",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "opencode:documented",
+    "repeat": 2,
+    "required": "private store",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:875",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:876",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "docs/inspection-tools.md:877",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:31",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:43",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "tools/zed-thread-tools/README.md:75",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "private store",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "whole-grammar",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "message text",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "result body",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "request argument",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 1,
+    "required": "private store",
+    "source": "tool",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:875",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:876",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "docs/inspection-tools.md:877",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:31",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:43",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "tools/zed-thread-tools/README.md:75",
+    "source": "gold",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "private store",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "whole-grammar",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "message text",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "result body",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "request argument",
+    "source": "answer",
+    "found": true
+  },
+  {
+    "scenario": "zed-thread-tools-not-at",
+    "target": "pi:documented",
+    "repeat": 2,
+    "required": "private store",
+    "source": "tool",
+    "found": true
+  }
+]

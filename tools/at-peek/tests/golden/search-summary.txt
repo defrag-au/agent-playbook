@@ -1,0 +1,4 @@
+# at-peek search · <root> · /alpha|beta/ in .
+# walked 3 files · skipped by rule: .git
+# 4 matches in 3 files, not shown
+# next: at-peek search 'alpha|beta' --limit 4 --root <root> · all 4 matches

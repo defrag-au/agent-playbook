@@ -1,0 +1,26 @@
+{
+  "name": "redirect-declines",
+  "why": "Zed thread 7768745e, 2026-11-09: which shell habits the redirect serves, and where it refuses to guess. Gold re-derived 2026-11-15: the stored lines pointed at served forms, not the decline comments.",
+  "prompt": "A thread asked which shell habits the rig redirect serves and which it refuses to guess at. Name the served forms, the operator that stops a compound being decomposed, and at least three flag families it declines. Cite the matcher and the decline comments as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "integrations/rig/src/redirect.rs:378",
+    "integrations/rig/src/redirect.rs:406",
+    "integrations/rig/src/redirect.rs:424",
+    "integrations/rig/src/redirect.rs:564",
+    "integrations/rig/src/redirect.rs:585",
+    "integrations/rig/src/redirect.rs:622",
+    "integrations/rig/src/redirect.rs:653"
+  ],
+  "extra_paths": [],
+  "must_say": [
+    "pipeline",
+    "&&",
+    "--porcelain",
+    "--cached",
+    "rg"
+  ],
+  "tool_says": [
+    "is_redirect"
+  ]
+}

@@ -21,22 +21,40 @@
 //!
 //! What it does not do: write the description. The reason a change exists is the one thing here that
 //! is not derivable from the repository, and that is the reader's to supply.
+//!
+//! The answer is a [`PrFacts`] value. [`collect`] reads it; [`PrFacts::report`] renders the CLI's
+//! bytes. A harness calls `collect` and keeps the sections rather than parsing the recipe.
 
 use at_core::contract::{Exit, Fail, Report, MAX_LIMIT};
 
 use crate::catalogue::PR_SECTIONS;
-use crate::facts::{self, FileStat};
+use crate::facts::{self, Commits, FileStat};
 use crate::git::Noun;
 use crate::status::Status;
 use crate::verbs::{again, plural, Budget, Opts, Outcome};
 use crate::TOOL;
 
-pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
-    let mut report = Report::new();
-    if let Some(asked) = opts.limit_clamped_from {
-        report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
-    }
+/// The answer to a PR read, before it is a report.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct PrFacts {
+    /// What the branch diverged from, as resolved.
+    pub base: String,
+    /// The sections the caller asked for.
+    pub wanted: Sections,
+    /// Tracked paths changed since HEAD.
+    pub uncommitted: usize,
+    /// The commits between the base and HEAD, when that section was asked for.
+    pub commits: Option<Commits>,
+    /// The per-file diffstat, when either of the sections that read it was asked for.
+    pub files: Option<Vec<FileStat>>,
+    /// The same comparison with whitespace ignored.
+    pub without_whitespace: Option<Vec<FileStat>>,
+    /// The branch has nothing on top of its base.
+    pub empty: bool,
+}
 
+pub fn collect(opts: &Opts) -> Result<PrFacts, Fail> {
     let wanted = Sections::of(opts)?;
     let base = resolve_base(opts)?;
     let commit_range = format!("{base}..HEAD");
@@ -44,23 +62,11 @@ pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
     // request shows — and both sides are commits, so no working-tree file is converted.
     let diff_range = format!("{base}...HEAD");
 
-    report.header(TOOL, "pr", opts.root.name(), &format!("base {base}"));
-    // Always true, and the caveat a reader needs most: the base is whatever this repository has
-    // locally, and nothing here fetches anything.
-    report.bound(format!(
-        "caveat: {base} is a local ref and this tool never fetches — the remote may be ahead"
-    ));
     // A branch's commits are not the whole change set, and work still sitting in the working tree is
     // what a reader writing the description from this is likeliest to leave out. Untracked paths are
     // deliberately not counted: they have no version in HEAD to have changed from, and a repository
     // with a directory of half-written notes would then carry this caveat forever.
     let uncommitted = Status::read_tracked(&opts.git)?.tracked_changes();
-    if uncommitted > 0 {
-        report.bound(format!(
-            "caveat: {} changed since HEAD and not in {commit_range} · at-recall state names them",
-            plural(uncommitted, "tracked path")
-        ));
-    }
 
     let commits = if wanted.commits {
         Some(facts::commits(&opts.git, &commit_range, &[], opts.limit)?)
@@ -83,112 +89,151 @@ pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
     // The whitespace delta is reported rather than left behind a flag: "half of this is
     // reindentation" is a fact a reviewer wants, and one they should not have to know to ask for.
     let without_whitespace = if reading_files {
-        Some(facts::numstat(
-            &opts.git,
-            &Some(diff_range.clone()),
-            &[],
-            true,
-        )?)
+        Some(facts::numstat(&opts.git, &Some(diff_range), &[], true)?)
     } else {
         None
     };
-
-    let mut budget = Budget::new(opts.limit);
-    let mut cut_commits = 0;
-    let mut cut_files = 0;
-    // Section labels are content but never spend budget — they are what says a section was cut — so
-    // they are counted separately for the total at the end.
-    let mut labels = 0usize;
-
-    if let Some(commits) = &commits {
-        let before = budget.dropped();
-        report.content(label("commits", plural(commits.total, "commit")));
-        labels += 1;
-        for line in commits.lines() {
-            budget.push(&mut report, format!("  {line}"));
-        }
-        let shown = commits.rows.len().saturating_sub(budget.dropped() - before);
-        if shown < commits.total {
-            cut_commits = commits.total;
-            // No `--limit` here: the limit is shared across the sections, so quoting it beside one
-            // section's count would suggest raising it by *this* section's shortfall is enough.
-            // The exit below names the read that answers this section alone.
-            report.bound(format!("{shown} of {}", plural(commits.total, "commit")));
-        }
-    }
-
-    if let Some(files) = &files {
-        // `areas` is counted from these files but does not print them, so the rows belong to the
-        // `diffstat` section and only it may spend budget on them.
-        if wanted.diffstat {
-            let before = budget.dropped();
-            report.content(label(
-                "diffstat",
-                format!("{}, {}", plural(files.len(), "file"), facts::totals(files)),
-            ));
-            labels += 1;
-            let widths = Widths::of(files);
-            for file in files {
-                budget.push(&mut report, widths.row(file));
-            }
-            let shown = files.len().saturating_sub(budget.dropped() - before);
-            if shown < files.len() {
-                cut_files = files.len();
-                report.bound(format!("{shown} of {}", plural(files.len(), "file")));
-            }
-            if let Some(delta) = without_whitespace
-                .as_ref()
-                .and_then(|without| whitespace_delta(without, files))
-            {
-                report.bound(delta);
-            }
-        }
-        if wanted.areas {
-            report.content(area_line(files));
-            labels += 1;
-        }
-    }
 
     // A branch with nothing on top of its base is the one answer a reader branches on the code
     // alone, and the labels below are content, so the frame would otherwise read as a result.
     let empty = commits.as_ref().is_none_or(|c| c.total == 0)
         && files.as_ref().is_none_or(|f| f.is_empty());
-    if empty {
-        report.bound(format!("nothing between {base} and HEAD"));
-    }
 
-    // The full answer rather than the part of it the budget saw: `log` is capped at `--limit` as
-    // well, so a commit the limit never fetched was never counted as dropped, and a total that left
-    // it out would understate the answer it claims to measure.
-    let rows = commits.as_ref().map_or(0, |c| c.total)
-        + match &files {
-            Some(files) if wanted.diffstat => files.len(),
-            _ => 0,
-        };
-    let emitted = report.content_lines();
-    if emitted < rows + labels {
-        // The per-section bounds say which section lost rows; this one says how much of the answer
-        // went missing in total, which is the only line that can state a section that vanished.
+    Ok(PrFacts {
+        base,
+        wanted,
+        uncommitted,
+        commits,
+        files,
+        without_whitespace,
+        empty,
+    })
+}
+
+impl PrFacts {
+    /// Render the CLI's answer.
+    pub fn report(&self, opts: &Opts) -> Outcome {
+        let mut report = Report::new();
+        if let Some(asked) = opts.limit_clamped_from {
+            report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
+        }
+
+        let commit_range = format!("{}..HEAD", self.base);
+        let diff_range = format!("{}...HEAD", self.base);
+
+        report.header(TOOL, "pr", opts.root.name(), &format!("base {}", self.base));
+        // Always true, and the caveat a reader needs most: the base is whatever this repository has
+        // locally, and nothing here fetches anything.
         report.bound(format!(
-            "{emitted} of {} lines · --limit {} reached",
-            rows + labels,
-            opts.limit
+            "caveat: {} is a local ref and this tool never fetches — the remote may be ahead",
+            self.base
         ));
-    }
-    budget.width_caveat(&mut report);
-    exits(
-        &mut report,
-        opts,
-        &commit_range,
-        &diff_range,
-        cut_commits,
-        cut_files,
-        // "The hunks" is an offer to read more of the same change set, so a branch that has no
-        // change set at all does not offer it — there is nothing behind the table.
-        !empty && files.is_some(),
-    );
+        if self.uncommitted > 0 {
+            report.bound(format!(
+                "caveat: {} changed since HEAD and not in {commit_range} · at-recall state names them",
+                plural(self.uncommitted, "tracked path")
+            ));
+        }
 
-    Ok(outcome(report, empty))
+        let mut budget = Budget::new(opts.limit);
+        let mut cut_commits = 0;
+        let mut cut_files = 0;
+        // Section labels are content but never spend budget — they are what says a section was cut —
+        // so they are counted separately for the total at the end.
+        let mut labels = 0usize;
+
+        if let Some(commits) = &self.commits {
+            let before = budget.dropped();
+            report.content(label("commits", plural(commits.total, "commit")));
+            labels += 1;
+            for line in commits.lines() {
+                budget.push(&mut report, format!("  {line}"));
+            }
+            let shown = commits.rows.len().saturating_sub(budget.dropped() - before);
+            if shown < commits.total {
+                cut_commits = commits.total;
+                // No `--limit` here: the limit is shared across the sections, so quoting it beside
+                // one section's count would suggest raising it by *this* section's shortfall is
+                // enough. The exit below names the read that answers this section alone.
+                report.bound(format!("{shown} of {}", plural(commits.total, "commit")));
+            }
+        }
+
+        if let Some(files) = &self.files {
+            // `areas` is counted from these files but does not print them, so the rows belong to
+            // the `diffstat` section and only it may spend budget on them.
+            if self.wanted.diffstat {
+                let before = budget.dropped();
+                report.content(label(
+                    "diffstat",
+                    format!("{}, {}", plural(files.len(), "file"), facts::totals(files)),
+                ));
+                labels += 1;
+                let widths = Widths::of(files);
+                for file in files {
+                    budget.push(&mut report, widths.row(file));
+                }
+                let shown = files.len().saturating_sub(budget.dropped() - before);
+                if shown < files.len() {
+                    cut_files = files.len();
+                    report.bound(format!("{shown} of {}", plural(files.len(), "file")));
+                }
+                if let Some(delta) = self
+                    .without_whitespace
+                    .as_ref()
+                    .and_then(|without| whitespace_delta(without, files))
+                {
+                    report.bound(delta);
+                }
+            }
+            if self.wanted.areas {
+                report.content(area_line(files));
+                labels += 1;
+            }
+        }
+
+        if self.empty {
+            report.bound(format!("nothing between {} and HEAD", self.base));
+        }
+
+        // The full answer rather than the part of it the budget saw: `log` is capped at `--limit`
+        // as well, so a commit the limit never fetched was never counted as dropped, and a total
+        // that left it out would understate the answer it claims to measure.
+        let rows = self.commits.as_ref().map_or(0, |c| c.total)
+            + match &self.files {
+                Some(files) if self.wanted.diffstat => files.len(),
+                _ => 0,
+            };
+        let emitted = report.content_lines();
+        if emitted < rows + labels {
+            // The per-section bounds say which section lost rows; this one says how much of the
+            // answer went missing in total, which is the only line that can state a section that
+            // vanished.
+            report.bound(format!(
+                "{emitted} of {} lines · --limit {} reached",
+                rows + labels,
+                opts.limit
+            ));
+        }
+        budget.width_caveat(&mut report);
+        exits(
+            &mut report,
+            opts,
+            &commit_range,
+            &diff_range,
+            cut_commits,
+            cut_files,
+            // "The hunks" is an offer to read more of the same change set, so a branch that has no
+            // change set at all does not offer it — there is nothing behind the table.
+            !self.empty && self.files.is_some(),
+        );
+
+        outcome(report, self.empty)
+    }
+}
+
+pub fn run(opts: &Opts) -> Result<Outcome, Fail> {
+    collect(opts).map(|facts| facts.report(opts))
 }
 
 /// The recipe's outcome, with the one deviation from the shared rule: an empty branch exits 1 even
@@ -203,10 +248,12 @@ fn outcome(report: Report, empty: bool) -> Outcome {
 
 /// Which sections were asked for. An unknown name is a usage error naming the ones that exist,
 /// because the set is fixed and a reader who mistypes should not silently get fewer sections.
-struct Sections {
-    commits: bool,
-    diffstat: bool,
-    areas: bool,
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Sections {
+    pub commits: bool,
+    pub diffstat: bool,
+    pub areas: bool,
 }
 
 impl Sections {

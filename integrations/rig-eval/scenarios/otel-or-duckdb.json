@@ -1,0 +1,23 @@
+{
+  "name": "otel-or-duckdb",
+  "why": "Zed thread 7768745e, 2026-11-08: whether OTel is required, and DuckDB as the first reader.",
+  "prompt": "A thread asked whether OTel is required to observe agent activity, or whether DuckDB was the right first reader. Answer from the design record: what is canonical, why the record already carries what a span would, and the one condition that would put OTel back. Cite each finding as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "docs/design/rig.md:195",
+    "docs/design/rig.md:199",
+    "docs/design/rig.md:212",
+    "docs/design/rig.md:230",
+    "docs/design/rig.md:232"
+  ],
+  "extra_paths": [],
+  "must_say": [
+    "effect log",
+    "DuckDB",
+    "decided_by",
+    "filelog"
+  ],
+  "tool_says": [
+    "decided_by"
+  ]
+}

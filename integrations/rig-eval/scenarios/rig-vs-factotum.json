@@ -1,0 +1,21 @@
+{
+  "name": "rig-vs-factotum",
+  "why": "Zed thread 7768745e, 2026-11-08: whether rig replaces factotum, or factotum becomes a rig front.",
+  "prompt": "A thread asked whether rig replaces factotum, or factotum should be regeared as a rig front. Answer from the committed design record: what rig is to factotum, what factotum owns that rig does not, and the one constraint that currently stops `rig acp` running as a factotum agent. Cite each finding as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "docs/design/rig.md:18",
+    "docs/design/rig.md:170",
+    "docs/design/rig.md:120",
+    "docs/design/rig.md:251"
+  ],
+  "extra_paths": [],
+  "must_say": [
+    "multi-client",
+    "v2",
+    "factotum"
+  ],
+  "tool_says": [
+    "multi-client session"
+  ]
+}

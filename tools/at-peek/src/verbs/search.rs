@@ -7,6 +7,10 @@
 //! Matches are counted over every file the walk considers, even after the listing is full.
 //! That is the point — `# 50 of 143` is the difference between a fact and a guess — and it is
 //! why the walk is bounded and the bound is stated.
+//!
+//! The answer is a [`SearchFacts`] value. [`run`] renders it for the CLI; a harness calls
+//! [`collect`] and keeps the facts, which is what lets the same read be typed rather than
+//! scraped from stdout.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -34,7 +38,8 @@ const SKIP_DIRS: &[&str] = &[
     "target",
 ];
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Mode {
     Matches,
     Count,
@@ -56,6 +61,194 @@ impl Mode {
     }
 }
 
+/// One matching line, as the walk found it. The text is the line itself, not a truncated copy:
+/// the width cap is a rendering decision, and a caller that wants the line should get it whole.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Found {
+    /// Relative to the root, forward slashes — the form a transcript cites.
+    pub path: String,
+    /// 1-based, as a reader counts.
+    pub line: usize,
+    pub text: String,
+}
+
+/// One file's share of the matches.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FileHits {
+    pub path: String,
+    pub hits: usize,
+}
+
+/// What the walk did, without the files themselves.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WalkFacts {
+    pub considered: usize,
+    pub capped: bool,
+    pub skipped_dirs: Vec<String>,
+    pub symlinks: usize,
+    pub unreadable: usize,
+}
+
+/// The answer to a search, before it is a report.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SearchFacts {
+    pub pattern: String,
+    /// The paths named after the pattern, in the order given; empty means the whole root.
+    pub named: Vec<String>,
+    pub mode: Mode,
+    /// The lines the limit left room for, in path order. Empty for the counting modes.
+    pub rows: Vec<Found>,
+    /// Every file with at least one match, in path order.
+    pub counted: Vec<FileHits>,
+    /// Matches over every file the walk considered, not only the listed ones.
+    pub total: usize,
+    pub walk: WalkFacts,
+    pub binary: usize,
+    pub not_utf8: usize,
+    pub secret_skipped: usize,
+    /// Lines over the width cap. Kept here rather than counted while rendering because the
+    /// bound is part of the answer, and `--summary` states it even though it prints no rows.
+    pub truncated_lines: usize,
+}
+
+impl SearchFacts {
+    /// The rows this answer lists: the body itself, or the count a summary uses instead.
+    fn listed(&self, opts: &Opts) -> usize {
+        if opts.summary {
+            match self.mode {
+                Mode::Matches => self.total,
+                Mode::Count | Mode::FilesOnly => self.counted.len(),
+            }
+        } else {
+            match self.mode {
+                Mode::Matches => self.rows.len(),
+                Mode::Count | Mode::FilesOnly => self.counted.len().min(opts.limit),
+            }
+        }
+    }
+
+    /// The contract's report: what the CLI prints, and what a harness returns as tool text.
+    pub fn report(&self, opts: &Opts) -> Report {
+        let mut report = Report::new();
+        if let Some(asked) = opts.limit_clamped_from {
+            report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
+        }
+        if let Some(asked) = opts.max_files_clamped_from {
+            report.bound(format!("--max-files {asked} clamped to {MAX_FILES}"));
+        }
+
+        let scope = match self.named.len() {
+            0 => ".".to_string(),
+            1 => self.named[0].clone(),
+            n => plural(n, "path"),
+        };
+        report.header(
+            TOOL,
+            "search",
+            opts.root.name(),
+            &format!("/{}/ in {scope}", self.pattern),
+        );
+
+        // The rows, unless the frame was asked for. `--summary` is the coarse answer again: how
+        // many matches, where they are not, and where the walk stopped.
+        let listed = if opts.summary {
+            self.listed(opts)
+        } else {
+            match self.mode {
+                Mode::Matches => {
+                    for row in &self.rows {
+                        let (text, _) = truncate(&row.text);
+                        report.content(format!("{}:{}:{}", row.path, row.line, text));
+                    }
+                    self.rows.len()
+                }
+                Mode::Count => {
+                    // Both columns are padded, so a column of counts can be compared by eye. The
+                    // widths come from the rows actually listed, so a limit does not leave a gap on
+                    // every line.
+                    let rows = &self.counted[..self.counted.len().min(opts.limit)];
+                    let paths = rows.iter().map(|row| row.path.len()).max().unwrap_or(0);
+                    let hits = rows
+                        .iter()
+                        .map(|row| row.hits.to_string().len())
+                        .max()
+                        .unwrap_or(1);
+                    for row in rows {
+                        report.content(format!("{:<paths$}  {:>hits$}", row.path, row.hits));
+                    }
+                    rows.len()
+                }
+                Mode::FilesOnly => {
+                    for row in self.counted.iter().take(opts.limit) {
+                        report.content(row.path.clone());
+                    }
+                    self.counted.len().min(opts.limit)
+                }
+            }
+        };
+
+        report.bound(walk_bound(&self.walk));
+        if let Some(skipped) = skip_bound(
+            self.secret_skipped,
+            self.binary,
+            self.not_utf8,
+            self.walk.symlinks,
+            self.walk.unreadable,
+        ) {
+            report.bound(skipped);
+        }
+        if self.walk.capped {
+            report.bound(format!(
+                "stopped after {} files considered (--max-files {})",
+                self.walk.considered, opts.max_files
+            ));
+        }
+        if self.truncated_lines > 0 {
+            report.bound(format!(
+                "caveat: {} line(s) wider than {MAX_LINE_WIDTH} characters, truncated",
+                self.truncated_lines
+            ));
+        }
+        let found = Findings {
+            listed,
+            total: self.total,
+            counted: &self.counted,
+            walk: &self.walk,
+        };
+        let mut coverage = coverage(self.mode, &found, opts.limit);
+        if opts.summary && listed > 0 {
+            coverage.push_str(", not shown");
+        }
+        report.bound(coverage);
+        exits(
+            &mut report,
+            opts,
+            self.mode,
+            &Query {
+                pattern: &self.pattern,
+                named: &self.named,
+            },
+            &found,
+        );
+        report
+    }
+
+    /// The report, with the exit the answer implies. A summary that found something is a frame
+    /// rather than an empty success: the count is the answer even though no rows were printed.
+    pub fn outcome(&self, opts: &Opts) -> Outcome {
+        let report = self.report(opts);
+        if opts.summary && self.listed(opts) > 0 {
+            Outcome::from_frame(report)
+        } else {
+            Outcome::from_report(report)
+        }
+    }
+}
+
 #[derive(Default)]
 struct Walk {
     /// A set, so a path named twice is searched once and results come out in path order
@@ -66,6 +259,22 @@ struct Walk {
     skipped_dirs: BTreeSet<&'static str>,
     symlinks: usize,
     unreadable: usize,
+}
+
+impl Walk {
+    fn facts(&self) -> WalkFacts {
+        WalkFacts {
+            considered: self.considered,
+            capped: self.capped,
+            skipped_dirs: self
+                .skipped_dirs
+                .iter()
+                .map(|name| (*name).to_owned())
+                .collect(),
+            symlinks: self.symlinks,
+            unreadable: self.unreadable,
+        }
+    }
 }
 
 /// What was asked: the pattern, and the paths named after it. Kept together because an exit has to
@@ -82,19 +291,16 @@ struct Query<'a> {
 struct Findings<'a> {
     listed: usize,
     total: usize,
-    counted: &'a [(String, usize)],
-    walk: &'a Walk,
+    counted: &'a [FileHits],
+    walk: &'a WalkFacts,
 }
 
-pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
+/// The typed answer. No printing: a caller that runs in-process owns its own stdout.
+pub fn collect(paths: &[String], opts: &Opts, mode: Mode) -> Result<SearchFacts, Fail> {
     let Some((pattern, named)) = paths.split_first() else {
         return Err(Fail::usage(
             "`search` needs a pattern · at-peek search <pattern> [path…]",
         ));
-    };
-    let query = Query {
-        pattern, // `&String` derefs to the `&str` an exit is built from
-        named,
     };
     let regex = Regex::new(pattern).map_err(|e| {
         Fail::usage(format!(
@@ -121,8 +327,8 @@ pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
         }
     }
 
-    let mut counted: Vec<(String, usize)> = Vec::new();
-    let mut shown: Vec<(String, usize, String)> = Vec::new();
+    let mut counted: Vec<FileHits> = Vec::new();
+    let mut rows: Vec<Found> = Vec::new();
     let mut total = 0;
     let mut truncated_lines = 0;
     let mut secret_skipped = 0;
@@ -163,121 +369,40 @@ pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
             }
             hits += 1;
             total += 1;
-            if mode == Mode::Matches && shown.len() < opts.limit {
-                let (rendered, cut) = truncate(line);
-                if cut {
+            if mode == Mode::Matches && rows.len() < opts.limit {
+                if truncate(line).1 {
                     truncated_lines += 1;
                 }
-                shown.push((rel.clone(), index + 1, rendered));
+                rows.push(Found {
+                    path: rel.clone(),
+                    line: index + 1,
+                    text: line.to_string(),
+                });
             }
         }
         if hits > 0 {
-            counted.push((rel, hits));
+            counted.push(FileHits { path: rel, hits });
         }
     }
 
-    let mut report = Report::new();
-    if let Some(asked) = opts.limit_clamped_from {
-        report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
-    }
-    if let Some(asked) = opts.max_files_clamped_from {
-        report.bound(format!("--max-files {asked} clamped to {MAX_FILES}"));
-    }
-
-    let scope = match named.len() {
-        0 => ".".to_string(),
-        1 => named[0].clone(),
-        n => plural(n, "path"),
-    };
-    report.header(
-        TOOL,
-        "search",
-        opts.root.name(),
-        &format!("/{pattern}/ in {scope}"),
-    );
-
-    // The rows, unless the frame was asked for. `--summary` is the coarse answer again: how many
-    // matches, where they are not, and where the walk stopped.
-    let listed = if opts.summary {
-        match mode {
-            Mode::Matches => total,
-            Mode::Count | Mode::FilesOnly => counted.len(),
-        }
-    } else {
-        match mode {
-            Mode::Matches => {
-                for (rel, line, text) in &shown {
-                    report.content(format!("{rel}:{line}:{text}"));
-                }
-                shown.len()
-            }
-            Mode::Count => {
-                // Both columns are padded, so a column of counts can be compared by eye. The
-                // widths come from the rows actually listed, so a limit does not leave a gap on
-                // every line.
-                let rows = &counted[..counted.len().min(opts.limit)];
-                let paths = rows.iter().map(|(rel, _)| rel.len()).max().unwrap_or(0);
-                let hits = rows
-                    .iter()
-                    .map(|(_, hits)| hits.to_string().len())
-                    .max()
-                    .unwrap_or(1);
-                for (rel, count) in rows {
-                    report.content(format!("{rel:<paths$}  {count:>hits$}"));
-                }
-                rows.len()
-            }
-            Mode::FilesOnly => {
-                for (rel, _) in counted.iter().take(opts.limit) {
-                    report.content(rel.clone());
-                }
-                counted.len().min(opts.limit)
-            }
-        }
-    };
-
-    report.bound(walk_bound(&walk));
-    if let Some(skipped) = skip_bound(
-        secret_skipped,
+    Ok(SearchFacts {
+        pattern: pattern.clone(),
+        named: named.to_vec(),
+        mode,
+        rows,
+        counted,
+        total,
+        walk: walk.facts(),
         binary,
         not_utf8,
-        walk.symlinks,
-        walk.unreadable,
-    ) {
-        report.bound(skipped);
-    }
-    if walk.capped {
-        report.bound(format!(
-            "stopped after {} files considered (--max-files {})",
-            walk.considered, opts.max_files
-        ));
-    }
-    if truncated_lines > 0 {
-        report.bound(format!(
-            "caveat: {truncated_lines} line(s) wider than {MAX_LINE_WIDTH} characters, truncated"
-        ));
-    }
-    let found = Findings {
-        listed,
-        total,
-        counted: &counted,
-        walk: &walk,
-    };
-    let mut coverage = coverage(mode, &found, opts.limit);
-    if opts.summary && listed > 0 {
-        coverage.push_str(", not shown");
-    }
-    report.bound(coverage);
-    exits(&mut report, opts, mode, &query, &found);
-
-    // A summary found the matches it is counting without printing them, so the frame is the answer.
-    // With nothing found there is no frame to be the answer to, and the honest code is the ordinary
-    // "nothing to show".
-    Ok(if opts.summary && listed > 0 {
-        Outcome::from_frame(report)
-    } else {
-        Outcome::from_report(report)
+        secret_skipped,
+        truncated_lines,
     })
+}
+
+/// The CLI's entry point: collect, render, and answer with the exit the report implies.
+pub fn run(paths: &[String], opts: &Opts, mode: Mode) -> Result<Outcome, Fail> {
+    collect(paths, opts, mode).map(|facts| facts.outcome(opts))
 }
 
 /// The exits: the body a summary withheld, or a listing the limit cut, then a walk that stopped.
@@ -375,11 +500,13 @@ fn descend(dir: &Path, opts: &Opts, walk: &mut Walk) {
     }
 }
 
-fn walk_bound(walk: &Walk) -> String {
+fn walk_bound(walk: &WalkFacts) -> String {
     let mut text = format!("walked {}", plural(walk.considered, "file"));
     if !walk.skipped_dirs.is_empty() {
-        let names: Vec<&str> = walk.skipped_dirs.iter().copied().collect();
-        text.push_str(&format!(" · skipped by rule: {}", names.join(", ")));
+        text.push_str(&format!(
+            " · skipped by rule: {}",
+            walk.skipped_dirs.join(", ")
+        ));
     }
     text
 }

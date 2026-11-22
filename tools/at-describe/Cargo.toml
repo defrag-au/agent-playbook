@@ -10,6 +10,7 @@ license = "MIT"
 # else is linked.
 [dependencies]
 at-cardano = { workspace = true }
+at-continue-thread = { workspace = true }
 at-cost = { workspace = true }
 at-crate = { workspace = true }
 at-peek = { workspace = true }

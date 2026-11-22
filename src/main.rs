@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use playbook::findings;
 use playbook::frontmatter::split_list;
 use playbook::init;
 use playbook::install::{self, Outcome};
@@ -30,6 +31,7 @@ commands
   skills     deliver the skills a repository declares: `skills sync`, `skills check`
   root       print the rule tree being resolved against, and how it was found
   rules      list every shared rule, and the activation that reaches it
+  findings   every finding captured across repositories, and the decision on it
 
 options
   --name <name>      project name to write (init; default: the directory name)
@@ -44,6 +46,13 @@ options
   --prune            skills sync: remove a delivered skill no longer declared
   --root <dir>       playbook root (default: found from the working directory, then
                      beside the installed binary — `playbook root` says which)
+  --dir <dir>        findings: scan here (default: the working directory, or the
+                     repository enclosing it)
+  --class <name>     findings: only this class
+  --project <text>   findings: only projects whose name contains this text
+  --stale <days>     findings: open, and older than this many days
+  --all              findings: also list the decision log in `.playbook/FINDINGS.md`
+  --json             findings: emit JSON instead of the table
   -h, --help         this
 
 examples
@@ -56,6 +65,9 @@ examples
   playbook skills check --target claude-code   # what CI would run
   playbook skills sync --target all            # both harnesses at once
   playbook root
+  playbook findings                  # in a repository: its own findings
+  playbook findings --dir ~/code/defrag   # every repository below it
+  playbook findings --stale 30 --json
 ";
 
 #[derive(Default)]
@@ -67,6 +79,12 @@ struct Opts {
     file: Option<String>,
     out: Option<String>,
     root: Option<String>,
+    dir: Option<String>,
+    class: Option<String>,
+    project: Option<String>,
+    stale: Option<u32>,
+    all: bool,
+    json: bool,
     offline: bool,
     prune: bool,
 }
@@ -106,6 +124,7 @@ fn main() -> ExitCode {
         "init" => cmd_init(&opts),
         "root" => cmd_root(&opts),
         "rules" => cmd_rules(&opts),
+        "findings" => cmd_findings(&opts),
         other => Err(format!("unknown command `{other}`")),
     };
 
@@ -127,6 +146,10 @@ fn parse_opts(args: &[String]) -> Result<Opts, String> {
         "--file",
         "--out",
         "--root",
+        "--dir",
+        "--class",
+        "--project",
+        "--stale",
     ];
 
     let mut opts = Opts::default();
@@ -140,6 +163,16 @@ fn parse_opts(args: &[String]) -> Result<Opts, String> {
         }
         if key == "--prune" {
             opts.prune = true;
+            i += 1;
+            continue;
+        }
+        if key == "--all" {
+            opts.all = true;
+            i += 1;
+            continue;
+        }
+        if key == "--json" {
+            opts.json = true;
             i += 1;
             continue;
         }
@@ -158,6 +191,16 @@ fn parse_opts(args: &[String]) -> Result<Opts, String> {
             "--file" => opts.file = Some(value),
             "--out" => opts.out = Some(value),
             "--root" => opts.root = Some(value),
+            "--dir" => opts.dir = Some(value),
+            "--class" => opts.class = Some(value),
+            "--project" => opts.project = Some(value),
+            "--stale" => {
+                opts.stale = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("`--stale` needs a number of days, got {value:?}"))?,
+                );
+            }
             _ => unreachable!("checked against VALUE_OPTS"),
         }
         i += 2;
@@ -719,6 +762,74 @@ fn cmd_init(opts: &Opts) -> Result<ExitCode, String> {
 fn cmd_root(opts: &Opts) -> Result<ExitCode, String> {
     let (root, source) = root_of_with_source(opts)?;
     println!("{} · {}", root.display(), source.as_str());
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Every finding captured in the repositories under `--dir`, and the decision on it.
+///
+/// This command needs no playbook root: it reads only `.playbook/findings/`, which any
+/// repository can carry. That is deliberate — the loop has to work for a repository that has
+/// never adopted the composer, or it cannot be offered to anyone outside this workspace.
+fn cmd_findings(opts: &Opts) -> Result<ExitCode, String> {
+    let dir = match opts.dir.as_deref() {
+        Some(path) => expand_tilde(path),
+        None => std::env::current_dir()
+            .map_err(|error| format!("could not resolve the working directory: {error}"))?,
+    };
+    if !dir.is_dir() {
+        return Err(format!("{} is not a directory", dir.display()));
+    }
+
+    let scan = findings::scan(&dir);
+    let stale = match opts.stale {
+        Some(days) if days > 0 => Some(i64::from(days)),
+        _ => None,
+    };
+    let class = opts.class.as_deref();
+    let project = opts.project.as_deref().map(str::to_lowercase);
+    let today = findings::today();
+
+    let shown: Vec<&findings::Finding> = scan
+        .findings
+        .iter()
+        .filter(|finding| {
+            if let Some(class) = class {
+                if !finding.class.eq_ignore_ascii_case(class) {
+                    return false;
+                }
+            }
+            if let Some(project) = &project {
+                if !finding.project.to_lowercase().contains(project) {
+                    return false;
+                }
+            }
+            if let Some(days) = stale {
+                if findings::age_days(&finding.captured, today).is_none_or(|age| age < days) {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+
+    let report = findings::Report {
+        findings: shown,
+        decisions: &scan.decisions,
+        repos: scan.repos,
+        total: scan.findings.len(),
+        today,
+        show_decisions: opts.all,
+    };
+
+    if opts.json {
+        print!("{}", findings::to_json(&report));
+    } else {
+        for warning in &scan.warnings {
+            eprintln!("warning: {warning}");
+        }
+        findings::print(&report);
+    }
+
     Ok(ExitCode::SUCCESS)
 }
 

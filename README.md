@@ -101,6 +101,7 @@ tools/            the agent toolkit, plus the skill store
   at-reach/         a private fleet tree — root, hosts, probe
   at-cost/          what the machine is costing, by repository — repos, tree, pid
   at-cardano/       read-only Cardano chain enquiry through Koios
+  at-continue-thread/ a text-only continuation digest of a Zed agent thread
   at-describe/      the catalogue, which opens nothing
   browser-shot/     browser captures, scenarios and frame bursts
   tui-shot/         terminal captures and scenario runs in a PTY it owns
@@ -123,9 +124,27 @@ references/       crate cheat sheets and API notes
 models/           compose-time overlays: generic, claude-code, deepseek-flash, zed
                   (models/zed-personal writes the personal instructions file)
 templates/        scaffolds for new rules, skills, projects and overlays
-docs/             precedence model, rule format, skills delivery, migration inventory, inspection and browser tools
+integrations/     consumers of the playbook, outside the workspace; rig/ is the rig plugin
+docs/             precedence model, rule format, skills delivery, migration inventory, inspection and browser tools;
+                  docs/design/ holds design records: rig, the toolkit's typed core, and container flows
 dist/             generated output (gitignored)
 ```
+
+Design records live in [`docs/design/`](docs/design/). [`rig.md`](docs/design/rig.md) is what
+rig's kernel makes possible, what was verified against which commit, and the commitment to build
+against it. [`toolkit-core.md`](docs/design/toolkit-core.md) is the seam it stands on: the `at-*`
+verbs return typed facts, and the CLI and a harness render the same text from them.
+[`rig-eval.md`](docs/design/rig-eval.md) is the measurement plan, the runner, and the first result:
+scenarios drawn from real Zed threads, scored under two homes. [`harness-comparison.md`](docs/design/harness-comparison.md)
+is the four-way comparison — rig, opencode, Pi and Zed — with the fairness controls and what each
+harness can report. [`perpish-flows.md`](docs/design/perpish-flows.md) is the investigation into
+Perpish — Dr. Vape's conlang — as a trace and policy surface for rig, with every example rendered by
+the language's own crate and every unbuilt claim named.
+[`container-flows.md`](docs/design/container-flows.md) is the hands-off builder: why the agent gets a
+working tree rather than a VCS, the typed handoff it returns, and the experiment that decides
+whether DeltaDB replaces the patch. The plugin is in `integrations/rig` and the runner in
+`integrations/rig-eval`, both outside this workspace so the composer and `cargo test` stay
+dependency-light.
 
 `models/` holds **targets**, not just models. A target is whatever consumes rules — usually
 a model+harness pair. `claude-code/` declares `model: claude`, `harness: claude-code`;
@@ -155,6 +174,11 @@ playbook check --target claude-code
 # Every shared rule, and the activation that reaches it.
 playbook rules
 
+# Every finding captured across repositories, and the decision on it.
+playbook findings
+playbook findings --dir ~/code/defrag    # every repository below a directory
+playbook findings --stale 30             # open, and captured over a month ago
+
 # Deliver the skills this repository declares, into its harness's project directory.
 playbook skills sync  --target zed
 playbook skills check --target zed
@@ -168,6 +192,12 @@ byte. A manifest with `skills_scope: global` delivers into `~/.agents/skills` an
 catalogue in `fleet` keeps every harness current in one command. An edit you have not published
 is delivered from a gitignored `.playbook/skills.patch`, and every line it affects says
 `(patched)`. See [`docs/skills.md`](docs/skills.md).
+
+`playbook findings` is the read side of the loop in [`docs/findings.md`](docs/findings.md): it
+walks `.playbook/` below `--dir`, reads the open findings and the decision log in
+`.playbook/FINDINGS.md`, and prints what is open. It needs no manifest and no playbook root, so a
+repository that has never adopted the composer can carry findings. A record that does not parse is
+a warning, not a silent drop.
 
 A repository that has no manifest yet gets one with `playbook init`, which writes
 `.playbook/project.conf` and an empty `.playbook/rules/`:
@@ -220,25 +250,26 @@ could run on a machine before its devshell existed. It was replaced after it pro
    match". The exclusion feature never worked.
 
 Neither failed loudly, and neither was the kind of thing a script could be tested for
-cheaply. The Rust version has 106 tests, an exhaustive `match` on activation, and a rule that
-will not compile if a variant is unhandled. The dependency-free property survives — the
+cheaply. The Rust version has an extensive test suite, an exhaustive `match` on activation, and a
+rule that will not compile if a variant is unhandled. The dependency-free property survives — the
 crate has no dependencies at all, so it still builds with no network and no registry cache.
 
 ## The inspection toolkit
 
 The other half of this repository is not a rule. It is the thing that makes it possible to stop
-writing rules about shell pipelines: seven binaries, built from `tools/`, that give an agent the
+writing rules about shell pipelines: eight binaries, built from `tools/`, that give an agent the
 reads it needs without an approval per command and without a bound hidden in a pipe.
 
 | Binary | Reads | Verbs |
 | --- | --- | --- |
-| `at-peek` | working-tree files, and spawns nothing at all | `stat`, `slice`, `search` |
+| `at-peek` | working-tree files, and spawns nothing at all | `stat`, `slice`, `outline`, `search` |
 | `at-crate` | extracted crate source, `Cargo.lock`, and build-script output; spawns nothing | `where`, `installed`, `files`, `slice`, `search`, `out` |
 | `at-recall` | `.git` objects and refs, through one subprocess — `git`, read verbs only | `state`, `log`, `diff`, `pr` |
 | `at-reach` | a private fleet tree, and one read-only probe over `ssh` (or `sh` locally) | `root`, `hosts`, `probe` |
 | `at-cost` | the process table, attributed to repositories; spawns nothing | `repos`, `tree`, `pid` |
 | `at-cardano` | Koios over HTTPS, GET and query-POST only; the key is never printed | nouns and aspects: `tip`, `network`, `epoch`, `block`, `blocks`, `tx`, `utxo`, `address`, `account`, `asset`, `policy`, `pool`, `drep`, `proposal`, `script`, `datum`, `endpoints`, `query`, `run` |
-| `at-describe` | nothing; it prints the catalogue | the six verb tables |
+| `at-continue-thread` | Zed's `threads.db`, read-only; spawns nothing | `find`, `digest` |
+| `at-describe` | nothing; it prints the catalogue | the seven verb tables |
 
 `rg` becomes `at-peek search`, `sed -n '40,60p' f.rs` becomes `at-peek slice f.rs:40-60`,
 `grep -rn … ~/.cargo/registry/src` becomes `at-crate search <pattern> <crate>`, and `git status`
@@ -261,6 +292,8 @@ at-cardano pool delegators <pool>         # who delegates, and their stake
 at-cardano endpoints                      # every Koios path, and what answers it
 at-cardano query tx_info --post --body '{"_tx_hashes":["<hash>"]}'   # the long tail
 at-cardano run --scenario .tmp/block.dsl  # several questions, a value carried between them
+at-continue-thread find exoplanet          # which threads match a title fragment
+at-continue-thread digest <id-or-title>    # enough of one thread to continue it in a new one
 at-describe                             # the catalogue, one screen
 ```
 
@@ -280,7 +313,7 @@ intention:
   invocation that produced it and runs exactly as printed — an *address*, never a handle, so no
   state crosses invocations.
 
-The tier each binary sits in is the reason there are seven, because a prefix allowlist can only
+The tier each binary sits in is the reason there are eight, because a prefix allowlist can only
 see a difference that is in the binary. `at-describe` opens no file at all. `at-peek` reads files
 and runs nothing. `at-crate` reads the cargo home, `Cargo.lock` and `target/`, and runs nothing —
 in particular it never invokes `cargo`, so an uninstalled crate is an answer rather than a fetch.
@@ -291,7 +324,9 @@ probe over `ssh` or `sh`; it has no write, sudo or secret verb. Its contract is
 [`docs/fleet.md`](docs/fleet.md). `at-cost` reads the macOS process table and nothing else.
 `at-cardano` is the one member with a socket: HTTPS to a Koios host chosen only by `--network`, GET
 and query-POST only, redirects disabled, `/submittx` refused by name, and a key read from
-`~/.config/koios/api_key` that no output ever prints.
+`~/.config/koios/api_key` that no output ever prints. `at-continue-thread` opens Zed's thread store
+read-only and spawns nothing; its digest replaces image payloads with a one-line placeholder, so a
+thread that a provider refuses on body size can still be continued in a new one.
 
 `defrag-nix` installs them into every defrag devshell, so they are on `PATH` in an interactive
 shell in any of those repositories; a shell an agent spawned reaches for them as
@@ -406,17 +441,23 @@ is [`tools/travel-secrets/README.md`](tools/travel-secrets/README.md).
 `tools/zed-thread-tools/` is deliberately outside the `at-` namespace. `zed-thread-audit`
 reports size, message and tool-call counts, tool-output bytes and compaction state for Zed's
 agent thread store, and `--explain` attributes a thread's largest outputs to the tool, message
-and request argument without printing the result body; `zed-thread-recover` appends a
+and request argument without printing the result body; `zed-thread-export` writes decoded JSON
+for whole thread trees, newest first under a size budget, beside a typed manifest — the
+snapshot to hand to an external reader; `zed-thread-recover` appends a
 `Compaction(Summary)` message so a thread
 that has hit its context limit can continue; `zed-thread-tui` is the unified library over
 `sidebar_threads` and `threads.db`, driving archive, single-thread delete, bundle export/import
-and recovery from a selected row. The audit binary opens the store read-only and never prints
-message content; the writers refuse to run while Zed is open, and make a `VACUUM INTO` backup
-before changing either store. None of them is linked into `agent-tools`, so the `at-`
-allowlist keeps its promise.
+and recovery from a selected row. The audit and export binaries open the store read-only, and
+the audit never prints message content; the writers refuse to run while Zed is open, and make a
+`VACUUM INTO` backup before changing either store. None of them is linked into `agent-tools`,
+so the `at-` allowlist keeps its promise.
 
 ## Adding a rule
 
+0. **Capture the finding first.** If you are reacting to something that just happened, write it
+   into the repository you were working in as `.playbook/findings/<date>-<slug>.md` — shape and
+   classes in [`docs/findings.md`](docs/findings.md). A rule is written after a decision, not at
+   the moment of noticing.
 1. Copy [`templates/rule.md`](templates/rule.md) into the right layer directory.
 2. Fill the frontmatter and write the body. The `id` is the contract — other files
    reference it in `overrides:` and `emphasis:`.

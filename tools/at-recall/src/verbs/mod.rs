@@ -1,7 +1,8 @@
 //! The verbs.
 //!
-//! Each returns an [`Outcome`] — a report and the exit code it implies — from the shared contract
-//! in `at-core`, so `at-recall` answers in exactly the shape `at-peek` does and one set of reading
+//! Each has a `collect` that reads and returns typed facts, and a `run` that renders those facts
+//! into an [`Outcome`] — a report and the exit code it implies — from the shared contract in
+//! `at-core`, so `at-recall` answers in exactly the shape `at-peek` does and one set of reading
 //! habits covers both. The output contract is the same document in both tools, and it has to be:
 //! a bound stated one way here and another way there is not a contract.
 //!
@@ -14,10 +15,10 @@ pub mod log;
 pub mod pr;
 pub mod state;
 
-use at_core::contract::{truncate, Fail, Report, MAX_LINE_WIDTH};
+use at_core::contract::{truncate, Fail, Report, DEFAULT_LIMIT, MAX_LIMIT, MAX_LINE_WIDTH};
 use at_core::paths::Root;
 
-use crate::git::Git;
+use crate::git::{Git, Noun};
 
 // Re-exported under the names the verbs use, the way `at-peek` does it: the answer's shape is the
 // contract's, and a verb should not have to name `at_core` to return one.
@@ -51,6 +52,91 @@ pub struct Opts {
     pub base: Option<String>,
     /// The sections a recipe was asked to print. Empty means all of them.
     pub with: Vec<String>,
+}
+
+/// The flags a run is configured with, before the worktree is resolved.
+///
+/// One value rather than eight arguments: the CLI parses flags into it and a harness passes its
+/// typed ones, so the two front ends cannot disagree about a default or a clamp.
+#[derive(Debug, Clone, Default)]
+pub struct Config {
+    /// Content lines this invocation may print.
+    pub limit: Option<usize>,
+    /// Whether `--patch` may print content from a secret-shaped path.
+    pub include_secret_paths: bool,
+    /// Whether hunks were asked for as well as the per-file table.
+    pub patch: bool,
+    /// Whether the caller asked for the frame and not the rows.
+    pub summary: bool,
+    /// Whether a diff should ignore whitespace when comparing lines.
+    pub ignore_space: bool,
+    /// The revision a recipe should compare against.
+    pub base: Option<String>,
+    /// The sections a recipe was asked to print.
+    pub with: Vec<String>,
+}
+
+impl Opts {
+    /// Resolve the worktree and the one subprocess a run needs.
+    ///
+    /// The named root when there is one, else the worktree enclosing the working directory. Git is
+    /// asked where the top of the worktree is rather than trusting the guess: `--root` may name a
+    /// subdirectory, and every path git prints is relative to the top. This is also the check that
+    /// the tree is a worktree at all, so a repository-less directory fails with one clear sentence
+    /// instead of four of git's.
+    pub fn resolve(named_root: Option<&std::path::Path>, config: Config) -> Result<Opts, Fail> {
+        let guess = match named_root {
+            Some(path) => Root::at(path)?,
+            None => {
+                let cwd = std::env::current_dir().map_err(|e| {
+                    Fail::environment(format!("cannot read the working directory: {e}"))
+                })?;
+                Root::discover(&cwd)?
+            }
+        };
+
+        let probe = Git::at(guess.dir());
+        let toplevel = probe
+            .probe(Noun::RevParse, &["--show-toplevel"])
+            .ok_or_else(|| {
+                Fail::environment(format!(
+                    "{} is not a git worktree · at-recall reads history, at-peek reads the working tree",
+                    guess.dir().display()
+                ))
+            })?;
+        let root = Root::at(std::path::Path::new(toplevel.trim()))?;
+        let git = Git::at(root.dir());
+
+        let (limit, limit_clamped_from) = match config.limit {
+            Some(asked) => {
+                if asked == 0 {
+                    return Err(Fail::usage(
+                        "--limit 0 asks for no output · the smallest useful limit is 1",
+                    ));
+                }
+                if asked > MAX_LIMIT {
+                    (MAX_LIMIT, Some(asked))
+                } else {
+                    (asked, None)
+                }
+            }
+            None => (DEFAULT_LIMIT, None),
+        };
+
+        Ok(Opts {
+            root,
+            root_was_explicit: named_root.is_some(),
+            git,
+            limit,
+            limit_clamped_from,
+            include_secret_paths: config.include_secret_paths,
+            patch: config.patch,
+            summary: config.summary,
+            ignore_space: config.ignore_space,
+            base: config.base,
+            with: config.with,
+        })
+    }
 }
 
 /// What one verb may still print, and what it gave up to stay inside `--limit`.

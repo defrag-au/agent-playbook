@@ -1,0 +1,25 @@
+{
+  "name": "zed-thread-tools-not-at",
+  "why": "Zed analyser recovery thread, 2026-10-17: why the thread tools sit beside the at-* toolkit.",
+  "prompt": "A thread recovered from a Zed session that died on crate research. Why do the Zed thread tools sit beside the `at-*` toolkit rather than inside it, and what do the audit and `--explain` deliberately never print? Cite the inspection-tools record and the tool's README as `path:line`.",
+  "workdir": ".",
+  "gold": [
+    "docs/inspection-tools.md:875",
+    "docs/inspection-tools.md:876",
+    "docs/inspection-tools.md:877",
+    "tools/zed-thread-tools/README.md:31",
+    "tools/zed-thread-tools/README.md:43",
+    "tools/zed-thread-tools/README.md:75"
+  ],
+  "extra_paths": [],
+  "must_say": [
+    "private store",
+    "whole-grammar",
+    "message text",
+    "result body",
+    "request argument"
+  ],
+  "tool_says": [
+    "private store"
+  ]
+}

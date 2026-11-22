@@ -32,6 +32,8 @@ const SEPARATOR: char = '\u{1f}';
 // ---------------------------------------------------------------------------------------------
 
 /// One line of `--numstat`.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FileStat {
     /// `None` for a binary file: git prints `-` where a count would be, and a line count for a
     /// binary file is a number that means nothing.
@@ -152,6 +154,8 @@ pub fn totals(files: &[FileStat]) -> String {
 // What changed lately
 // ---------------------------------------------------------------------------------------------
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Commit {
     pub short: String,
     pub date: String,
@@ -161,6 +165,8 @@ pub struct Commit {
 
 /// Commits, and how many there are in total — read together, because a listing without its true
 /// total is the failure this toolkit exists to remove.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Commits {
     pub total: usize,
     pub rows: Vec<Commit>,

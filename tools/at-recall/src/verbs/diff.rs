@@ -13,6 +13,10 @@
 //! * A diff prints content, so `--patch` withholds the files the deny-list refuses and names them.
 //!   The table does not: a file's name and its line counts are metadata, and a reader who cannot
 //!   see that a file changed cannot ask about it.
+//!
+//! The answer is a [`DiffFacts`] value. [`collect`] reads it, including the hunks when they were
+//! asked for; [`DiffFacts::report`] renders the CLI's bytes. A harness calls `collect` and keeps the
+//! file stats rather than parsing the table.
 
 use std::collections::BTreeSet;
 
@@ -24,108 +28,161 @@ use crate::status::Status;
 use crate::verbs::{again, plural, split_rev_and_paths, Budget, Opts, Outcome};
 use crate::TOOL;
 
-pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
-    let mut report = Report::new();
-    if let Some(asked) = opts.limit_clamped_from {
-        report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
-    }
+/// The answer to a diff read, before it is a report.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DiffFacts {
+    /// The revision compared against, or `None` for the index on a branch with no commits.
+    pub rev: Option<String>,
+    /// The path filter the caller named, in the order given.
+    pub paths: Vec<String>,
+    /// One row per changed file, in git's path order.
+    pub files: Vec<FileStat>,
+    /// The same comparison without `--ignore-space`, when that flag was given.
+    pub hidden: Option<Vec<FileStat>>,
+    /// Secret-shaped names a patch would withhold.
+    pub withheld: Vec<String>,
+    /// Why an empty answer is empty: untracked or ignored paths the caller named.
+    pub empty_caveats: Vec<String>,
+    /// The hunks, when `--patch` was asked for and was not a summary.
+    pub hunks: Vec<String>,
+}
 
+pub fn collect(args: &[String], opts: &Opts) -> Result<DiffFacts, Fail> {
     let (rev, paths) = split_rev_and_paths(args, opts)?;
     let rev = default_revision(rev, opts);
     refuse_filtered(opts, &rev, &paths)?;
-    report.header(TOOL, "diff", opts.root.name(), &comparison(&rev));
 
     let files = facts::numstat(&opts.git, &rev, &paths, opts.ignore_space)?;
-    if files.is_empty() {
-        report.bound("no differences".to_string());
-        explain_empty(&mut report, opts, &paths)?;
-        return Ok(Outcome::from_report(report));
-    }
+    let empty_caveats = if files.is_empty() {
+        explain_empty(opts, &paths)?
+    } else {
+        Vec::new()
+    };
     // What the flag hid, when there is something to hide: the same comparison without it, so the
     // reader can see how much of the change is reindentation rather than reach for a second read.
-    let hidden = if opts.ignore_space {
+    let hidden = if opts.ignore_space && !files.is_empty() {
         Some(facts::numstat(&opts.git, &rev, &paths, false)?)
     } else {
         None
     };
-
-    let mut budget = Budget::new(opts.limit);
-    let width = files
-        .iter()
-        .map(|file| file.counts().len())
-        .max()
-        .unwrap_or(0);
-    if !opts.summary {
-        for file in &files {
-            budget.push(
-                &mut report,
-                format!("{:<width$}  {}", file.counts(), file.label),
-            );
-        }
-    }
-
-    let totals = totals(&files);
-    let total = files.len();
-    let shown = total - budget.dropped();
-    report.bound(if opts.summary {
-        format!("{}, {totals}, not shown", plural(total, "file"))
-    } else if shown == total {
-        format!("{}, {totals}", plural(total, "file"))
-    } else {
-        format!(
-            "{}, {totals} · {shown} shown · --limit {}",
-            plural(total, "file"),
-            opts.limit
-        )
-    });
-    if let Some(raw) = &hidden {
-        space_bound(&mut report, &files, raw);
-    }
+    let withheld = withheld(&files, opts);
 
     // `--summary` does not fetch the hunks it would only discard: the patch is the most expensive
     // thing this verb reads, and a survey of several questions is exactly where that would be paid
     // for nothing.
-    let withheld = withheld(&files, opts);
-    if !withheld.is_empty() {
-        report.bound(format!(
-            "{} withheld from the hunks: {}",
-            plural(withheld.len(), "secret-shaped path"),
-            withheld.join(", ")
-        ));
-    }
-    if opts.patch && !opts.summary {
-        patch(&mut report, &mut budget, opts, &rev, &paths, &withheld)?;
-    }
-
-    let emitted = report.content_lines();
-    let dropped = budget.dropped();
-    if dropped > 0 {
-        report.bound(format!(
-            "{emitted} of {} lines · --limit {} reached",
-            emitted + dropped,
-            opts.limit
-        ));
-    }
-    budget.width_caveat(&mut report);
-    exits(
-        &mut report,
-        opts,
-        &rev,
-        &paths,
-        &withheld,
-        Counts {
-            rows: files.len(),
-            emitted,
-            dropped,
-        },
-    );
-
-    // A summary found the files it is describing without printing them; the frame is the answer.
-    Ok(if opts.summary {
-        Outcome::from_frame(report)
+    let hunks = if opts.patch && !opts.summary && !files.is_empty() {
+        patch(opts, &rev, &paths, &withheld)?
     } else {
-        Outcome::from_report(report)
+        Vec::new()
+    };
+
+    Ok(DiffFacts {
+        rev,
+        paths,
+        files,
+        hidden,
+        withheld,
+        empty_caveats,
+        hunks,
     })
+}
+
+impl DiffFacts {
+    /// Render the CLI's answer.
+    pub fn report(&self, opts: &Opts) -> Outcome {
+        let mut report = Report::new();
+        if let Some(asked) = opts.limit_clamped_from {
+            report.bound(format!("--limit {asked} clamped to {MAX_LIMIT}"));
+        }
+
+        report.header(TOOL, "diff", opts.root.name(), &comparison(&self.rev));
+
+        if self.files.is_empty() {
+            report.bound("no differences".to_string());
+            for caveat in &self.empty_caveats {
+                report.bound(caveat.clone());
+            }
+            return Outcome::from_report(report);
+        }
+
+        let mut budget = Budget::new(opts.limit);
+        let width = self
+            .files
+            .iter()
+            .map(|file| file.counts().len())
+            .max()
+            .unwrap_or(0);
+        if !opts.summary {
+            for file in &self.files {
+                budget.push(
+                    &mut report,
+                    format!("{:<width$}  {}", file.counts(), file.label),
+                );
+            }
+        }
+
+        let totals = totals(&self.files);
+        let total = self.files.len();
+        let shown = total - budget.dropped();
+        report.bound(if opts.summary {
+            format!("{}, {totals}, not shown", plural(total, "file"))
+        } else if shown == total {
+            format!("{}, {totals}", plural(total, "file"))
+        } else {
+            format!(
+                "{}, {totals} · {shown} shown · --limit {}",
+                plural(total, "file"),
+                opts.limit
+            )
+        });
+        if let Some(raw) = &self.hidden {
+            space_bound(&mut report, &self.files, raw);
+        }
+
+        if !self.withheld.is_empty() {
+            report.bound(format!(
+                "{} withheld from the hunks: {}",
+                plural(self.withheld.len(), "secret-shaped path"),
+                self.withheld.join(", ")
+            ));
+        }
+        if opts.patch && !opts.summary {
+            for line in &self.hunks {
+                budget.push(&mut report, line.clone());
+            }
+        }
+
+        let emitted = report.content_lines();
+        let dropped = budget.dropped();
+        if dropped > 0 {
+            report.bound(format!(
+                "{emitted} of {} lines · --limit {} reached",
+                emitted + dropped,
+                opts.limit
+            ));
+        }
+        budget.width_caveat(&mut report);
+        exits(
+            &mut report,
+            opts,
+            &self.rev,
+            &self.paths,
+            &self.withheld,
+            Counts {
+                rows: self.files.len(),
+                emitted,
+                dropped,
+            },
+        );
+
+        // A summary found the files it is describing without printing them; the frame is the answer.
+        if opts.summary {
+            Outcome::from_frame(report)
+        } else {
+            Outcome::from_report(report)
+        }
+    }
 }
 
 /// What the answer counted, in the three terms an exit needs them.
@@ -350,13 +407,11 @@ fn index_paths(opts: &Opts, rev: &Option<String>, paths: &[String]) -> Result<Ve
 /// hunk belongs to, so a file named with a space or a quote cannot make the two disagree. The names
 /// come from git's own listing, which is what makes them safe to pass back as pathspecs.
 fn patch(
-    report: &mut Report,
-    budget: &mut Budget,
     opts: &Opts,
     rev: &Option<String>,
     paths: &[String],
     withheld: &[String],
-) -> Result<(), Fail> {
+) -> Result<Vec<String>, Fail> {
     let mut pathspecs = paths.to_vec();
     for name in withheld {
         pathspecs.push(format!(":(exclude,literal){name}"));
@@ -364,10 +419,7 @@ fn patch(
 
     let args = facts::diff_args(rev, &pathspecs, &["--patch"], opts.ignore_space);
     let hunks = opts.git.run(Noun::Diff, &borrowed(&args))?;
-    for line in hunks.lines() {
-        budget.push(report, line);
-    }
-    Ok(())
+    Ok(hunks.lines().map(str::to_string).collect())
 }
 
 /// What a comparison with no revision given is against.
@@ -396,7 +448,8 @@ fn comparison(rev: &Option<String>) -> String {
 
 /// `git diff` reports nothing for a path it does not track, and nothing reads as "unchanged". Say
 /// which of the three this is, and fail on a path that is not there at all.
-fn explain_empty(report: &mut Report, opts: &Opts, paths: &[String]) -> Result<(), Fail> {
+fn explain_empty(opts: &Opts, paths: &[String]) -> Result<Vec<String>, Fail> {
+    let mut caveats = Vec::new();
     for path in paths {
         // A pattern that matches nothing is indistinguishable from a path that changed nothing, so
         // the check is limited to the plain names it can actually answer for.
@@ -420,11 +473,11 @@ fn explain_empty(report: &mut Report, opts: &Opts, paths: &[String]) -> Result<(
         // Both of these are paths git knows about and a diff between commits still cannot show,
         // which is the reading a bare "no differences" invites.
         if probe.split('\0').any(|record| record.starts_with("? ")) {
-            report.bound(format!(
+            caveats.push(format!(
                 "caveat: {path} is untracked, and a diff between commits cannot show it"
             ));
         } else if probe.split('\0').any(|record| record.starts_with("! ")) {
-            report.bound(format!(
+            caveats.push(format!(
                 "caveat: {path} is ignored by this repository, so no diff shows it"
             ));
         } else if std::fs::metadata(opts.root.dir().join(path)).is_err() {
@@ -434,7 +487,7 @@ fn explain_empty(report: &mut Report, opts: &Opts, paths: &[String]) -> Result<(
             )));
         }
     }
-    Ok(())
+    Ok(caveats)
 }
 
 /// Whether a path is one the deny-list refuses. Both the name and the whole path are checked: the
@@ -443,6 +496,10 @@ fn explain_empty(report: &mut Report, opts: &Opts, paths: &[String]) -> Result<(
 fn secret_shaped_path(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     secret_shaped(name).is_some() || secret_shaped(path).is_some()
+}
+
+pub fn run(args: &[String], opts: &Opts) -> Result<Outcome, Fail> {
+    collect(args, opts).map(|facts| facts.report(opts))
 }
 
 #[cfg(test)]

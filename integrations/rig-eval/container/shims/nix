@@ -1,0 +1,22 @@
+#!/bin/sh
+# `nix develop -c <cmd>` in the eval image: the image is the devshell.
+#
+# The rules put every cargo invocation behind `nix develop -c`, and the sandboxed-shell note offers
+# `direnv exec` as the alternative. Both have to work for the comparison to measure the harness
+# rather than the absence of a daemon. Anything else is refused rather than pretended.
+if [ "$1" = "develop" ]; then
+	shift
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-c | --command)
+			shift
+			exec "$@"
+			;;
+		*) shift ;;
+		esac
+	done
+	echo "nix: only \`nix develop -c <cmd>\` is available in the eval image" >&2
+	exit 1
+fi
+echo "nix: not available in the eval image; the toolchain is on PATH" >&2
+exit 1

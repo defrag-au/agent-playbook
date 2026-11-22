@@ -1,0 +1,5 @@
+# at-peek search · <root> · /alpha/ in .
+docs/readme.md:1:alpha beta
+# walked 3 files · skipped by rule: .git
+# 1 of 3 matches in 3 files · --limit 1
+# next: at-peek search alpha --limit 3 --root <root> · all 3 matches

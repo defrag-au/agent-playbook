@@ -18,12 +18,10 @@
 
 use std::path::Path;
 
-use at_core::contract::{Exit, Fail, DEFAULT_LIMIT, MAX_LIMIT};
-use at_core::paths::Root;
+use at_core::contract::{Exit, Fail};
 
 use crate::catalogue::{self, Verb};
-use crate::git::{Git, Noun};
-use crate::verbs::{self, Opts};
+use crate::verbs::{self, Config, Opts};
 
 pub fn run(args: &[String]) -> i32 {
     match dispatch(args) {
@@ -207,50 +205,14 @@ fn parse(verb: &'static Verb, args: &[String]) -> Result<Parsed, Fail> {
 
 /// The root and the one subprocess, resolved once per invocation.
 fn context(parsed: &Parsed) -> Result<Opts, Fail> {
-    let named_root = parsed.value("--root").map(str::to_string);
-    let guess = match &named_root {
-        Some(path) => Root::at(Path::new(path))?,
-        None => {
-            let cwd = std::env::current_dir().map_err(|e| {
-                Fail::environment(format!("cannot read the working directory: {e}"))
-            })?;
-            Root::discover(&cwd)?
-        }
-    };
-
-    // Ask git where the top of the worktree is rather than trusting the guess: `--root` may name a
-    // subdirectory, and every path git prints is relative to the top. This is also the check that
-    // the tree is a worktree at all, so a repository-less directory fails with one clear sentence
-    // instead of four of git's.
-    let probe = Git::at(guess.dir());
-    let toplevel = probe
-        .probe(Noun::RevParse, &["--show-toplevel"])
-        .ok_or_else(|| {
-            Fail::environment(format!(
-                "{} is not a git worktree · at-recall reads history, at-peek reads the working tree",
-                guess.dir().display()
-            ))
-        })?;
-    let root = Root::at(Path::new(toplevel.trim()))?;
-    let git = Git::at(root.dir());
-
-    let (limit, limit_clamped_from) = match parsed.value("--limit") {
-        Some(raw) => {
-            let asked = raw
-                .parse::<usize>()
-                .map_err(|_| Fail::usage(format!("--limit {raw} is not a number")))?;
-            if asked == 0 {
-                return Err(Fail::usage(
-                    "--limit 0 asks for no output · the smallest useful limit is 1",
-                ));
-            }
-            if asked > MAX_LIMIT {
-                (MAX_LIMIT, Some(asked))
-            } else {
-                (asked, None)
-            }
-        }
-        None => (DEFAULT_LIMIT, None),
+    // `--limit` is parsed here rather than in the constructor so a non-number is a usage error
+    // naming the flag, not a silent fallback to the default.
+    let limit = match parsed.value("--limit") {
+        Some(raw) => Some(
+            raw.parse::<usize>()
+                .map_err(|_| Fail::usage(format!("--limit {raw} is not a number")))?,
+        ),
+        None => None,
     };
 
     // `--with` is a comma-separated list of section names. The set is the verb's — it validates,
@@ -264,17 +226,16 @@ fn context(parsed: &Parsed) -> Result<Opts, Fail> {
         None => Vec::new(),
     };
 
-    Ok(Opts {
-        root,
-        root_was_explicit: named_root.is_some(),
-        git,
-        limit,
-        limit_clamped_from,
-        include_secret_paths: parsed.has("--include-secret-paths"),
-        patch: parsed.has("--patch"),
-        summary: parsed.has("--summary"),
-        ignore_space: parsed.has("--ignore-space"),
-        base: parsed.value("--base").map(str::to_string),
-        with,
-    })
+    Opts::resolve(
+        parsed.value("--root").map(Path::new),
+        Config {
+            limit,
+            include_secret_paths: parsed.has("--include-secret-paths"),
+            patch: parsed.has("--patch"),
+            summary: parsed.has("--summary"),
+            ignore_space: parsed.has("--ignore-space"),
+            base: parsed.value("--base").map(str::to_string),
+            with,
+        },
+    )
 }

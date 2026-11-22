@@ -1,13 +1,19 @@
 //! The verbs.
 //!
-//! Each returns an [`Outcome`] — a report and the exit code it implies — so that "nothing
-//! found" is a fact the caller can branch on rather than an empty success, and so a verb cannot
-//! print content and then exit as though it had found none. Both live in the contract in
-//! `at-core`, because `at-recall` answers in the same shape and the two must not drift. Any
-//! target that fails fails the whole invocation: a partial result that looks complete is the
+//! Each has a `collect` that reads and returns typed facts, and a `run` that renders those facts
+//! into an [`Outcome`] — a report and the exit code it implies — from the shared contract in
+//! `at-core`, so `at-peek` answers in exactly the shape `at-recall` does and one set of reading
+//! habits covers both. The output contract is the same document in both tools, and it has to be:
+//! a bound stated one way here and another way there is not a contract.
+//!
+//! A harness calls `collect` and keeps the facts; the CLI calls `run`, which is `collect` plus
+//! `report`. The rendered text is the CLI's own bytes either way.
+//!
+//! Any target that fails fails the whole invocation: a partial result that looks complete is the
 //! failure this toolkit exists to remove, and it is cheaper to re-run without the bad target
 //! than to notice that one line of a batch was missing.
 
+pub mod outline;
 pub mod search;
 pub mod slice;
 pub mod stat;
@@ -16,7 +22,9 @@ use std::fs;
 use std::path::Path;
 use std::time::SystemTime;
 
-use crate::contract::{secret_shaped, Fail};
+use crate::contract::{
+    secret_shaped, Fail, DEFAULT_LIMIT, DEFAULT_MAX_FILES, MAX_FILES, MAX_LIMIT,
+};
 use crate::paths::{self, Root, Target};
 
 pub use crate::contract::{plural, Outcome};
@@ -38,6 +46,63 @@ pub struct Opts {
     /// coarser form that is itself a fact — a count, a total — offer it, so the flag table says
     /// which those are rather than a mode printing nothing.
     pub summary: bool,
+}
+
+impl Opts {
+    /// Build the options a verb runs with, applying the same clamps whichever front asked.
+    ///
+    /// The CLI parses flags into these arguments and a harness passes its typed ones. One
+    /// constructor means `--limit` cannot mean two things: a value past the ceiling is clamped and
+    /// the clamp is announced, and zero is refused rather than quietly producing no output.
+    pub fn resolve(
+        root: Root,
+        root_was_explicit: bool,
+        limit: Option<usize>,
+        max_files: Option<usize>,
+        include_secret_paths: bool,
+        summary: bool,
+    ) -> Result<Opts, Fail> {
+        let (limit, limit_clamped_from) = match limit {
+            Some(asked) => {
+                if asked == 0 {
+                    return Err(Fail::usage(
+                        "--limit 0 asks for no output · the smallest useful limit is 1",
+                    ));
+                }
+                if asked > MAX_LIMIT {
+                    (MAX_LIMIT, Some(asked))
+                } else {
+                    (asked, None)
+                }
+            }
+            None => (DEFAULT_LIMIT, None),
+        };
+
+        let (max_files, max_files_clamped_from) = match max_files {
+            Some(asked) => {
+                if asked == 0 {
+                    return Err(Fail::usage("--max-files 0 considers no files"));
+                }
+                if asked > MAX_FILES {
+                    (MAX_FILES, Some(asked))
+                } else {
+                    (asked, None)
+                }
+            }
+            None => (DEFAULT_MAX_FILES, None),
+        };
+
+        Ok(Opts {
+            root,
+            root_was_explicit,
+            limit,
+            limit_clamped_from,
+            max_files,
+            max_files_clamped_from,
+            include_secret_paths,
+            summary,
+        })
+    }
 }
 
 /// The verbs' spelling of [`at_core::contract::again`]: the targets the caller gave, in the order

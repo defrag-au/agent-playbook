@@ -116,6 +116,8 @@
             "at-cardano"
             "-p"
             "at-describe"
+            "-p"
+            "at-continue-thread"
           ];
           # `cargo install` takes one package per invocation and the workspace root is the
           # composer, so the default install phase would install `playbook` and neither
@@ -125,7 +127,7 @@
           installPhase = ''
             runHook preInstall
             mkdir -p $out/bin
-            for tool in at-peek at-crate at-recall at-reach at-cost at-cardano at-describe; do
+            for tool in at-peek at-crate at-recall at-reach at-cost at-cardano at-describe at-continue-thread; do
               install -m755 \
                 "$(find target -maxdepth 3 -type f -name "$tool" -perm -u+x | head -n1)" \
                 "$out/bin/$tool"
@@ -415,6 +417,16 @@
               # checking an export are this repository's own workflow, and should not need a
               # `cargo run` wrapper. Wrapped with git, so a `github:` source resolves.
               (skillStoreFor pkgs)
+              # Reading a rig session: the effect log is JSONL, and DuckDB is the first reader.
+              # `skills/rig-session-query` is the procedure; this is the tool it runs.
+              pkgs.duckdb
+              # Node 22.19+ is what the Pi coding agent requires, and Pi is one arm of the
+              # harness comparison in `docs/design/harness-comparison.md`. It is a shell tool,
+              # not a repository package: `pi` itself is installed from npm into `.tmp/pi`.
+              pkgs.nodejs_22
+              # The benchmark site is an assets-only worker built with Observable Framework —
+              # see `docs/design/benchmark-site.md`. Node builds it; wrangler deploys it.
+              pkgs.wrangler
             ];
           };
         }

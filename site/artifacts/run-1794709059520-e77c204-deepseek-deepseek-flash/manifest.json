@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "runner": {
+    "name": "rig-eval",
+    "version": "0.1.0"
+  },
+  "started_ms": 1794709059520,
+  "finished_ms": 1794710384904,
+  "model": "deepseek/deepseek-flash",
+  "env_names": [
+    "DEEPSEEK_API_KEY"
+  ],
+  "isolation": "container",
+  "container": {
+    "image": "playbook-eval/rig-eval:local",
+    "digest": "sha256:823e47f93f048c78f4ac8da9ea4a8221d1d3edb5f8feaf7adb801cc2978c2979",
+    "cpus": 6,
+    "memory": "16G",
+    "head": "c0bcfecbd40fdbf2587c045515a2bb3944f9137c",
+    "homes": {
+      "baseline": "68d6c89fabf4828a6c9206d5ab07e976b8b42f50",
+      "gated": "11c6797220a0f926a437d846a63d0c93d0a6c584"
+    }
+  },
+  "corpus": {
+    "directory": "integrations/rig-eval/scenarios",
+    "fingerprint": "e77c204b536b87bc75367da1c9ed1da7dcd6c007",
+    "files": [
+      {
+        "name": "advertising-over-gating.json",
+        "bytes": 825,
+        "blob": "3c4a139205391ec05b36b2e0adc3d45825dfdb29"
+      },
+      {
+        "name": "devshell-tests.json",
+        "bytes": 573,
+        "blob": "55d81262e390ec633f20b0d386643969a405cacd"
+      },
+      {
+        "name": "draft-pr.json",
+        "bytes": 552,
+        "blob": "813520ec51d2b572c965c5edcc52c7f739080564"
+      },
+      {
+        "name": "eval-contamination.json",
+        "bytes": 996,
+        "blob": "1ced5a5fbe7d54bb272a0251f7a78fa4475820f5"
+      },
+      {
+        "name": "facts-without-subprocess.json",
+        "bytes": 927,
+        "blob": "f2b85d966b67d02bbffa9f6272e8f49acf8d1e6c"
+      },
+      {
+        "name": "otel-or-duckdb.json",
+        "bytes": 773,
+        "blob": "24bf769911a12872b9849b5e0bafdb0901923f07"
+      },
+      {
+        "name": "pre-edit-state.json",
+        "bytes": 286,
+        "blob": "c6ac5641d5ffe66d461d1f692c83a0161183ba78"
+      },
+      {
+        "name": "recover-investigation.json",
+        "bytes": 586,
+        "blob": "0b8655f7babadf4770adb914dcd35a40051b3da3"
+      },
+      {
+        "name": "redirect-declines.json",
+        "bytes": 1027,
+        "blob": "65d97f0c7fcd7d7ec5b5f3ad479b7bb06d004173"
+      },
+      {
+        "name": "rig-vs-factotum.json",
+        "bytes": 759,
+        "blob": "522c5c4cc655429c34cb940c93bf9e7f2ec2b243"
+      },
+      {
+        "name": "the-skipped-rule.json",
+        "bytes": 1047,
+        "blob": "786f0f662d2aa3dd783d19d123aa0164fea00763"
+      },
+      {
+        "name": "trace-redirect.json",
+        "bytes": 761,
+        "blob": "fedf44c380566c8b34b0fc464303dc621b811a27"
+      },
+      {
+        "name": "zed-thread-tools-not-at.json",
+        "bytes": 901,
+        "blob": "7f707a0067fda36b6ea465c47845b04f52da5b62"
+      }
+    ]
+  },
+  "checkout": {
+    "head": "c0bcfecbd40fdbf2587c045515a2bb3944f9137c",
+    "branch": "damon-mcp",
+    "dirty": false
+  },
+  "snapshot": {
+    "commit": "e03754666674fd521d09379f1a05428b8ec91dfe",
+    "unadvertised": "506dccb632398b09db4573696bfd33c7c4934913"
+  },
+  "targets": [
+    {
+      "label": "rig:gated",
+      "kind": "rig",
+      "toolkit": "documented",
+      "location": ".tmp/rig-home",
+      "config": "11c6797220a0f926a437d846a63d0c93d0a6c584"
+    },
+    {
+      "label": "rig:baseline",
+      "kind": "rig",
+      "toolkit": "documented",
+      "location": ".tmp/rig-home-baseline",
+      "config": "68d6c89fabf4828a6c9206d5ab07e976b8b42f50"
+    },
+    {
+      "label": "opencode:documented",
+      "kind": "opencode",
+      "toolkit": "documented",
+      "location": ".tmp/opencode/opencode.json",
+      "config": "f9855cc2b909ad9125d8811e815554b549dabb53"
+    },
+    {
+      "label": "pi:documented",
+      "kind": "pi",
+      "toolkit": "documented",
+      "location": ".tmp/pi/bin/pi",
+      "config": null
+    }
+  ],
+  "jobs": 2,
+  "repeat": 2,
+  "totals": {
+    "runs": 104,
+    "cost_usd": 0.5988784379999998,
+    "input_tokens": 13754598,
+    "cached_input_tokens": 12145536,
+    "output_tokens": 290907,
+    "model_calls": 830,
+    "tool_calls": 1241,
+    "passed": 656,
+    "checks": 728
+  }
+}

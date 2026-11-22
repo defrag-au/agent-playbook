@@ -2,6 +2,7 @@
 members = [
     "tools/at-core",
     "tools/at-cardano",
+    "tools/at-continue-thread",
     "tools/at-cost",
     "tools/at-crate",
     "tools/at-describe",
@@ -10,6 +11,7 @@ members = [
     "tools/at-reach",
     "tools/android-shot",
     "tools/browser-shot",
+    "tools/command-classify",
     "tools/fleet-sync",
     "tools/image-shot",
     "tools/skill-store",
@@ -26,11 +28,13 @@ resolver = "2"
 # Sibling crates. Declaring the path once means a rename or a move is one line here, not five.
 at-core = { path = "tools/at-core" }
 at-cardano = { path = "tools/at-cardano" }
+at-continue-thread = { path = "tools/at-continue-thread" }
 at-cost = { path = "tools/at-cost" }
 at-crate = { path = "tools/at-crate" }
 at-peek = { path = "tools/at-peek" }
 at-reach = { path = "tools/at-reach" }
 at-recall = { path = "tools/at-recall" }
+zed-thread-tools = { path = "tools/zed-thread-tools" }
 
 # Dependencies with more than one consumer. A dependency with a single consumer stays in that
 # crate's manifest: `browser-shot` is meant to move to `agent-toolbox` as a self-contained crate,

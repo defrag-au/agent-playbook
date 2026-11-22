@@ -7,6 +7,11 @@ license = "MIT"
 
 # One dependency, and it is the shared contract — no `regex`, and none of the working-tree verbs
 # `at-peek` carries. This is the binary that spawns `git`, so what it links should be readable in
-# a sitting.
+# a sitting. `serde` is optional and off for the CLI: it exists so a harness can publish the typed
+# answer instead of parsing the rendered report.
+[features]
+serde = ["dep:serde"]
+
 [dependencies]
 at-core = { workspace = true }
+serde = { workspace = true, optional = true }

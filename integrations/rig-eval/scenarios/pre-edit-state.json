@@ -1,0 +1,7 @@
+{
+  "name": "pre-edit-state",
+  "why": "The status read that precedes every edit.",
+  "prompt": "What is uncommitted in this working tree right now? Name the current branch and list every changed path, marking which are under `integrations/rig`.",
+  "workdir": ".",
+  "git": "status"
+}
