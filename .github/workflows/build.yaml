@@ -4,12 +4,13 @@ name: Build
 # and the `*-shot` tools from this repository and wires them into every repository's
 # devshell, so a package that stops building breaks every shell in the org.
 #
-# A cargo build does not reproduce the derivation. nixpkgs' cargo setup hook exports
-# `ZSTD_SYS_USE_PKG_CONFIG` (and the sqlite/git2 equivalents), so a crate that bundles
-# its own C zstd under plain cargo links against the system one here instead — and a
-# derivation without `pkg-config` and `zstd` fails on the build script. That is the
-# class of failure this job exists to find: it is invisible to `cargo test` and first
-# surfaced in whichever devshell next evaluated.
+# The environment matters more than the source. `defrag-nix` pins its own nixpkgs, and
+# this repository pins another; nixpkgs' Rust hook is not the same in both. In the
+# consumer pin it enables `cargoUseSystemLibs`, which exports
+# `ZSTD_SYS_USE_PKG_CONFIG` for `zstd-sys`, so a crate that bundles its C zstd under
+# plain cargo instead needs `pkg-config` and `zstd` in the derivation. Building `.#`
+# here exercises only this repository's pin and does not see that. The consumer build
+# below is therefore the gate that matters.
 on:
   push:
     branches: [main]
@@ -45,16 +46,20 @@ jobs:
             # settings compete and turns the build log into interleaved noise.
             max-jobs = 1
 
-      # The zstd-dependent pair first: `agent-tools` is the package every consumer
-      # devshell takes, and a regression there is the one that breaks the org. With no
-      # `--keep-going` the failing package is the answer, rather than one item in a
-      # list that still spends runner time on the other eight.
-      - name: Build the toolkit
-        run: nix build --no-link --print-build-logs .#agent-tools .#zed-thread-tools
+      # The consumer build, and the reason this workflow exists. `defrag-nix` evaluates
+      # `agent-playbook.packages` with its own nixpkgs and its own Rust hook; override
+      # the input so it builds this checkout, exactly as a devshell does. With no
+      # `--keep-going`, the failing package is the answer, and the other packages are
+      # never started.
+      - name: Build the consumer toolkit
+        run: |
+          nix build --no-link --print-build-logs \
+            --override-input agent-playbook "path:$GITHUB_WORKSPACE" \
+            "github:defrag-au/defrag-nix#agent-tools"
 
-      # Only reached when the toolkit builds. The remaining packages are still the
-      # contract — `defrag-nix` takes most of them — but they should not compete with
-      # the pair that just failed.
+      # Under this repository's own pin, which is what `nix build .#…` and the tests
+      # use. `agent-tools` is absent here because the consumer build above already
+      # built it, under the stricter nixpkgs.
       - name: Build the remaining packages
         run: |
           nix build --no-link --print-build-logs \
@@ -65,7 +70,8 @@ jobs:
             .#image-shot \
             .#fleet-sync \
             .#travel-secrets \
-            .#skill-store
+            .#skill-store \
+            .#zed-thread-tools
 
       # `flake.nix` says `nix flake check` runs the suite rather than only evaluating
       # the outputs. Run it here so that claim is a gate instead of a note. The suite
