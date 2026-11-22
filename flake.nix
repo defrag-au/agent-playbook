@@ -93,14 +93,22 @@
       # in a way that reads like a permissions problem. A store path also cannot be
       # re-pointed by editing this repository — which matters, because the whole point of
       # these binaries is to be allowlisted once and trusted thereafter.
+
+      # `at-continue-thread` pulls in `zed-thread-tools`, which pulls in `zstd`. nixpkgs'
+      # cargo setup hook exports `ZSTD_SYS_USE_PKG_CONFIG`, which makes `zstd-sys` link
+      # the system library instead of bundling its own, so this derivation needs both
+      # `pkg-config` and `zstd`. A plain cargo build does not set that variable, which is
+      # why the failure only appears in the derivation.
       toolkitFor =
-        rustPlatform:
-        rustPlatform.buildRustPackage {
+        pkgs:
+        (rustPlatformFor pkgs).buildRustPackage {
           pname = "agent-tools";
           # From the crate that names the toolkit, so the two cannot drift.
           version = (lib.importTOML ./tools/at-peek/Cargo.toml).package.version;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.zstd ];
           cargoBuildFlags = [
             "-p"
             "at-peek"
@@ -339,12 +347,15 @@
       # private store outside the worktree, and the recover binary writes to it. Neither belongs in
       # a namespace whose promise is that its entire grammar is safe to allowlist.
       zedThreadToolsFor =
-        rustPlatform:
-        rustPlatform.buildRustPackage {
+        pkgs:
+        (rustPlatformFor pkgs).buildRustPackage {
           pname = "zed-thread-tools";
           version = (lib.importTOML ./tools/zed-thread-tools/Cargo.toml).package.version;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          # Same zstd inputs as `toolkitFor`: this package depends on `zstd` directly.
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.zstd ];
           cargoBuildFlags = [
             "-p"
             "zed-thread-tools"
@@ -369,7 +380,7 @@
           pkgs = pkgsFor system;
           rustPlatform = rustPlatformFor pkgs;
           playbook = composerFor rustPlatform;
-          agent-tools = toolkitFor rustPlatform;
+          agent-tools = toolkitFor pkgs;
         in
         {
           inherit playbook agent-tools;
@@ -380,7 +391,7 @@
           fleet-sync = fleetSyncFor rustPlatform;
           travel-secrets = travelSecretsFor pkgs;
           skill-store = skillStoreFor pkgs;
-          zed-thread-tools = zedThreadToolsFor rustPlatform;
+          zed-thread-tools = zedThreadToolsFor pkgs;
           # What this repository is *for*; the toolkit is what it also ships.
           default = playbook;
         }
@@ -459,7 +470,11 @@
             nativeBuildInputs = [
               pkgs.git
               pkgs.gnupg
+              # `cargo build --workspace` compiles `zed-thread-tools`, so the same
+              # system-zstd inputs as `toolkitFor` are required here.
+              pkgs.pkg-config
             ];
+            buildInputs = [ pkgs.zstd ];
             buildPhase = "cargo build --workspace --offline";
             doCheck = true;
             checkPhase = "cargo test --workspace --offline";
